@@ -6117,6 +6117,10 @@ The migration set (`MigrationTables`) is, in payload-key order: `sessions`, `web
     "integrationDeliveryFailures": [],
     "statusUpdates": [],
     "automationRules": [],
+    "divisions": [],
+    "divisionAgents": [],
+    "divisionSettings": [],
+    "divisionChatStates": [],
     "inboxConversations": [],
     "inboxNotes": [],
     "crmDeals": [],
@@ -6142,6 +6146,10 @@ The migration set (`MigrationTables`) is, in payload-key order: `sessions`, `web
     "integrationDeliveryFailures": 0,
     "statusUpdates": 0,
     "automationRules": 0,
+    "divisions": 0,
+    "divisionAgents": 0,
+    "divisionSettings": 0,
+    "divisionChatStates": 0,
     "inboxConversations": 0,
     "inboxNotes": 0,
     "crmDeals": 0,
@@ -6157,7 +6165,7 @@ The migration set (`MigrationTables`) is, in payload-key order: `sessions`, `web
 
 Rows are raw DB column shapes (e.g. `messageBatches` rows use snake_case columns: `batch_id`, `session_id`, `current_index`, `created_at`, …). **`webhooks` rows omit `secret` and `headers`** (webhook credentials are excluded from backups; they restore as `null`/`{}`), while `pluginInstances` rows still carry integration secrets — treat the payload as a credential dump. **`sessions` rows have any `user:pass` stripped from `proxyUrl`** (a value that does not parse as a URL exports as `null`), so a restored authenticated proxy reads `hasCredentials: false` and fails on the session's next start until the credentials are re-entered with `PATCH /api/sessions/:sessionId/proxy`. On Postgres the generated `body_ts` FTS column is stripped from `messages` so archives stay dialect-neutral.
 
-`sessions`/`webhooks` are queried directly, so a hard DB error there yields `500`. The other 14 are queried tolerantly: a _genuinely missing_ table (an older DB that has not run the migration) exports as `[]` and its name is listed in `skippedTables`; any other error (lock, I/O, timeout) fails the export rather than reporting the table as empty. Check `skippedTables` before restoring — a skipped table is "not migrated yet", not "exported empty".
+`sessions`/`webhooks` are queried directly, so a hard DB error there yields `500`. The other 25 are queried tolerantly: a _genuinely missing_ table (an older DB that has not run the migration) exports as `[]` and its name is listed in `skippedTables`; any other error (lock, I/O, timeout) fails the export rather than reporting the table as empty. Check `skippedTables` before restoring — a skipped table is "not migrated yet", not "exported empty".
 
 `omittedInlineMedia` counts, per table, the inline media payloads the `EXPORT_INLINE_MEDIA_BUDGET_BYTES` budget dropped. Zeroes mean everything fitted; an archive with a non-zero count still restores, but those rows come back without their media.
 
@@ -6181,7 +6189,7 @@ Replace all Data DB rows with the supplied export. **Destructive and transaction
 | `tables.sessions`             | `SessionRow[]`      | No       | Inserted first; a row whose `id` or `name` is not a safe directory name refuses the whole restore before any engine is stopped or the transaction opens (`imported:false`, the row named in `warnings`; see the orphan-engine pre-flight below). An ACTIVE status in the backup (`ready`, `initializing`, ...) describes the source host's engines: restored as `disconnected` (a notice counts them), unless the session is held by a live peer whose claim the import preserves |
 | `tables.webhooks`             | `WebhookRow[]`      | No       | Export rows omit `secret`/`headers`; an absent key restores as `null`/`{}`                                                                                                                                                                                                                                                                                                                                                                                                        |
 | `tables.messageBatches`       | `MessageBatchRow[]` | No       | snake_case columns                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| `tables.*` (the remaining 13) | `Row[]`             | No       | Same keys as the export; an omitted table restores **zero** rows into an emptied table                                                                                                                                                                                                                                                                                                                                                                                            |
+| `tables.*` (the remaining 24) | `Row[]`             | No       | Same keys as the export; an omitted table restores **zero** rows into an emptied table                                                                                                                                                                                                                                                                                                                                                                                            |
 | `stopOrphans`                 | boolean             | No       | Stop the running engines for sessions the backup does not contain, inside this request and before the replace (best-effort, time-bounded per engine). Preferred over `force`                                                                                                                                                                                                                                                                                                      |
 | `force`                       | boolean             | No       | Legacy escape hatch: proceed despite orphaned engines and leave them running until a process restart (`restartRequired: true`)                                                                                                                                                                                                                                                                                                                                                    |
 
@@ -6219,6 +6227,10 @@ Replace all Data DB rows with the supplied export. **Destructive and transaction
     "integrationDeliveryFailures": [],
     "statusUpdates": [],
     "automationRules": [],
+    "divisions": [],
+    "divisionAgents": [],
+    "divisionSettings": [],
+    "divisionChatStates": [],
     "inboxConversations": [],
     "inboxNotes": [],
     "crmDeals": [],
@@ -6253,6 +6265,10 @@ Replace all Data DB rows with the supplied export. **Destructive and transaction
     "integrationDeliveryFailures": 0,
     "statusUpdates": 0,
     "automationRules": 0,
+    "divisions": 0,
+    "divisionAgents": 0,
+    "divisionSettings": 0,
+    "divisionChatStates": 0,
     "inboxConversations": 0,
     "inboxNotes": 0,
     "crmDeals": 0,
@@ -7480,7 +7496,10 @@ activity is reopened (`open`, `resolvedAt` cleared) by the next read, and `inbox
 #### GET /api/sessions/:sessionId/inbox/conversations
 
 The session's chats with their inbox state, newest activity first. Optional `status`, `assignee`
-(`me`, `unassigned`, or an API key id), `q` (name, chat id or last message), `limit` (1-200, default 50) and `offset`. **Auth:** API key (VIEWER+) · **Response** `200`, an array of conversations.
+(`me`, `unassigned`, or an API key id), `division` (`unassigned`, or a division id — the tag the
+routing wrote, see §6.4.22), `q` (name, chat id or last message), `limit` (1-200, default 50) and
+`offset`. **Auth:** API key (VIEWER+) · **Response** `200`, an array of conversations, each with
+`divisionId` and `divisionName` (`null` when the chat was never routed).
 
 #### GET /api/sessions/:sessionId/inbox/summary
 
@@ -7493,9 +7512,10 @@ One conversation with its internal notes, oldest first. **Auth:** API key (VIEWE
 
 #### PATCH /api/sessions/:sessionId/inbox/conversations/:chatId
 
-Assign (`assigneeKeyId`, or `null` to release) and/or change `status`. `assigneeKeyId` must name an
-active API key. An empty update answers `400`. **Auth:** API key (OPERATOR) · `200` with the
-conversation and its notes · `400` or `404`.
+Assign (`assigneeKeyId`, or `null` to release), change `status` and/or set `divisionId` (`null`
+removes the tag; the id must name a division of this session). Resolving a conversation re-arms its
+routing menu, so the next message shows the menu again. An empty update answers `400`.
+**Auth:** API key (OPERATOR) · `200` with the conversation and its notes · `400` or `404`.
 
 #### POST /api/sessions/:sessionId/inbox/conversations/:chatId/notes
 
@@ -7605,6 +7625,307 @@ not yet attempted becomes `skipped`. Recipients already `sent` or `failed` keep 
 
 One page of recipients, oldest first. Optional `status` (`pending`, `sent`, `failed`, `skipped`),
 `limit` (1-200, default 50) and `offset`. **Auth:** API key (VIEWER) · **Response** `200`.
+
+### 6.4.21 Dashboard accounts (email + password)
+
+People sign in to the dashboard with an email address and a password; machines (a Laravel app, a
+script, another service) keep using `X-API-Key`. The two are one identity model, not two: every
+account owns a linked row in `api_keys`, and a session token resolves to that row, so the role
+hierarchy, the chat fence, audit attribution and the WebSocket socket cap treat a signed-in person
+exactly like the key behind them. The linked key's plaintext is never issued, and it cannot be edited
+or revoked from `/api/auth/api-keys` (that answers `409`, pointing at this section) because the two
+rows are kept in step here.
+
+`POST /api/auth/login` is the only unauthenticated route in this group. It returns an opaque session
+token (`owa_s1_…`) that the caller sends as `Authorization: Bearer <token>`; the token is stored only
+as a hash and is valid for `AUTH_SESSION_TTL_HOURS` (default 168 h). Logging out, changing the
+password, an admin resetting it, or disabling the account revokes it immediately — a live WebSocket
+authenticated with it is disconnected within one sweep interval (60 s).
+
+Account management requires an **ADMIN** key or session **with no session scope**: minting an
+account mints a credential, which is what the `@RequireUnscopedKey` fence exists to stop a confined
+key from doing. `GET /api/auth/me`, `POST /api/auth/logout` and `POST /api/auth/change-password` act
+only on the calling credential, so a session-scoped key may reach them.
+
+#### POST /api/auth/login
+
+Sign in. Answers the same `401 "Email or password is incorrect"` for an unknown address, a wrong
+password and a disabled account, and pays one scrypt verification in all three cases, so the route is
+not an oracle for which addresses exist. Throttled per client IP to 5 attempts a minute and 20 an
+hour, tighter than the global tiers.
+
+**Auth:** none
+
+**Request body** — `LoginDto`
+
+| Field      | Type   | Required | Notes                        |
+| ---------- | ------ | -------- | ---------------------------- |
+| `email`    | string | yes      | Stored and matched lowercased |
+| `password` | string | yes      | 1-200 characters             |
+
+```json
+{ "email": "admin@example.com", "password": "a-long-passphrase" }
+```
+
+**Response** `200`
+
+```json
+{
+  "token": "owa_s1_3f9c…",
+  "expiresAt": "2026-11-28T10:00:00.000Z",
+  "user": {
+    "id": "0a941dac-a965-45e7-b318-74ae8be134f0",
+    "email": "admin@example.com",
+    "name": "Administrator",
+    "role": "admin",
+    "isActive": true,
+    "apiKeyId": "8f3c2b1a-9d4e-4c7a-8b2f-1e6d5a4c3b2a",
+    "lastLoginAt": "2026-11-21T09:59:58.000Z",
+    "createdAt": "2026-11-20T05:30:00.000Z"
+  },
+  "role": "admin",
+  "scoped": false,
+  "engineType": "baileys"
+}
+```
+
+**Errors:** `401` email or password is incorrect, or the account is disabled · `429` too many attempts from this address
+
+#### POST /api/auth/logout
+
+Revokes the session token that made the request. Idempotent from the client's side: the second call
+carries a revoked token and answers `401` from the guard.
+
+**Auth:** session token
+
+**Response** `204`
+
+**Errors:** `400` the credential is an API key, not a dashboard session · `401` missing or invalid credential
+
+#### GET /api/auth/me
+
+Describes the credential that made the request. `user` is `null` for an API-key caller; `scoped`
+mirrors `allowedSessions`, and `keyId`/`keyName` describe the linked or presented key.
+
+**Auth:** any valid key or session
+
+**Response** `200`
+
+```json
+{
+  "user": { "id": "0a941dac-…", "email": "admin@example.com", "name": "Administrator", "role": "admin", "isActive": true, "apiKeyId": "8f3c2b1a-…", "lastLoginAt": null, "createdAt": "2026-11-20T05:30:00.000Z" },
+  "role": "admin",
+  "scoped": false,
+  "engineType": "baileys",
+  "keyId": "8f3c2b1a-…",
+  "keyName": "Administrator"
+}
+```
+
+**Errors:** `401` missing or invalid credential
+
+#### POST /api/auth/change-password
+
+Changes the signed-in account's password. The current password is required as proof of possession,
+so a stolen token alone cannot take the account over. Every other session of the account is revoked;
+the one that made the request keeps working.
+
+**Auth:** session token
+
+**Request body** — `ChangePasswordDto`
+
+| Field             | Type   | Required | Notes                  |
+| ----------------- | ------ | -------- | ---------------------- |
+| `currentPassword` | string | yes      | 1-200 characters       |
+| `newPassword`     | string | yes      | At least 12 characters |
+
+```json
+{ "currentPassword": "a-long-passphrase", "newPassword": "another-long-passphrase" }
+```
+
+**Response** `204`
+
+**Errors:** `400` the credential is an API key, not a dashboard session · `401` current password is incorrect, or the credential is invalid
+
+#### GET /api/auth/users
+
+List dashboard accounts, newest first. The password hash, the session hashes and the linked key's
+hash are never returned.
+
+**Auth:** API key (ADMIN, unscoped)
+
+**Response** `200`
+
+Bare JSON array of `UserResponseDto`, ordered by `createdAt` DESC.
+
+```json
+[ { "id": "0a941dac-…", "email": "admin@example.com", "name": "Administrator", "role": "admin", "isActive": true, "apiKeyId": "8f3c2b1a-…", "lastLoginAt": "2026-11-21T09:59:58.000Z", "createdAt": "2026-11-20T05:30:00.000Z" } ]
+```
+
+**Errors:** `401` missing or invalid credential · `403` role below ADMIN, or a session-scoped key
+
+#### POST /api/auth/users
+
+Create an account. The account's linked API key is created in the same transaction and its plaintext
+is discarded, so the only way to use it is through this account or through a separately minted key.
+
+**Auth:** API key (ADMIN, unscoped)
+
+**Request body** — `CreateUserDto`
+
+| Field      | Type   | Required | Notes                                    |
+| ---------- | ------ | -------- | ---------------------------------------- |
+| `email`    | string | yes      | Unique, stored lowercased                |
+| `name`     | string | yes      | 2-100 characters                         |
+| `role`     | enum   | no       | `admin`, `operator` (default), `viewer`  |
+| `password` | string | yes      | At least 12 characters                   |
+
+```json
+{ "email": "agent@example.com", "name": "Siti", "role": "operator", "password": "a-long-passphrase" }
+```
+
+**Response** `201` — `UserResponseDto`
+
+**Errors:** `401` missing or invalid credential · `403` role below ADMIN, or a session-scoped key · `409` a user with that email already exists
+
+#### PATCH /api/auth/users/:id
+
+Update the display name, role or active flag. A role or active change is mirrored onto the linked key
+in the same transaction; disabling the account revokes every live session of it at once.
+
+**Auth:** API key (ADMIN, unscoped)
+
+**Path parameters**
+
+| Parameter | Type   | Notes     |
+| --------- | ------ | --------- |
+| `id`      | string | User UUID |
+
+**Request body** — `UpdateUserDto`
+
+| Field      | Type    | Required | Notes                                   |
+| ---------- | ------- | -------- | --------------------------------------- |
+| `name`     | string  | no       | 2-100 characters                        |
+| `role`     | enum    | no       | `admin`, `operator`, `viewer`           |
+| `isActive` | boolean | no       | `false` disables and revokes sessions   |
+
+```json
+{ "role": "operator", "isActive": true }
+```
+
+**Response** `200` — `UserResponseDto`
+
+**Errors:** `401` missing or invalid credential · `403` role below ADMIN, or a session-scoped key · `404` no such account · `409` the change would remove the last admin
+
+#### POST /api/auth/users/:id/reset-password
+
+Set a new password for an account and revoke every session of it, including any the account holds in
+a browser right now.
+
+**Auth:** API key (ADMIN, unscoped)
+
+**Path parameters**
+
+| Parameter | Type   | Notes     |
+| --------- | ------ | --------- |
+| `id`      | string | User UUID |
+
+**Request body** — `ResetPasswordDto`
+
+| Field      | Type   | Required | Notes                  |
+| ---------- | ------ | -------- | ---------------------- |
+| `password` | string | yes      | At least 12 characters |
+
+```json
+{ "password": "another-long-passphrase" }
+```
+
+**Response** `204`
+
+**Errors:** `401` missing or invalid credential · `403` role below ADMIN, or a session-scoped key · `404` no such account
+
+#### DELETE /api/auth/users/:id
+
+Delete an account, its sessions and its linked API key. Refused when the account is the last usable
+admin (a second admin user or a hand-minted admin key must exist first).
+
+**Auth:** API key (ADMIN, unscoped)
+
+**Path parameters**
+
+| Parameter | Type   | Notes     |
+| --------- | ------ | --------- |
+| `id`      | string | User UUID |
+
+**Response** `204`
+
+**Errors:** `401` missing or invalid credential · `403` role below ADMIN, or a session-scoped key · `404` no such account · `409` the account is the last admin
+
+### 6.4.22 Division routing (one number, several teams)
+
+Several divisions share one WhatsApp number. An inbound message on that number is answered with a
+numbered menu (`1` SMP Putra, `2` SMA Putri, …), and the customer picks a team either by replying
+with its number or by writing one of that team's keywords (`smp putra`). The conversation then
+lands in the team inbox tagged with the division and assigned to the least-busy CS of that team;
+that CS answers from the dashboard through the same number. Nothing is bridged to another WhatsApp
+account — the "forward" is the inbox assignment.
+
+The routes here are configuration. They sit under `:sessionId`, are not chat-scoped (a key
+restricted with `allowedChats` is refused by default-deny, like any other session setting), and
+reads require `VIEWER` while every write requires `ADMIN`.
+
+Ordering is `sortOrder`, then `name`; the router numbers the menu in that order, and a session may
+hold at most 20 divisions. Keywords are matched case- and punctuation-insensitively as whole words,
+the longest match wins, and a keyword that is only digits is refused (`400`) because it would
+collide with the menu numbering. An inactive division is left out of the menu and matches no
+keyword, but keeps its CS list.
+
+The menu is shown once per conversation. It is re-armed when the conversation is resolved, after
+`idleHours` of customer silence (default 24; `0` disables the re-prompt), or when the customer sends
+`menu`, `m`, `start` or `0` — that last path is rate-limited to once every 3 s. A reply that is not
+a number in the menu the customer was shown, or text that matches no keyword, gets the
+`invalidReply` text once per prompt and the menu stays open. `enabled: false` turns the router off
+entirely, leaving automation rules as the only inbound handler.
+
+Routing writes `divisionId`/`divisionName` onto the inbox conversation, which is what the Inbox page
+filters and groups by. Deleting a division clears that tag and keeps the assignee; the conversation
+does not silently fall back to another team.
+
+#### GET /api/sessions/:sessionId/divisions
+
+The session's divisions in menu order, each with its keywords and its CS (`agents`, ordered by when
+they joined the division). **Auth:** API key (VIEWER) · **Response** `200`, an array of divisions.
+
+#### POST /api/sessions/:sessionId/divisions
+
+Creates a division. `name` is required and must be unique within the session; `keywords`,
+`menuLabel`, `welcomeText`, `sortOrder` (0-1000, default 0), `isActive` (default `true`) and
+`agentKeyIds` are optional. `agentKeyIds` must name active API keys, and it replaces the whole set
+when the division is updated. **Auth:** API key (ADMIN) · **Response** `201` with the division.
+**Errors:** `400` a keyword made only of digits, an unknown or inactive agent key, or the 20th division already exists · `404` no such session · `409` a division with this name already exists in the session
+
+#### GET /api/sessions/:sessionId/divisions/settings
+
+The session's routing settings, with the defaults (`enabled: true`, `menuHeader: null`,
+`invalidReply: null`, `idleHours: 24`) when they were never saved. **Auth:** API key (VIEWER) ·
+**Response** `200`.
+
+#### PATCH /api/sessions/:sessionId/divisions/settings
+
+Partial update of `enabled`, `menuHeader`, `invalidReply` and/or `idleHours` (0-720). A `null` text
+restores the built-in wording. **Auth:** API key (ADMIN) · **Response** `200` with the settings ·
+`404` no such session.
+
+#### PATCH /api/sessions/:sessionId/divisions/:divisionId
+
+Partial update of a division, including its CS list (`agentKeyIds` replaces the set). An empty
+update answers `400`. **Auth:** API key (ADMIN) · **Response** `200` with the division ·
+**Errors:** `400` an invalid keyword, an unknown or inactive agent key, or an empty body · `404` no such division in this session · `409` a division with this name already exists in the session
+
+#### DELETE /api/sessions/:sessionId/divisions/:divisionId
+
+Deletes a division. Conversations already routed to it keep their CS; only the tag is removed.
+**Auth:** API key (ADMIN) · **Response** `204` or `404`.
 
 ## 6.5 Real-time API (WebSocket)
 

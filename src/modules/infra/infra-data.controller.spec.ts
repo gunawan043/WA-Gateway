@@ -47,6 +47,10 @@ import { CrmDealActivity } from '../crm/entities/crm-deal-activity.entity';
 import { Campaign } from '../campaign/entities/campaign.entity';
 import { CampaignRecipient } from '../campaign/entities/campaign-recipient.entity';
 import { CampaignSegment } from '../campaign/entities/campaign-segment.entity';
+import { Division } from '../division/entities/division.entity';
+import { DivisionAgent } from '../division/entities/division-agent.entity';
+import { DivisionSettings } from '../division/entities/division-settings.entity';
+import { DivisionChatState } from '../division/entities/division-chat-state.entity';
 import { CrmStage } from '../crm/entities/crm-stage.entity';
 import { AuditAction } from '../audit/entities/audit-log.entity';
 import { ScopeBindingService } from '../integration/scope-binding.service';
@@ -97,6 +101,10 @@ describe('InfraDataController.importData round-trips export-data (no silent mess
         Campaign,
         CampaignRecipient,
         CampaignSegment,
+        Division,
+        DivisionAgent,
+        DivisionSettings,
+        DivisionChatState,
         SendIdempotencyKey,
       ],
       synchronize: true,
@@ -1603,6 +1611,10 @@ describe('InfraDataController.import/export preserves every data-DB table', () =
         Campaign,
         CampaignRecipient,
         CampaignSegment,
+        Division,
+        DivisionAgent,
+        DivisionSettings,
+        DivisionChatState,
       ],
       synchronize: true,
     });
@@ -2090,6 +2102,10 @@ describe('InfraDataController audit trail — import emits only on a committed r
         Campaign,
         CampaignRecipient,
         CampaignSegment,
+        Division,
+        DivisionAgent,
+        DivisionSettings,
+        DivisionChatState,
       ],
       synchronize: true,
     });
@@ -2420,6 +2436,10 @@ describe('InfraDataController.importData status_updates + runtime reconciliation
         Campaign,
         CampaignRecipient,
         CampaignSegment,
+        Division,
+        DivisionAgent,
+        DivisionSettings,
+        DivisionChatState,
       ],
       synchronize: true,
     });
@@ -3222,6 +3242,10 @@ describe('InfraDataController.importData re-syncs plugin instance bindings', () 
         Campaign,
         CampaignRecipient,
         CampaignSegment,
+        Division,
+        DivisionAgent,
+        DivisionSettings,
+        DivisionChatState,
       ],
       synchronize: true,
     });

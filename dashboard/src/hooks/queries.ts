@@ -10,6 +10,8 @@ import {
   pluginInstancesApi,
   statsApi,
   inboxApi,
+  messageApi,
+  divisionApi,
   crmApi,
   campaignApi,
   type CreateWebhookRequest,
@@ -21,6 +23,8 @@ import {
   type UpdateInstanceInput,
   type InboxListParams,
   type InboxStatus,
+  type DivisionInput,
+  type DivisionSettingsInput,
   type CreateCrmDealInput,
   type UpdateCrmDealInput,
   type CreateCampaignInput,
@@ -52,6 +56,9 @@ export const queryKeys = {
   inboxSummary: (sessionId: string) => ['sessions', sessionId, 'inbox', 'summary'] as const,
   inboxConversation: (sessionId: string, chatId: string) =>
     ['sessions', sessionId, 'inbox', 'conversation', chatId] as const,
+  inboxThread: (sessionId: string, chatId: string) => ['sessions', sessionId, 'inbox', 'thread', chatId] as const,
+  divisions: (sessionId: string) => ['sessions', sessionId, 'divisions'] as const,
+  divisionSettings: (sessionId: string) => ['sessions', sessionId, 'divisions', 'settings'] as const,
   agents: ['agents'] as const,
   crmBoard: ['crm', 'board'] as const,
   crmStages: ['crm', 'stages'] as const,
@@ -470,8 +477,13 @@ function invalidateInbox(queryClient: ReturnType<typeof useQueryClient>, session
 export function useUpdateInboxMutation(sessionId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ chatId, data }: { chatId: string; data: { status?: InboxStatus; assigneeKeyId?: string | null } }) =>
-      inboxApi.update(sessionId, chatId, data),
+    mutationFn: ({
+      chatId,
+      data,
+    }: {
+      chatId: string;
+      data: { status?: InboxStatus; assigneeKeyId?: string | null; divisionId?: string | null };
+    }) => inboxApi.update(sessionId, chatId, data),
     onSuccess: () => invalidateInbox(queryClient, sessionId),
   });
 }
@@ -490,6 +502,95 @@ export function useDeleteInboxNoteMutation(sessionId: string) {
     mutationFn: ({ chatId, noteId }: { chatId: string; noteId: string }) =>
       inboxApi.deleteNote(sessionId, chatId, noteId),
     onSuccess: () => invalidateInbox(queryClient, sessionId),
+  });
+}
+
+/**
+ * The last messages of a conversation, for the inbox reply pane. Deliberately short: the inbox is a
+ * triage surface, and the full thread (media, paging, retries) lives on the Chats page.
+ */
+export function useInboxThreadQuery(sessionId: string, chatId: string, enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.inboxThread(sessionId, chatId),
+    queryFn: () => sessionApi.getChatMessages(sessionId, chatId, 20),
+    enabled: Boolean(sessionId && chatId) && enabled,
+    staleTime: 5_000,
+    refetchInterval: 10_000,
+  });
+}
+
+/** Sends a reply from the inbox through the ordinary send path (same number the customer wrote to). */
+export function useSendInboxReplyMutation(sessionId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ chatId, text }: { chatId: string; text: string }) =>
+      messageApi.sendText(sessionId, chatId, text),
+    onSuccess: (_data, variables) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.inboxThread(sessionId, variables.chatId) });
+      invalidateInbox(queryClient, sessionId);
+    },
+  });
+}
+
+// ── Division Routing Queries ──────────────────────────────────────────
+
+export function useDivisionsQuery(sessionId: string) {
+  return useQuery({
+    queryKey: queryKeys.divisions(sessionId),
+    queryFn: () => divisionApi.list(sessionId),
+    enabled: Boolean(sessionId),
+    staleTime: 15_000,
+  });
+}
+
+export function useDivisionSettingsQuery(sessionId: string) {
+  return useQuery({
+    queryKey: queryKeys.divisionSettings(sessionId),
+    queryFn: () => divisionApi.getSettings(sessionId),
+    enabled: Boolean(sessionId),
+    staleTime: 30_000,
+  });
+}
+
+function invalidateDivisions(queryClient: ReturnType<typeof useQueryClient>, sessionId: string): void {
+  void queryClient.invalidateQueries({ queryKey: queryKeys.divisions(sessionId) });
+  // A renamed or deleted division is shown on the inbox rows too.
+  invalidateInbox(queryClient, sessionId);
+}
+
+export function useCreateDivisionMutation(sessionId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: DivisionInput) => divisionApi.create(sessionId, data),
+    onSuccess: () => invalidateDivisions(queryClient, sessionId),
+  });
+}
+
+export function useUpdateDivisionMutation(sessionId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ divisionId, data }: { divisionId: string; data: Partial<DivisionInput> }) =>
+      divisionApi.update(sessionId, divisionId, data),
+    onSuccess: () => invalidateDivisions(queryClient, sessionId),
+  });
+}
+
+export function useDeleteDivisionMutation(sessionId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (divisionId: string) => divisionApi.remove(sessionId, divisionId),
+    onSuccess: () => invalidateDivisions(queryClient, sessionId),
+  });
+}
+
+export function useUpdateDivisionSettingsMutation(sessionId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: DivisionSettingsInput) => divisionApi.updateSettings(sessionId, data),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.divisionSettings(sessionId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.divisions(sessionId) });
+    },
   });
 }
 

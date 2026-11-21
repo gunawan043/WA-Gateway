@@ -720,6 +720,11 @@ LOG_LEVEL=debug
 # Optional: seed a known admin key. If omitted, OpenWA generates a random key and writes data/.api-key.
 API_MASTER_KEY=
 
+# Optional: a dashboard account (email + password sign-in) seeded on the first boot of an empty
+# users table. Set both or neither; the password must be at least 12 characters.
+# ADMIN_EMAIL=admin@example.com
+# ADMIN_PASSWORD=
+
 # Session
 # SESSION_DATA_PATH=./data/sessions
 
@@ -772,6 +777,11 @@ DATABASE_SYNCHRONIZE=false
 # Optional HMAC pepper so a DB leak alone can't precompute key hashes. Generate a random value
 # (openssl rand -base64 32); setting or changing it invalidates every API key issued before.
 # API_KEY_PEPPER=
+# Dashboard account seeded once on the first boot of an empty users table; set both or neither.
+# The API key stays for machines, this is what a person signs in to the dashboard with.
+# ADMIN_EMAIL=admin@example.com
+# ADMIN_PASSWORD=<at-least-12-characters>
+# AUTH_SESSION_TTL_HOURS=168
 CORS_ORIGINS=https://dashboard.example.com
 
 # Session

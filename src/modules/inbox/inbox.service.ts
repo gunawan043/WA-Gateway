@@ -1,9 +1,11 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { AuditAction } from '../audit/entities/audit-log.entity';
 import { AuditService } from '../audit/audit.service';
 import { ApiKey } from '../auth/entities/api-key.entity';
+import type { DivisionInboxPort, DivisionRouteInput, DivisionRouteResult } from '../division/division-inbox.port';
+import { DivisionService } from '../division/division.service';
 import { ChatSummary } from '../../engine/interfaces/whatsapp-engine.interface';
 import { EventsGateway } from '../events/events.gateway';
 import { SessionService } from '../session/session.service';
@@ -21,6 +23,8 @@ export interface InboxListFilters {
   status?: InboxConversationStatus;
   /** `me`, `unassigned`, or an API key id. */
   assignee?: string;
+  /** `unassigned`, or a division id. */
+  division?: string;
   q?: string;
 }
 
@@ -37,7 +41,7 @@ export interface InboxListFilters {
  * resolved and then received something, so it stays bounded.
  */
 @Injectable()
-export class InboxService {
+export class InboxService implements DivisionInboxPort {
   constructor(
     @InjectRepository(InboxConversation, 'data')
     private readonly conversations: Repository<InboxConversation>,
@@ -48,6 +52,7 @@ export class InboxService {
     private readonly sessionService: SessionService,
     private readonly audit: AuditService,
     private readonly events: EventsGateway,
+    private readonly divisions: DivisionService,
   ) {}
 
   /**
@@ -67,6 +72,7 @@ export class InboxService {
 
     const query = filters.q?.trim().toLowerCase();
     const wantedAssignee = this.resolveAssigneeFilter(filters.assignee, viewerKeyId);
+    const wantedDivision = this.resolveDivisionFilter(filters.division);
 
     return chats
       .map(chat => this.toView(chat, byChat.get(chat.id)))
@@ -75,6 +81,11 @@ export class InboxService {
         if (wantedAssignee === undefined) return true;
         if (wantedAssignee === null) return view.assigneeKeyId === null;
         return view.assigneeKeyId === wantedAssignee;
+      })
+      .filter(view => {
+        if (wantedDivision === undefined) return true;
+        if (wantedDivision === null) return view.divisionId === null;
+        return view.divisionId === wantedDivision;
       })
       .filter(view => {
         if (!query) return true;
@@ -104,6 +115,7 @@ export class InboxService {
     const row = await this.getOrCreateRow(sessionId, chatId);
     const previousStatus = row.status;
     const previousAssignee = row.assigneeKeyId;
+    const previousDivision = row.divisionId;
 
     if (dto.status !== undefined && dto.status !== row.status) {
       row.status = dto.status;
@@ -126,12 +138,35 @@ export class InboxService {
       }
     }
 
+    if (dto.divisionId !== undefined) {
+      await this.applyDivision(sessionId, row, dto.divisionId);
+      if (row.divisionId !== previousDivision) {
+        await this.audit.logInfo(AuditAction.INBOX_CONVERSATION_DIVISION_CHANGED, {
+          sessionId,
+          apiKey: actor,
+          metadata: {
+            chatId,
+            from: previousDivision,
+            to: row.divisionId,
+            divisionName: row.divisionName,
+          },
+        });
+      }
+    }
+
     const saved = await this.conversations.save(row);
+    // Resolving a conversation re-arms the routing: the next inbound message shows the menu again,
+    // so a returning customer can reach another division. The division tag itself is kept.
+    if (previousStatus !== 'resolved' && saved.status === 'resolved') {
+      await this.divisions.rearm(sessionId, chatId);
+    }
     this.events.emitInboxUpdated(sessionId, {
       chatId,
       status: saved.status,
       assigneeKeyId: saved.assigneeKeyId,
       assigneeName: saved.assigneeName,
+      divisionId: saved.divisionId,
+      divisionName: saved.divisionName,
     });
 
     return this.get(sessionId, chatId);
@@ -166,6 +201,77 @@ export class InboxService {
     });
   }
 
+  /**
+   * Tags a conversation with a division and hands it to that division's least busy CS.
+   *
+   * Called by the division router through {@link DivisionInboxPort} (the router cannot import this
+   * module: InboxModule imports SessionModule, which imports DivisionModule). Idempotent: a chat
+   * already owned by the same division and an active member keeps its assignee, so routing a
+   * returning customer never reshuffles a live conversation.
+   */
+  async routeConversation(input: DivisionRouteInput): Promise<DivisionRouteResult> {
+    const { sessionId, chatId, divisionId, divisionName, agentKeyIds } = input;
+    const row = await this.getOrCreateRow(sessionId, chatId);
+    const previousDivision = row.divisionId;
+    const previousAssignee = row.assigneeKeyId;
+
+    row.divisionId = divisionId;
+    row.divisionName = divisionName;
+
+    const keepAssignee =
+      previousDivision === divisionId && previousAssignee !== null && agentKeyIds.includes(previousAssignee);
+    if (!keepAssignee) {
+      const assignee = await this.pickLeastBusy(sessionId, agentKeyIds);
+      row.assigneeKeyId = assignee?.id ?? null;
+      row.assigneeName = assignee?.name ?? null;
+    }
+
+    const saved = await this.conversations.save(row);
+    if (saved.divisionId !== previousDivision || saved.assigneeKeyId !== previousAssignee) {
+      await this.audit.logInfo(AuditAction.INBOX_CONVERSATION_DIVISION_CHANGED, {
+        sessionId,
+        metadata: {
+          chatId,
+          from: previousDivision,
+          to: saved.divisionId,
+          divisionName: saved.divisionName,
+          assigneeKeyId: saved.assigneeKeyId,
+        },
+      });
+    }
+    this.events.emitInboxUpdated(sessionId, {
+      chatId,
+      status: saved.status,
+      assigneeKeyId: saved.assigneeKeyId,
+      assigneeName: saved.assigneeName,
+      divisionId: saved.divisionId,
+      divisionName: saved.divisionName,
+    });
+    return { assigneeKeyId: saved.assigneeKeyId, assigneeName: saved.assigneeName };
+  }
+
+  async rearm(sessionId: string, chatId: string): Promise<void> {
+    await this.divisions.rearm(sessionId, chatId);
+  }
+
+  /** Drops a deleted division's tag from the session's conversations. The assignee is kept. */
+  async clearDivision(sessionId: string, divisionId: string): Promise<void> {
+    const affected = await this.conversations.find({ where: { sessionId, divisionId } });
+    if (affected.length === 0) return;
+
+    await this.conversations.update({ sessionId, divisionId }, { divisionId: null, divisionName: null });
+    for (const row of affected) {
+      this.events.emitInboxUpdated(sessionId, {
+        chatId: row.chatId,
+        status: row.status,
+        assigneeKeyId: row.assigneeKeyId,
+        assigneeName: row.assigneeName,
+        divisionId: null,
+        divisionName: null,
+      });
+    }
+  }
+
   /** Counts for the inbox header, computed from the same (already chat-scope-filtered) list. */
   summarize(conversations: InboxConversationDto[], viewerKeyId?: string): InboxSummaryDto {
     return {
@@ -196,10 +302,44 @@ export class InboxService {
         status: 'open' as InboxConversationStatus,
         assigneeKeyId: null,
         assigneeName: null,
+        divisionId: null,
+        divisionName: null,
         resolvedAt: null,
         lastInboundAt: null,
       }),
     );
+  }
+
+  /**
+   * The active agent of the division with the fewest non-resolved conversations. One grouped count
+   * on `(sessionId, assigneeKeyId)`; ties go to the first id in `agentKeyIds`, which is the
+   * membership order the operator sees.
+   */
+  private async pickLeastBusy(sessionId: string, agentKeyIds: string[]): Promise<ApiKey | null> {
+    if (agentKeyIds.length === 0) return null;
+    const keys = await this.apiKeys.find({ where: { id: In(agentKeyIds) } });
+    const byId = new Map(keys.map(key => [key.id, key]));
+    const active = agentKeyIds
+      .map(id => byId.get(id))
+      .filter((key): key is ApiKey => key !== undefined && key.isActive);
+    if (active.length === 0) return null;
+
+    const counts = await this.conversations
+      .createQueryBuilder('conversation')
+      .select('conversation.assigneeKeyId', 'assigneeKeyId')
+      .addSelect('COUNT(*)', 'load')
+      .where('conversation.sessionId = :sessionId', { sessionId })
+      .andWhere('conversation.status != :resolved', { resolved: 'resolved' })
+      .andWhere('conversation.assigneeKeyId IN (:...ids)', { ids: active.map(key => key.id) })
+      .groupBy('conversation.assigneeKeyId')
+      .getRawMany<{ assigneeKeyId: string; load: string | number }>();
+
+    const load = new Map(counts.map(row => [row.assigneeKeyId, Number(row.load)]));
+    let best = active[0];
+    for (const key of active) {
+      if ((load.get(key.id) ?? 0) < (load.get(best.id) ?? 0)) best = key;
+    }
+    return best;
   }
 
   private async applyAssignee(row: InboxConversation, assigneeKeyId: string | null): Promise<void> {
@@ -215,6 +355,27 @@ export class InboxService {
     }
     row.assigneeKeyId = key.id;
     row.assigneeName = key.name;
+  }
+
+  private async applyDivision(sessionId: string, row: InboxConversation, divisionId: string | null): Promise<void> {
+    if (divisionId === null) {
+      row.divisionId = null;
+      row.divisionName = null;
+      return;
+    }
+    const division = await this.divisions.lookup(sessionId, divisionId);
+    if (!division) {
+      throw new BadRequestException('divisionId does not name a division in this session');
+    }
+    row.divisionId = division.id;
+    row.divisionName = division.name;
+  }
+
+  /** `undefined` = no filter, `null` = untagged only, string = that division id. */
+  private resolveDivisionFilter(division: string | undefined): string | null | undefined {
+    if (!division || division === 'all') return undefined;
+    if (division === 'unassigned') return null;
+    return division;
   }
 
   /** `undefined` = no filter, `null` = unassigned only, string = that key id. */
@@ -252,6 +413,8 @@ export class InboxService {
         status: row.status,
         assigneeKeyId: row.assigneeKeyId,
         assigneeName: row.assigneeName,
+        divisionId: row.divisionId,
+        divisionName: row.divisionName,
       });
     }
   }
@@ -271,6 +434,8 @@ export class InboxService {
       status: row?.status ?? 'open',
       assigneeKeyId: row?.assigneeKeyId ?? null,
       assigneeName: row?.assigneeName ?? null,
+      divisionId: row?.divisionId ?? null,
+      divisionName: row?.divisionName ?? null,
       resolvedAt: row?.resolvedAt ? row.resolvedAt.toISOString() : null,
     };
   }

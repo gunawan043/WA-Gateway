@@ -30,6 +30,7 @@ export type InboxConversationStatus = 'open' | 'pending' | 'resolved';
 @Index('UQ_inbox_conversations_session_chat', ['sessionId', 'chatId'], { unique: true })
 @Index('IDX_inbox_conversations_session_status', ['sessionId', 'status'])
 @Index('IDX_inbox_conversations_session_assignee', ['sessionId', 'assigneeKeyId'])
+@Index('IDX_inbox_conversations_session_division', ['sessionId', 'divisionId'])
 export class InboxConversation {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
@@ -54,6 +55,15 @@ export class InboxConversation {
 
   @Column({ type: 'varchar', length: 100, nullable: true })
   assigneeName!: string | null;
+
+  // The division this conversation was routed to, with the same no-FK/snapshot convention as the
+  // assignee: `divisions` lives on this connection, but a division can be deleted while its chats
+  // remain, and the tag must stay readable after that.
+  @Column({ type: 'varchar', length: 36, nullable: true })
+  divisionId!: string | null;
+
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  divisionName!: string | null;
 
   // Set when the status becomes `resolved`; the list uses it to decide whether newer inbound
   // activity should reopen the conversation.

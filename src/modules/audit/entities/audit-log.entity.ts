@@ -9,6 +9,16 @@ export enum AuditAction {
   API_KEY_DELETED = 'api_key_deleted',
   API_KEY_AUTH_FAILED = 'api_key_auth_failed',
 
+  // Dashboard account events (email/password sign-in; API keys stay the machine credential)
+  USER_LOGIN_SUCCEEDED = 'user_login_succeeded',
+  USER_LOGIN_FAILED = 'user_login_failed',
+  USER_CREATED = 'user_created',
+  USER_UPDATED = 'user_updated',
+  USER_DELETED = 'user_deleted',
+  USER_PASSWORD_CHANGED = 'user_password_changed',
+  USER_PASSWORD_RESET = 'user_password_reset',
+  USER_SESSION_REVOKED = 'user_session_revoked',
+
   // Rate-limit enforcement (sampled: at most one row per subject+kind per minute — see
   // EventsGateway — so enforcing a limit never becomes an audit-write flood of its own).
   RATE_LIMIT_EXCEEDED = 'rate_limit_exceeded',
@@ -83,8 +93,17 @@ export enum AuditAction {
   // conversation; a note is internal, but deleting one destroys that record and is audited.
   INBOX_CONVERSATION_ASSIGNED = 'inbox_conversation_assigned',
   INBOX_CONVERSATION_STATUS_CHANGED = 'inbox_conversation_status_changed',
+  INBOX_CONVERSATION_DIVISION_CHANGED = 'inbox_conversation_division_changed',
   INBOX_NOTE_ADDED = 'inbox_note_added',
   INBOX_NOTE_DELETED = 'inbox_note_deleted',
+
+  // Division routing. The configuration events record who changed the menu a customer sees; a
+  // routing event records which division a chat reached and which CS it was handed to.
+  DIVISION_CREATED = 'division_created',
+  DIVISION_UPDATED = 'division_updated',
+  DIVISION_DELETED = 'division_deleted',
+  DIVISION_SETTINGS_UPDATED = 'division_settings_updated',
+  DIVISION_ROUTED = 'division_routed',
 
   // Sales pipeline events. Creating a deal, moving it between stages (which decides open/won/lost)
   // and deleting it with its whole history are the three state changes an operator may need to

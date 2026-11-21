@@ -10,6 +10,10 @@ import { Reflector } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import { Request } from 'express';
 import { AuthService, UnresolvedApiKeyException } from '../auth.service';
+import { SessionAuthService } from '../session-auth.service';
+import { isSessionToken } from '../session-token';
+import { User } from '../entities/user.entity';
+import { UserSession } from '../entities/user-session.entity';
 import { ChatScopeService } from '../chat-scope.service';
 import type { ChatScope } from '../../../common/security/chat-scope';
 import { BULK_MESSAGES_MAX } from '../../message/dto/bulk-message.dto';
@@ -38,6 +42,7 @@ export class ApiKeyGuard implements CanActivate {
     private readonly configService: ConfigService,
     private readonly auditService: AuditService,
     private readonly chatScope: ChatScopeService,
+    private readonly sessions: SessionAuthService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -99,8 +104,12 @@ export class ApiKeyGuard implements CanActivate {
       string | undefined;
     const clientIp = this.getClientIp(request);
 
-    // Validate API key
-    const apiKey = await this.authService.validateApiKey(apiKeyHeader, clientIp, sessionId);
+    // Validate API key — or a dashboard session token, which resolves to the account's linked key.
+    // Past this point the two are indistinguishable on purpose: everything below (role, chat fence,
+    // unscoped fence, actor stamp) must judge a session exactly as it judges a key.
+    const apiKey = isSessionToken(apiKeyHeader)
+      ? await this.resolveSession(request, apiKeyHeader, clientIp)
+      : await this.authService.validateApiKey(apiKeyHeader, clientIp, sessionId);
 
     // Stamp the resolved actor into the per-request async context so downstream audit log writes —
     // which fire from services deep in the call stack without DI access to the key — can attribute
@@ -236,6 +245,18 @@ export class ApiKeyGuard implements CanActivate {
   private extractApiKey(request: Request): string | undefined {
     // Both the X-API-Key header and Authorization Bearer are supported.
     return presentedApiKey(request.headers);
+  }
+
+  /**
+   * Resolves a dashboard session token to its account and linked key, and hangs both on the request
+   * so `@CurrentUser()` / `@CurrentAuthSession()` can read them. The account's key is returned, not
+   * the user: every check after this point speaks in keys.
+   */
+  private async resolveSession(request: Request, rawToken: string, clientIp: string): Promise<ApiKey> {
+    const { user, session, apiKey } = await this.sessions.resolve(rawToken, clientIp);
+    (request as Request & { authSession?: UserSession }).authSession = session;
+    (request as Request & { authUser?: User }).authUser = user;
+    return apiKey;
   }
 
   /**

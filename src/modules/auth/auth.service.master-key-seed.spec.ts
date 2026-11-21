@@ -4,7 +4,7 @@ jest.mock('fs', () => ({ __esModule: true, ...jest.requireActual<typeof import('
 import * as fs from 'fs';
 import type { Repository } from 'typeorm';
 import type { ModuleRef } from '@nestjs/core';
-import { AuthService } from './auth.service';
+import { AuthService, resolveSeedApiKey } from './auth.service';
 import type { ApiKeyUsageTracker } from './api-key-usage-tracker.service';
 import { hashApiKey } from './api-key-hash';
 import { ApiKeyRole, type ApiKey } from './entities/api-key.entity';
@@ -322,5 +322,34 @@ describe('the startup banner of a later boot', () => {
 
   it('points at the dashboard when no key file is left', async () => {
     expect(await bannerOfLaterBoot(null)).toContain('(check dashboard for keys)');
+  });
+});
+
+// A master key that begins with the session-token prefix is read as a dashboard session by the guard,
+// so it would never authenticate. Refusing it at boot is the difference between an operator reading
+// one clear error and an operator holding a key that silently does nothing.
+describe('an API_MASTER_KEY shaped like a session token', () => {
+  const saved = { API_MASTER_KEY: process.env.API_MASTER_KEY, ALLOW_DEV_API_KEY: process.env.ALLOW_DEV_API_KEY };
+
+  afterEach(() => {
+    for (const [name, value] of Object.entries(saved)) {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
+  });
+
+  it('is refused, naming the prefix', () => {
+    delete process.env.ALLOW_DEV_API_KEY;
+    process.env.API_MASTER_KEY = `owa_s1_${'ab'.repeat(32)}`;
+    expect(() => resolveSeedApiKey()).toThrow(/must not start with "owa_s1_"/);
+  });
+
+  it('does not affect a normal master key or a generated one', () => {
+    delete process.env.ALLOW_DEV_API_KEY;
+    process.env.API_MASTER_KEY = MASTER;
+    expect(resolveSeedApiKey()).toBe(MASTER);
+
+    delete process.env.API_MASTER_KEY;
+    expect(resolveSeedApiKey()).toMatch(/^owa_k1_[a-f0-9]{64}$/);
   });
 });

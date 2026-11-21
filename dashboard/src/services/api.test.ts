@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 
 let sessionApi: (typeof import('./api.ts'))['sessionApi'];
 let pluginsApi: (typeof import('./api.ts'))['pluginsApi'];
+let authApi: (typeof import('./api.ts'))['authApi'];
 const navigations: string[] = [];
 
 before(async () => {
@@ -18,7 +19,7 @@ before(async () => {
     configurable: true,
     writable: true,
   });
-  ({ sessionApi, pluginsApi } = await import('./api.ts'));
+  ({ sessionApi, pluginsApi, authApi } = await import('./api.ts'));
 });
 
 beforeEach(() => {
@@ -66,6 +67,30 @@ test('a role 403 keeps the key and rejects with the status', async () => {
     assert.equal(err.message, 'Insufficient permissions. Required: operator');
     return true;
   });
+  assert.equal(sessionStorage.getItem('openwa_api_key'), 'stored-key');
+  assert.deepEqual(navigations, []);
+});
+
+// A 401 on change-password means the CURRENT password was wrong, not that the stored credential died:
+// the operator stays signed in and the dialog shows the message.
+test('a wrong current password keeps the session and reports the message', async () => {
+  let sentKey: string | null = null;
+  globalThis.fetch = ((_input: RequestInfo | URL, init?: RequestInit) => {
+    sentKey = new Headers(init?.headers).get('X-API-Key');
+    return Promise.resolve(
+      new Response(JSON.stringify({ statusCode: 401, message: 'Current password is incorrect' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+  }) as typeof fetch;
+
+  await assert.rejects(authApi.changePassword('wrong', 'correct horse battery'), (err: Error & { status?: number }) => {
+    assert.equal(err.status, 401);
+    assert.equal(err.message, 'Current password is incorrect');
+    return true;
+  });
+  assert.equal(sentKey, 'stored-key');
   assert.equal(sessionStorage.getItem('openwa_api_key'), 'stored-key');
   assert.deepEqual(navigations, []);
 });

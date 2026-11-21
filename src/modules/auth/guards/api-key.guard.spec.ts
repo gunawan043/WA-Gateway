@@ -8,7 +8,15 @@ import { ChatScopeService } from '../chat-scope.service';
 import { ApiKey, ApiKeyRole } from '../entities/api-key.entity';
 import { AuditService } from '../../audit/audit.service';
 import { AuditAction } from '../../audit/entities/audit-log.entity';
-import { CHAT_QUOTED_ALLOWED_KEY, CHAT_SCOPED_KEY, REQUIRED_ROLE_KEY } from '../decorators/auth.decorators';
+import {
+  CHAT_QUOTED_ALLOWED_KEY,
+  CHAT_SCOPED_KEY,
+  REQUIRED_ROLE_KEY,
+  UNSCOPED_KEY,
+} from '../decorators/auth.decorators';
+import { SessionAuthService } from '../session-auth.service';
+import { User } from '../entities/user.entity';
+import { UserSession } from '../entities/user-session.entity';
 
 function createMockApiKey(overrides: Partial<ApiKey> = {}): ApiKey {
   return {
@@ -61,6 +69,7 @@ describe('ApiKeyGuard', () => {
   let reflector: jest.Mocked<Reflector>;
   let configService: jest.Mocked<Partial<ConfigService>>;
   let auditService: jest.Mocked<Partial<AuditService>>;
+  let sessions: { resolve: jest.Mock };
   /** Per-call metadata the guard reads via Reflector; tests set only what they need. */
   let metadata: Record<string, unknown>;
 
@@ -74,6 +83,7 @@ describe('ApiKeyGuard', () => {
       configService as ConfigService,
       auditService as AuditService,
       new ChatScopeService(),
+      sessions as unknown as SessionAuthService,
     );
   }
 
@@ -91,6 +101,8 @@ describe('ApiKeyGuard', () => {
     auditService = {
       logWarn: jest.fn().mockResolvedValue(null),
     };
+
+    sessions = { resolve: jest.fn() };
 
     guard = buildGuard();
   });
@@ -797,6 +809,121 @@ describe('ApiKeyGuard', () => {
         messages: [{ chatId: FORBIDDEN_CONTACT, type: 'text', content: { text: 'unrestricted' } }],
       });
       expect(await guard.canActivate(bulkContext)).toBe(true);
+    });
+  });
+
+  /**
+   * A dashboard session token must be judged exactly as the account's key is judged: the guard
+   * resolves the token to that key and then runs the same role, chat and unscoped checks. The tests
+   * below pin the branch itself and the two things that would silently diverge if it were special-cased.
+   */
+  describe('dashboard session tokens', () => {
+    const TOKEN = 'owa_s1_' + 'a'.repeat(64);
+
+    const user = (over: Partial<User> = {}): User =>
+      ({ id: 'u1', email: 'a@b.c', name: 'A', isActive: true, ...over }) as User;
+    const userSession = (over: Partial<UserSession> = {}): UserSession =>
+      ({
+        id: 's1',
+        userId: 'u1',
+        tokenHash: 'h',
+        expiresAt: new Date(Date.now() + 60_000),
+        revokedAt: null,
+        ...over,
+      }) as UserSession;
+
+    /** A context whose request object the test can inspect after the guard ran. */
+    const contextFor = (headers: Record<string, string>, params: Record<string, string> = {}) => {
+      const request = {
+        headers,
+        params,
+        ip: '203.0.113.9',
+        socket: { remoteAddress: '203.0.113.9' },
+        query: {},
+      };
+      const context = {
+        switchToHttp: () => ({ getRequest: () => request }),
+        getHandler: () => ({}),
+        getClass: () => ({}),
+      } as unknown as ExecutionContext;
+      return { context, request: request as unknown as Record<string, unknown> };
+    };
+
+    it('resolves the token to the linked key and never touches the key path', async () => {
+      const apiKey = createMockApiKey({ role: ApiKeyRole.ADMIN });
+      sessions.resolve.mockResolvedValue({ user: user(), session: userSession(), apiKey });
+      (authService.hasPermission as jest.Mock).mockReturnValue(true);
+
+      const { context, request } = contextFor({ 'x-api-key': TOKEN });
+      await expect(guard.canActivate(context)).resolves.toBe(true);
+
+      expect(sessions.resolve).toHaveBeenCalledWith(TOKEN, '203.0.113.9');
+      expect(authService.validateApiKey).not.toHaveBeenCalled();
+      // The handlers read these; they are the only trace of which session is acting.
+      expect(request.apiKey).toBe(apiKey);
+      expect(request.authSession).toMatchObject({ id: 's1' });
+      expect(request.authUser).toMatchObject({ id: 'u1' });
+      expect(request.clientIp).toBe('203.0.113.9');
+    });
+
+    it('accepts a token in the Authorization Bearer header too', async () => {
+      sessions.resolve.mockResolvedValue({ user: user(), session: userSession(), apiKey: createMockApiKey() });
+      (authService.hasPermission as jest.Mock).mockReturnValue(true);
+
+      await expect(guard.canActivate(contextFor({ authorization: `Bearer ${TOKEN}` }).context)).resolves.toBe(true);
+      expect(sessions.resolve).toHaveBeenCalledWith(TOKEN, '203.0.113.9');
+    });
+
+    it('applies the role check to the account key, not to the token', async () => {
+      sessions.resolve.mockResolvedValue({
+        user: user(),
+        session: userSession(),
+        apiKey: createMockApiKey({ role: ApiKeyRole.VIEWER }),
+      });
+      (authService.hasPermission as jest.Mock).mockReturnValue(false);
+      metadata[REQUIRED_ROLE_KEY] = ApiKeyRole.ADMIN;
+
+      await expect(guard.canActivate(contextFor({ 'x-api-key': TOKEN }).context)).rejects.toThrow(ForbiddenException);
+      expect(authService.hasPermission).toHaveBeenCalledWith(
+        expect.objectContaining({ role: ApiKeyRole.VIEWER }),
+        ApiKeyRole.ADMIN,
+      );
+    });
+
+    it('applies the unscoped fence to a session-restricted account key', async () => {
+      sessions.resolve.mockResolvedValue({
+        user: user(),
+        session: userSession(),
+        apiKey: createMockApiKey({ role: ApiKeyRole.ADMIN, allowedSessions: ['s1'] }),
+      });
+      (authService.hasPermission as jest.Mock).mockReturnValue(true);
+      metadata[REQUIRED_ROLE_KEY] = ApiKeyRole.ADMIN;
+      metadata[UNSCOPED_KEY] = true;
+
+      await expect(guard.canActivate(contextFor({ 'x-api-key': TOKEN }).context)).rejects.toThrow(
+        'Session-scoped API keys are not permitted on this route',
+      );
+    });
+
+    it('turns a refused token into the usual 401 plus a bounded audit row', async () => {
+      sessions.resolve.mockRejectedValue(new UnauthorizedException('Session is invalid or has expired'));
+
+      await expect(guard.canActivate(contextFor({ 'x-api-key': TOKEN }).context)).rejects.toBeInstanceOf(
+        UnauthorizedException,
+      );
+      expect(authService.validateApiKey).not.toHaveBeenCalled();
+      expect(auditService.logWarn).toHaveBeenCalledWith(
+        AuditAction.API_KEY_AUTH_FAILED,
+        expect.objectContaining({ ipAddress: '203.0.113.9', errorMessage: 'Session is invalid or has expired' }),
+      );
+    });
+
+    it('leaves the request unstamped when the token is refused', async () => {
+      sessions.resolve.mockRejectedValue(new UnauthorizedException('Session is invalid or has expired'));
+      const { context, request } = contextFor({ 'x-api-key': TOKEN });
+      await expect(guard.canActivate(context)).rejects.toBeInstanceOf(UnauthorizedException);
+      expect(request.apiKey).toBeUndefined();
+      expect(request.authUser).toBeUndefined();
     });
   });
 });

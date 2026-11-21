@@ -30,6 +30,9 @@ export const PUBLIC_PATHS = [
   '/api/health/ready',
   '/api/infra/health',
   '/api/ingress/{pluginId}/{instanceId}/{path}',
+  // Password sign-in is the one auth route a caller reaches without a credential; the rest of
+  // /api/auth requires either a key or the session token it returns.
+  '/api/auth/login',
 ];
 
 const HTTP_METHODS = ['get', 'post', 'put', 'delete', 'patch', 'options', 'head', 'trace', 'search'] as const;
@@ -270,6 +273,7 @@ export function createSwaggerConfig(): Omit<OpenAPIObject, 'paths'> {
       .addTag('health', 'Health check endpoints')
       .addTag('automation', 'Automation rules (auto-reply)')
       .addTag('inbox', 'Team inbox (per-chat assignment, status and notes)')
+      .addTag('divisions', 'Division routing on a shared number (menu, keywords and CS assignment)')
       .addTag('crm', 'Sales pipeline (stages, deals and activity history)')
       .addTag('campaigns', 'Broadcast campaigns (audience, chunks and per-recipient results)')
       .addTag('media', 'Media conversion')

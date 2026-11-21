@@ -11,6 +11,7 @@ import { RoleProvider } from './components/RoleProvider';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { API_BASE_URL } from './services/api';
 import { clearActorState, isUserRole, resolveStartupValidation } from './utils/authLifecycle';
+import { clearCredential, readCredential, storeAccount, storeCredential, type StoredAccount } from './utils/credential';
 import './App.css';
 
 const Login = lazy(() => import('./pages/Login').then(m => ({ default: m.Login })));
@@ -18,12 +19,14 @@ const Dashboard = lazy(() => import('./pages/Dashboard').then(m => ({ default: m
 const Sessions = lazy(() => import('./pages/Sessions').then(m => ({ default: m.Sessions })));
 const Chats = lazy(() => import('./pages/Chats').then(m => ({ default: m.Chats })));
 const Inbox = lazy(() => import('./pages/Inbox').then(m => ({ default: m.Inbox })));
+const Divisions = lazy(() => import('./pages/Divisions').then(m => ({ default: m.Divisions })));
 const Pipeline = lazy(() => import('./pages/Pipeline').then(m => ({ default: m.Pipeline })));
 const Campaigns = lazy(() => import('./pages/Campaigns').then(m => ({ default: m.Campaigns })));
 const Webhooks = lazy(() => import('./pages/Webhooks').then(m => ({ default: m.Webhooks })));
 const Templates = lazy(() => import('./pages/Templates').then(m => ({ default: m.Templates })));
 const Logs = lazy(() => import('./pages/Logs').then(m => ({ default: m.Logs })));
 const ApiKeys = lazy(() => import('./pages/ApiKeys').then(m => ({ default: m.ApiKeys })));
+const Users = lazy(() => import('./pages/Users').then(m => ({ default: m.Users })));
 const MessageTester = lazy(() => import('./pages/MessageTester').then(m => ({ default: m.MessageTester })));
 const NumberChecker = lazy(() => import('./pages/NumberChecker').then(m => ({ default: m.NumberChecker })));
 const Infrastructure = lazy(() => import('./pages/Infrastructure').then(m => ({ default: m.Infrastructure })));
@@ -41,10 +44,9 @@ const queryClient = new QueryClient({
 
 function AppContent() {
   // Capture the key ONCE at mount. Read live per render, the null→key transition when
-  // handleLogin stores a fresh key would re-fire the startup re-validation effect below and
-  // double the /auth/validate request on every sign-in — the effect is for genuine page
-  // refreshes with a saved key only.
-  const [savedKey] = useState(() => sessionStorage.getItem('openwa_api_key'));
+  // handleLogin stores a fresh key would re-fire the startup check below and double the /auth/me
+  // request on every sign-in — the effect is for genuine page refreshes with a saved key only.
+  const [savedKey] = useState(() => readCredential());
   const [isAuthenticated, setIsAuthenticated] = useState(!!savedKey);
   const [, setApiKey] = useState(savedKey || '');
   const { setRole, role, setEngineType, setScoped, scoped, setKeyIdentity } = useRole();
@@ -56,9 +58,13 @@ function AppContent() {
     scoped = false,
     keyId?: string,
     keyName?: string,
+    user?: StoredAccount,
   ) => {
     setApiKey(key);
-    sessionStorage.setItem('openwa_api_key', key);
+    storeCredential(key);
+    // An API-key sign-in passes no account, which also clears the name cached by an earlier email
+    // sign-in in this tab, so the Users page never marks a key's caller as a person.
+    storeAccount(user ?? null);
 
     // The login page's validate response already carried the role, so no second /auth/validate
     // round-trip is needed here. An absent or unrecognized role falls back to viewer, the
@@ -78,7 +84,7 @@ function AppContent() {
     setEngineType(null);
     setScoped(false);
     setKeyIdentity?.(null, null);
-    sessionStorage.removeItem('openwa_api_key');
+    clearCredential();
     // Wipe the React Query cache too: it is keyed by resource, not actor, so without a full
     // clear a logout → login in the same tab with a different key/scope shows the previous
     // actor's sessions/messages/apiKeys/audit rows.
@@ -89,24 +95,32 @@ function AppContent() {
   useEffect(() => {
     if (!savedKey) return;
 
-    fetch(`${API_BASE_URL}/auth/validate`, {
-      method: 'POST',
+    // /auth/me answers for both credential kinds and adds the signed-in account, so one round-trip
+    // refreshes the role, the session scope, the key identity and the stored account name. It is
+    // the same trust decision /auth/validate feeds: 401/403 logs out, 429/5xx keeps the cache.
+    fetch(`${API_BASE_URL}/auth/me`, {
+      method: 'GET',
       headers: { 'X-API-Key': savedKey },
     })
       .then(async res => {
         const body: {
-          valid?: boolean;
+          user?: StoredAccount | null;
           role?: string;
           engineType?: string;
           scoped?: unknown;
           keyId?: unknown;
           keyName?: unknown;
         } | null = await res.json().catch(() => null);
-        const decision = resolveStartupValidation(res.status, body);
+        // resolveStartupValidation reads the /auth/validate shape; a 2xx from /auth/me is the same
+        // proof of validity that endpoint's `valid: true` carries.
+        const decision = resolveStartupValidation(
+          res.status,
+          body ? { valid: true, role: body.role, engineType: body.engineType, scoped: body.scoped } : null,
+        );
         // Nothing cancels this request on logout. If the user has since signed out, or back in with
         // another key, the answer is about a key no longer in use: applying it would hand the new
         // session the old key's role, or log it out over the old key's 401.
-        if (sessionStorage.getItem('openwa_api_key') !== savedKey) return;
+        if (readCredential() !== savedKey) return;
         if (decision.action === 'logout') {
           handleLogout();
         } else if (decision.action === 'role') {
@@ -116,6 +130,14 @@ function AppContent() {
           if (typeof body?.keyId === 'string') {
             setKeyIdentity?.(body.keyId, typeof body.keyName === 'string' ? body.keyName : null);
           }
+          // A session token resolves to its account; an API key resolves to null, which drops any
+          // account left behind by an earlier email sign-in in this tab.
+          const account = body?.user;
+          storeAccount(
+            account && typeof account.id === 'string' && typeof account.email === 'string'
+              ? { id: account.id, email: account.email, name: account.name }
+              : null,
+          );
         }
       })
       .catch(() => {
@@ -150,12 +172,14 @@ function AppContent() {
                 <Route path="sessions" element={<Sessions />} />
                 <Route path="chats" element={<Chats />} />
                 <Route path="inbox" element={<Inbox />} />
+                {role === 'admin' && <Route path="divisions" element={<Divisions />} />}
                 <Route path="pipeline" element={<Pipeline />} />
                 <Route path="campaigns" element={<Campaigns />} />
                 <Route path="number-checker" element={<NumberChecker />} />
                 <Route path="webhooks" element={<Webhooks />} />
                 <Route path="templates" element={<Templates />} />
                 {role === 'admin' && !scoped && <Route path="api-keys" element={<ApiKeys />} />}
+                {role === 'admin' && !scoped && <Route path="users" element={<Users />} />}
                 {role === 'admin' && <Route path="logs" element={<Logs />} />}
                 <Route path="message-tester" element={<MessageTester />} />
                 {role === 'admin' && !scoped && <Route path="infrastructure" element={<Infrastructure />} />}

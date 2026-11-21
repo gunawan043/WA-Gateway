@@ -281,6 +281,10 @@ services:
       - PLUGIN_DOWNLOAD_ALLOW_INSECURE_REDIRECTS=${PLUGIN_DOWNLOAD_ALLOW_INSECURE_REDIRECTS:-false}
       # Security
       - API_MASTER_KEY=${API_MASTER_KEY:-}
+      # First dashboard account, seeded on the boot that finds no accounts. Both must be set.
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
+      - AUTH_SESSION_TTL_HOURS=${AUTH_SESSION_TTL_HOURS:-}
       - TRUSTED_PROXIES=${TRUSTED_PROXIES:-}
       # Forward the plain-HTTP dashboard CSP override; unset preserves the application default.
       - CSP_UPGRADE_INSECURE_REQUESTS=${CSP_UPGRADE_INSECURE_REQUESTS:-}

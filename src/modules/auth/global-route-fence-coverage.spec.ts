@@ -40,6 +40,13 @@ const ALLOWLIST = new Map<string, string>([
   // The inbox's agent picker. Returns active key ids and display names only — no scope, usage or
   // secret — and reads no session or chat data, so a session-scoped agent may reach it.
   ['auth-agents.controller.ts :: findAll', 'directory of active key ids and names only; no session data'],
+  // The signed-in account's own surface. Each acts only on the credential that made the request —
+  // the calling session or the calling key — and looks up no session or chat by id, so a
+  // session-restricted key cannot reach another tenant through them. A scoped operator must keep
+  // being able to sign out and change its own password.
+  ['auth-session.controller.ts :: me', 'describes the calling credential only; no resource lookup'],
+  ['auth-session.controller.ts :: logout', 'revokes the calling session only; no resource lookup'],
+  ['auth-session.controller.ts :: changePassword', 'changes the calling account only; no resource lookup'],
 ]);
 
 /**

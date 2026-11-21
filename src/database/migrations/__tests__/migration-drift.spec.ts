@@ -129,6 +129,7 @@ const dataConnection = (): DataSource =>
       join(repoRoot, 'src/modules/inbox/**/*.entity{.ts,.js}'),
       join(repoRoot, 'src/modules/crm/**/*.entity{.ts,.js}'),
       join(repoRoot, 'src/modules/campaign/**/*.entity{.ts,.js}'),
+      join(repoRoot, 'src/modules/division/**/*.entity{.ts,.js}'),
     ],
     migrations: importMigrations(join(repoRoot, 'src/database/migrations')) as never,
   });

@@ -19,8 +19,9 @@ OpenWA supports two database backends that can be selected at deployment time:
 | **SQLite**     | Development, personal bot, low-resource VPS | 1-5      | ❌                 |
 | **PostgreSQL** | Production, multi-session, high volume      | 5+       | ✅                 |
 
-The PostgreSQL row covers the data database only. The main database (`api_keys`, `audit_logs`) is
-always a SQLite file on each node, and running more than one replica is not supported yet; see
+The PostgreSQL row covers the data database only. The main database (`api_keys`, `audit_logs`,
+`users`, `user_sessions`) is always a SQLite file on each node, and running more than one replica is
+not supported yet; see
 [13 - Horizontal Scaling Guide](./13-horizontal-scaling.md).
 
 > [!NOTE]
@@ -48,8 +49,8 @@ OpenWA v0.2+ implements a **dual-database architecture** that separates boot con
 ├─────────────────────────────┼───────────────────────────────────┤
 │ • api_keys                  │ • sessions                        │
 │ • audit_logs                │ • webhooks                        │
-│                             │ • messages                        │
-│                             │ • message_batches                 │
+│ • users                     │ • messages                        │
+│ • user_sessions             │ • message_batches                 │
 │                             │ • templates                       │
 │                             │ • status_updates                  │
 │                             │ • webhook_delivery_failures       │
@@ -201,7 +202,7 @@ connectedAt!: Date | null;
 ```
 
 > [!NOTE]
-> Main DB entities (api_keys, audit_logs) use native SQLite `datetime` type since they always remain in SQLite.
+> Main DB entities (api_keys, audit_logs, users, user_sessions) use native SQLite `datetime` type since they always remain in SQLite.
 
 #### Timestamps on PostgreSQL are UTC
 
@@ -315,7 +316,7 @@ erDiagram
     }
 ```
 
-Only `webhooks`, `templates`, `automation_rules` and `baileys_stored_messages` declare an `ON DELETE CASCADE` foreign key to `sessions.id`. `messages`, `message_batches`, `chat_states`, `status_updates`, `webhook_outbox_events`, `webhook_delivery_failures`, `integration_delivery_failures` and `send_idempotency_keys` reference it through a plain `sessionId` (`session_id` on `message_batches`) with no foreign key. Deleting a session through the API removes their rows explicitly; a raw `DELETE FROM sessions` leaves them behind.
+Only `webhooks`, `templates`, `automation_rules`, `baileys_stored_messages`, `divisions`, `division_settings` and `division_chat_states` declare an `ON DELETE CASCADE` foreign key to `sessions.id`. `messages`, `message_batches`, `chat_states`, `status_updates`, `webhook_outbox_events`, `webhook_delivery_failures`, `integration_delivery_failures` and `send_idempotency_keys` reference it through a plain `sessionId` (`session_id` on `message_batches`) with no foreign key. Deleting a session through the API removes their rows explicitly; a raw `DELETE FROM sessions` leaves them behind.
 
 ## 5.3 Table Specifications
 
@@ -686,7 +687,10 @@ plugin instances (`integration_instance_created`, `integration_instance_updated`
 `plugin_enabled`, `plugin_disabled`, `plugin_config_updated`, `plugin_sessions_updated`; metadata carries the plugin
 id, version, the host of the requested download URL and config field names, never config values), and ADMIN-only infrastructure operations (`infra_config_saved`,
 `infra_restart_requested`, `infra_data_exported`, `infra_data_imported`, `infra_storage_exported`,
-`infra_storage_imported`).
+`infra_storage_imported`), and dashboard accounts (`user_login_succeeded`, `user_login_failed`,
+`user_created`, `user_updated`, `user_deleted`, `user_password_changed`, `user_password_reset`,
+`user_session_revoked`; a failed login records the attempted email in metadata — never the password —
+and is capped at 10 rows per client IP per minute, like any other rejection that names no stored key).
 
 Six of these are reserved and never emitted, so no row ever carries them: `api_key_used`,
 `session_connected`, `message_sent`, `message_failed`, `webhook_triggered` and `webhook_failed`.
@@ -695,6 +699,85 @@ authoritative list, with the reason for each. The `error` severity is reserved t
 
 > [!NOTE]
 > Audit-log retention is automatic: see [§5.7 Data Retention](#57-data-retention). Other event types (session logs, API access logs) are surfaced via structured application logging, not dedicated database tables. The one exception is a webhook delivery that exhausts every retry — that lands in the `webhook_delivery_failures` table (§5.3.8), not just the log stream.
+
+---
+
+### 5.3.6a users
+
+Dashboard accounts — the email/password identities a person signs in with. Lives on the **main**
+(always-SQLite) connection, next to `api_keys`.
+
+```sql
+CREATE TABLE users (
+    id VARCHAR PRIMARY KEY,
+    email VARCHAR(190) NOT NULL,                   -- UNIQUE index; stored trimmed and lowercased
+    name VARCHAR(100) NOT NULL,
+    "passwordHash" VARCHAR(255) NOT NULL,          -- scrypt$N$r$p$saltB64$hashB64, never returned by any route
+    role VARCHAR(20) NOT NULL DEFAULT 'operator',  -- admin | operator | viewer
+    "isActive" BOOLEAN NOT NULL DEFAULT 1,
+    "apiKeyId" VARCHAR(36) NOT NULL,               -- UNIQUE index; the linked api_keys row
+    "lastLoginAt" DATETIME,
+    "createdAt" DATETIME NOT NULL DEFAULT (datetime('now')),
+    "updatedAt" DATETIME NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE UNIQUE INDEX "UQ_users_email" ON users(email);
+CREATE UNIQUE INDEX "UQ_users_apiKeyId" ON users("apiKeyId");
+```
+
+> [!NOTE]
+> **One identity, two credentials.** Every user owns exactly one `api_keys` row (`users."apiKeyId"`),
+> created in the same transaction. A password login resolves to that key, so everything downstream —
+> the role hierarchy, the chat fence, audit attribution, inbox assignment, the WebSocket per-key
+> socket cap — keeps reading `request.apiKey` and needed no second principal. The key's plaintext is
+> generated and discarded at creation, so a user's key can never be handed to a caller; it exists so
+> the account *is* a key. For that reason `PATCH`/`DELETE`/`revoke` on `/api/auth/api-keys` answer
+> **409** for a user-managed key rather than orphaning the account — delete the user instead.
+>
+> There is no cross-table foreign key between `users` and `api_keys`: the auth tables predate foreign
+> keys here, and a cascade would silently remove the actor of an existing audit row. The link is
+> enforced by `UsersService`, which mirrors `name`/`role`/`isActive` onto the key and revokes the
+> account's sessions when it is disabled.
+
+> [!NOTE]
+> Password reset is an ADMIN action that sets a new password and revokes the target's sessions; there
+> is no email delivery, no reset link and no "forgot password" route. The first account is seeded from
+> `ADMIN_EMAIL`/`ADMIN_PASSWORD` on the first boot of an empty `users` table (see §5.6 and
+> [10 - DevOps Infrastructure](./10-devops-infrastructure.md)).
+
+---
+
+### 5.3.6b user_sessions
+
+One row per dashboard sign-in. Lives on the **main** (always-SQLite) connection, next to `users`.
+
+```sql
+CREATE TABLE user_sessions (
+    id VARCHAR PRIMARY KEY,
+    "userId" VARCHAR(36) NOT NULL,
+    "tokenHash" VARCHAR(64) NOT NULL,              -- UNIQUE index; SHA-256/HMAC of the token
+    "expiresAt" DATETIME NOT NULL,
+    "revokedAt" DATETIME,
+    "lastSeenAt" DATETIME,
+    "userAgent" VARCHAR(255),
+    "ipAddress" VARCHAR(45),
+    "createdAt" DATETIME NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE UNIQUE INDEX "UQ_user_sessions_tokenHash" ON user_sessions("tokenHash");
+CREATE INDEX "IDX_user_sessions_userId" ON user_sessions("userId");
+```
+
+The browser receives the raw token once, as `owa_s1_<64 hex>`, and sends it in `X-API-Key` (or
+`Authorization: Bearer`). Only the hash is stored, exactly as with `api_keys."keyHash"` — the same
+`API_KEY_PEPPER` HMAC applies, so a stolen `main.sqlite` yields no usable token.
+
+> [!NOTE]
+> Revoking sets `"revokedAt"` and keeps the row; nothing deletes a session on logout. That is
+> deliberate: the WebSocket sweep re-reads these rows and disconnects a socket whose session was
+> revoked or expired, which it could not do if the row were gone. Rows past `"expiresAt"` are pruned
+> on a schedule (§5.7), and `"lastSeenAt"` is written at most once every five minutes per session so
+> a chatty dashboard does not turn every request into a write.
 
 ### 5.3.7 message_batches
 
@@ -749,6 +832,7 @@ The data connection also owns:
 - **`integration_delivery_failures`**: DLQ-of-record for failed inbound (ingress) deliveries, the rows the instance redrive replays; only the ingress path writes it, and only as `inbound`. A data import restores each row's `direction` as stored, and redrive replays only `inbound` rows (`src/modules/integration/entities/integration-delivery-failure.entity.ts`).
 - **`baileys_stored_messages`** — Baileys engine message store — the serialized WAMessage proto (`src/engine/adapters/baileys-stored-message.entity.ts`); present only when the Baileys engine is used. With `STORE_EPHEMERAL_MESSAGES=false` it keeps no copy of a message received in a disappearing-messages chat; what the account sent there through the API's message send routes (a product send included) or typed on its phone, and a status, keep theirs. (Credentials live on the filesystem, not here.)
 - **`lid_mappings`** — LID↔phone-number identity mappings (`src/engine/identity/lid-mapping.entity.ts`).
+- **`divisions`, `division_agents`, `division_settings`, `division_chat_states`** — division routing on a shared number (`src/modules/division/entities/`). `divisions` is unique on `(sessionId, name)` and indexed on `(sessionId, sortOrder)`; `keywords` is a JSON array of normalised phrases. `division_agents` is unique on `(divisionId, apiKeyId)` and keeps `agentName` as a snapshot; it has no foreign key to `api_keys`, which lives on the main connection. `division_settings` is one row per session (unique `sessionId`), and the defaults live in code rather than in the row. `division_chat_states` is unique on `(sessionId, chatId)` and holds the prompt claim (`promptedAt`), the menu the customer was shown (`menuDivisionIds`), the routed `divisionId` (`ON DELETE SET NULL`, so deleting a division re-prompts the chat instead of stranding it) and the idle clock. `inbox_conversations.divisionId`/`divisionName` are the denormalised tag the Inbox filters and groups by; they carry no foreign key, so a conversation keeps its CS after the division is deleted.
 - **`chat_states`** (engine): per-session mute, archive and pin state of each Baileys chat (`src/engine/adapters/baileys-chat-state.entity.ts`), keyed `(sessionId, chatId)`. `chatId` is the person's phone JID (`<phone>@s.whatsapp.net`) whenever their lid resolves, so a state WhatsApp syncs under the lid and one set through the phone number land on the same row; it stays `<lid>@lid` while the lid is unresolved, and a row found under the lid later is folded onto the phone JID on the chat's next change (reads and the fold take each field from the newest row that observed it: `observed` lists the fields a row has seen, and null, on a row not written since the column was added, means the fields it holds a set value for; the next write that can read the row records the list). WhatsApp does not re-deliver that state, so it is kept in backups. A chat deleted on the phone or through the API keeps its row with the state reset and `deletedAt` set (epoch ms): the gateway keeps the chat's stored messages, and one from before the deletion must neither key a chat write nor list the chat again. A later message re-creates the chat and the row goes, so it starts clean.
 
 `lid_mappings.isReported` distinguishes engine mapping reports from cache-only display data. Phone/LID alias authorization, candidate expansion and list filters use only reported mappings. A conflicting cached phone revokes alias trust without replacing the stored phone, and a later actual report restores it. The migration conservatively marks older mixed-origin rows as display data; backups carry the flag, and older backups restore with alias access disabled until a new report arrives.
@@ -781,6 +865,9 @@ These indexes are the ones declared on the entities (see §5.3); the rows below 
 | Message stats over a date range  | `IDX_messages_createdAt`                                              | Medium    |
 | Find a session's webhooks        | `IDX_webhooks_sessionId`                                              | Very High |
 | Authenticate API key             | UNIQUE on `api_keys("keyHash")`, main DB                              | Very High |
+| Sign in / find an account        | `UQ_users_email` (UNIQUE), main DB                                    | High      |
+| Resolve a session token          | `UQ_user_sessions_tokenHash` (UNIQUE), main DB                        | Very High |
+| Revoke every session of a user   | `IDX_user_sessions_userId`, main DB                                   | Low       |
 | Filter audit logs                | `audit_logs` indexes on `action` / `apiKeyId` / `sessionId`           | Medium    |
 
 ### Composite & Unique Indexes (as implemented)
@@ -807,6 +894,13 @@ ALTER TABLE message_batches ADD CONSTRAINT "UQ_message_batches_session_id_batch_
 -- audit_logs (main DB): filter by action / key / session, ordered by time
 CREATE INDEX "IDX_audit_logs_action" ON audit_logs(action);
 CREATE INDEX "IDX_audit_logs_createdAt" ON audit_logs("createdAt");
+
+-- users / user_sessions (main DB): one account per email, one row per sign-in,
+-- and every live session of an account found by user id on revoke-all.
+CREATE UNIQUE INDEX "UQ_users_email"             ON users(email);
+CREATE UNIQUE INDEX "UQ_users_apiKeyId"          ON users("apiKeyId");
+CREATE UNIQUE INDEX "UQ_user_sessions_tokenHash" ON user_sessions("tokenHash");
+CREATE INDEX        "IDX_user_sessions_userId"   ON user_sessions("userId");
 ```
 
 > [!NOTE]
@@ -897,7 +991,7 @@ OpenWA runs **two separate TypeORM connections**, each with its own migrations d
 
 | Connection | DataSource            | Migrations dir                  | Owns                                                                                                                                                                                                                                                                                                                                                      |
 | ---------- | --------------------- | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **main**   | `data-source-main.ts` | `src/database/migrations-main/` | `api_keys`, `audit_logs`, always SQLite (`./data/main.sqlite` by default)                                                                                                                                                                                                                                                                                 |
+| **main**   | `data-source-main.ts` | `src/database/migrations-main/` | `api_keys`, `audit_logs`, `users`, `user_sessions`, always SQLite (`./data/main.sqlite` by default)                                                                                                                                                                                        |
 | **data**   | `data-source.ts`      | `src/database/migrations/`      | `sessions`, `webhooks`, `messages`, `message_batches`, `templates`, `status_updates`, `automation_rules`, `webhook_delivery_failures`, `webhook_outbox_events`, `send_idempotency_keys`, the integration tables (`plugin_instances`, `ingress_events`, `conversation_mappings`, `integration_delivery_failures`), engine tables, SQLite **or** PostgreSQL |
 
 Migrations are hand-authored and idempotent (`IF NOT EXISTS`) so they are safe to adopt on a database originally created by `synchronize`. The two connections differ in how schema is managed:
@@ -906,7 +1000,7 @@ Migrations are hand-authored and idempotent (`IF NOT EXISTS`) so they are safe t
 
   The data connection sends no session setting in the startup packet, which PgBouncer refuses for `statement_timeout`: the zone, the runtime `statement_timeout` and a custom schema's `search_path` are set by a statement on each new connection, and the boot lock connection turns `statement_timeout` off the same way, so PgBouncer in session mode needs no `ignore_startup_parameters` entry.
 
-- **main**: migration-managed by default, like data: `migrations-main/` creates and upgrades `api_keys` / `audit_logs` at boot. The chain is idempotent, so a `main.sqlite` an earlier release built with synchronize is adopted in place on the first boot (rows kept, missing columns added, the ledger written). `MAIN_DATABASE_SYNCHRONIZE=true` additionally synchronizes after the chain, for development; it cannot add an entity column that has no migration yet, because the missing-column check below refuses the boot first, so write the migration in `migrations-main/`. Boot logs a warning when it is set under `NODE_ENV=production`. Before any provider reads the file, boot refuses to start (in both modes) when the ledger records a migration this release does not ship (a newer release upgraded the file) or when an entity column is still missing after the chain ran (an older release rebuilt the table, so its values are gone, or the column has no migration yet); the error names the migration or column. For a newer ledger or a rebuilt table, the remedy is restoring `main.sqlite` from the backup taken before the downgrade or upgrade; for a column with no migration yet, it is adding one in `migrations-main/`. For a table rebuilt without `api_keys.allowedChats` and no backup, stop the instance, delete that migration's ledger row from the file the error names (the `MAIN_DATABASE_NAME` path, `data/main.sqlite` by default) and start it. On a source install that is `sqlite3 data/main.sqlite "DELETE FROM migrations WHERE name = 'AddApiKeyAllowedChats1786600000000'"`. On the compose deployment the file lives in the `openwa-data` volume, not on the host, and a stopped container cannot be exec'd into, so run the CLI in a one-off container of the service: `docker compose stop openwa-api && docker compose run --rm --no-deps openwa-api sqlite3 /app/data/main.sqlite "DELETE FROM migrations WHERE name = 'AddApiKeyAllowedChats1786600000000'"` (with `MAIN_DATABASE_NAME` set, use that path under `/app`). On the Helm chart, scale the StatefulSet to 0 and start the `openwa-restore` helper pod on the release's data PVC as [11 - Runbook: Restore from Backup](./11-operational-runbooks.md#runbook-restore-from-backup) does, run `kubectl exec openwa-restore -- sqlite3 /app/data/main.sqlite "DELETE FROM migrations WHERE name = 'AddApiKeyAllowedChats1786600000000'"`, then delete the pod and scale back to 1. Then the chain re-creates `api_keys.allowedChats` empty, which means every chat, so re-apply each key's `allowedChats` before exposing the API. A file whose ledger does not record the lost column's migration (0.23.6 and 0.23.7 wrote the ledger only with `MAIN_DATABASE_SYNCHRONIZE=false`) is not detected: the column comes back empty, which means every chat, so each key's `allowedChats` must be re-applied. Never delete or rename a `migrations-main/` file: its ledger row would read as a newer release's.
+- **main**: migration-managed by default, like data: `migrations-main/` creates and upgrades `api_keys` / `audit_logs` / `users` / `user_sessions` at boot. The chain is idempotent, so a `main.sqlite` an earlier release built with synchronize is adopted in place on the first boot (rows kept, missing columns added, the ledger written). `MAIN_DATABASE_SYNCHRONIZE=true` additionally synchronizes after the chain, for development; it cannot add an entity column that has no migration yet, because the missing-column check below refuses the boot first, so write the migration in `migrations-main/`. Boot logs a warning when it is set under `NODE_ENV=production`. Before any provider reads the file, boot refuses to start (in both modes) when the ledger records a migration this release does not ship (a newer release upgraded the file) or when an entity column is still missing after the chain ran (an older release rebuilt the table, so its values are gone, or the column has no migration yet); the error names the migration or column. For a newer ledger or a rebuilt table, the remedy is restoring `main.sqlite` from the backup taken before the downgrade or upgrade; for a column with no migration yet, it is adding one in `migrations-main/`. For a table rebuilt without `api_keys.allowedChats` and no backup, stop the instance, delete that migration's ledger row from the file the error names (the `MAIN_DATABASE_NAME` path, `data/main.sqlite` by default) and start it. On a source install that is `sqlite3 data/main.sqlite "DELETE FROM migrations WHERE name = 'AddApiKeyAllowedChats1786600000000'"`. On the compose deployment the file lives in the `openwa-data` volume, not on the host, and a stopped container cannot be exec'd into, so run the CLI in a one-off container of the service: `docker compose stop openwa-api && docker compose run --rm --no-deps openwa-api sqlite3 /app/data/main.sqlite "DELETE FROM migrations WHERE name = 'AddApiKeyAllowedChats1786600000000'"` (with `MAIN_DATABASE_NAME` set, use that path under `/app`). On the Helm chart, scale the StatefulSet to 0 and start the `openwa-restore` helper pod on the release's data PVC as [11 - Runbook: Restore from Backup](./11-operational-runbooks.md#runbook-restore-from-backup) does, run `kubectl exec openwa-restore -- sqlite3 /app/data/main.sqlite "DELETE FROM migrations WHERE name = 'AddApiKeyAllowedChats1786600000000'"`, then delete the pod and scale back to 1. Then the chain re-creates `api_keys.allowedChats` empty, which means every chat, so re-apply each key's `allowedChats` before exposing the API. A file whose ledger does not record the lost column's migration (0.23.6 and 0.23.7 wrote the ledger only with `MAIN_DATABASE_SYNCHRONIZE=false`) is not detected: the column comes back empty, which means every chat, so each key's `allowedChats` must be re-applied. Never delete or rename a `migrations-main/` file: its ledger row would read as a newer release's.
 
 ### Migration Files
 
@@ -914,7 +1008,8 @@ Migrations are hand-authored and idempotent (`IF NOT EXISTS`) so they are safe t
 src/database/migrations-main/      # main connection (auth + audit, SQLite)
 ├── 1779900000000-CreateAuthAuditTables.ts   # creates api_keys + audit_logs
 ├── 1786600000000-AddApiKeyAllowedChats.ts   # adds api_keys.allowedChats
-└── 1786610000000-DropSynchronizeIndexDuplicates.ts  # drops synchronize-named duplicate indexes
+├── 1786610000000-DropSynchronizeIndexDuplicates.ts  # drops synchronize-named duplicate indexes
+└── 1786700000000-AddUsersAndSessions.ts     # creates users + user_sessions (dashboard sign-in)
 
 src/database/migrations/           # data connection (pluggable)
 ├── 1770108659848-AddMessageStatus.ts
@@ -969,7 +1064,8 @@ src/database/migrations/           # data connection (pluggable)
 ├── 1791800000000-AddStatusMediaPathIndex.ts   # partial index on status_updates.mediaPath (orphan sweep)
 ├── 1791900000000-CreateInboxTables.ts   # inbox_conversations + inbox_notes (team inbox)
 ├── 1792000000000-CreateCrmTables.ts   # crm_stages (seeded) + crm_deals + crm_deal_activities (sales pipeline)
-└── 1792100000000-CreateCampaignTables.ts   # campaigns + campaign_recipients + campaign_segments (broadcast)
+├── 1792100000000-CreateCampaignTables.ts   # campaigns + campaign_recipients + campaign_segments (broadcast)
+└── 1792200000000-CreateDivisionTables.ts   # divisions + division_agents + division_settings + division_chat_states, and inbox_conversations.divisionId/divisionName (shared-number routing)
 ```
 
 > [!NOTE]
@@ -1004,7 +1100,7 @@ export class AddMessagesWaMessageIdUnique1781300000000 implements MigrationInter
 
 ### Retention Policies
 
-Seven tables have an automated _time-based_ retention job, across six services: **`audit_logs`**, **`status_updates`**, **`webhook_delivery_failures`**, **`webhook_outbox_events`** (settled rows only), **`ingress_events`**, **`integration_delivery_failures`** and **`send_idempotency_keys`**. Separately, **`baileys_stored_messages`** is capped per session rather than by age: each write keeps the newest `BAILEYS_MESSAGE_STORE_LIMIT` rows (default 5000) for that session and deletes the rest. Everything else is kept indefinitely (api keys, sessions, webhooks, pending and processing batches, templates, conversation mappings, plugin instances, lid mappings, chat states, automation rules) and is removed only by user action (e.g. deleting a session) or operational backup/restore. An unlink of a Baileys session's account, through `POST /api/sessions/:sessionId/logout` or initiated by WhatsApp, also deletes that session's `baileys_stored_messages` and `chat_states` rows (see that route in [06 - API Specification](./06-api-specification.md)). Two more, `messages` and finished `message_batches`, have an opt-in time-based job (`MESSAGE_RETENTION_DAYS`, off by default); until it is set they are kept indefinitely too.
+Eight tables have an automated _time-based_ retention job, across seven services: **`audit_logs`**, **`user_sessions`** (rows past `expiresAt`, swept hourly), **`status_updates`**, **`webhook_delivery_failures`**, **`webhook_outbox_events`** (settled rows only), **`ingress_events`**, **`integration_delivery_failures`** and **`send_idempotency_keys`**. Separately, **`baileys_stored_messages`** is capped per session rather than by age: each write keeps the newest `BAILEYS_MESSAGE_STORE_LIMIT` rows (default 5000) for that session and deletes the rest. Everything else is kept indefinitely (api keys, dashboard accounts, WhatsApp sessions, webhooks, pending and processing batches, templates, conversation mappings, plugin instances, lid mappings, chat states, automation rules) and is removed only by user action (e.g. deleting a session) or operational backup/restore. An unlink of a Baileys session's account, through `POST /api/sessions/:sessionId/logout` or initiated by WhatsApp, also deletes that session's `baileys_stored_messages` and `chat_states` rows (see that route in [06 - API Specification](./06-api-specification.md)). Two more, `messages` and finished `message_batches`, have an opt-in time-based job (`MESSAGE_RETENTION_DAYS`, off by default); until it is set they are kept indefinitely too.
 
 | Data Type                     | Default Retention | Configurable                                                    |
 | ----------------------------- | ----------------- | --------------------------------------------------------------- |

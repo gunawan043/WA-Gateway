@@ -63,6 +63,8 @@
 | 29  | [Engine Capability Matrix](./29-engine-capability-matrix.md)             | Per-engine capability support, gaps, and roadmap                                   |
 | 30  | [Plugin Sandboxing](./30-plugin-sandboxing.md)                           | Worker isolation, capabilities, and plugin limits                                  |
 | 31  | [Session Lifecycle: Invariant Catalog](./31-session-lifecycle-design.md) | The race windows the lifecycle defends, where each is defended, which spec pins it |
+| 32  | [Laravel Integration](./32-laravel-integration.md)                       | Sending from Laravel and receiving inbound messages with a verified webhook       |
+| 33  | [Division Routing](./33-division-routing.md)                             | One shared number, several teams: menu, keywords, CS assignment and the inbox tag |
 
 **Examples**
 

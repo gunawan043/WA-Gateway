@@ -2,6 +2,7 @@ import { useEffect, useRef, useCallback, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { API_ORIGIN } from '../services/api';
 import { resolveSocketUrl, warnIfInsecureHttpUrl } from '../utils/urlSecurity';
+import { readCredential } from '../utils/credential';
 
 interface SessionStatusEvent {
   sessionId: string;
@@ -329,8 +330,8 @@ export function useWebSocket(events: WebSocketEvents = {}) {
   const connect = useCallback(() => {
     if (socketRef.current?.connected) return;
 
-    // Get API key from sessionStorage (same as api.ts)
-    const apiKey = sessionStorage.getItem('openwa_api_key');
+    // The one credential slot (same as api.ts): an API key or a dashboard session token.
+    const apiKey = readCredential();
 
     if (!apiKey) {
       console.warn('[WebSocket] No API key found, skipping connection');

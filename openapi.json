@@ -63,6 +63,14 @@
                 "api_key_revoked",
                 "api_key_deleted",
                 "api_key_auth_failed",
+                "user_login_succeeded",
+                "user_login_failed",
+                "user_created",
+                "user_updated",
+                "user_deleted",
+                "user_password_changed",
+                "user_password_reset",
+                "user_session_revoked",
                 "rate_limit_exceeded",
                 "queue_board_mutated",
                 "session_created",
@@ -103,8 +111,14 @@
                 "plugin_sessions_updated",
                 "inbox_conversation_assigned",
                 "inbox_conversation_status_changed",
+                "inbox_conversation_division_changed",
                 "inbox_note_added",
                 "inbox_note_deleted",
+                "division_created",
+                "division_updated",
+                "division_deleted",
+                "division_settings_updated",
+                "division_routed",
                 "crm_deal_created",
                 "crm_deal_stage_changed",
                 "crm_deal_deleted",
@@ -650,6 +664,529 @@
           }
         },
         "summary": "List active agents (API key id and display name) for assignment pickers",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "operationId": "AuthSessionController_login",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Email or password is incorrect, or the account is disabled"
+          },
+          "429": {
+            "description": "Too many attempts from this address"
+          }
+        },
+        "summary": "Sign in with email and password and receive a session token",
+        "tags": [
+          "auth"
+        ],
+        "security": []
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "operationId": "AuthSessionController_logout",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": "Session revoked"
+          },
+          "400": {
+            "description": "The credential is an API key, not a dashboard session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credential",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key's role, session or chat scope, or IP allow-list does not allow this operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Revoke the session token that made this request",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/me": {
+      "get": {
+        "operationId": "AuthSessionController_me",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Caller identity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credential",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key's role, session or chat scope, or IP allow-list does not allow this operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Describe the credential that made this request",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/change-password": {
+      "post": {
+        "operationId": "AuthSessionController_changePassword",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePasswordDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Password changed; every other session was revoked"
+          },
+          "400": {
+            "description": "The credential is an API key, not a dashboard session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Current password is incorrect, or the credential is invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key's role, session or chat scope, or IP allow-list does not allow this operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Change the signed-in account password",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/users": {
+      "get": {
+        "operationId": "AuthUsersController_findAll",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Accounts, newest first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UserResponseDto"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credential",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Role below ADMIN, or a session-scoped key. Also returned when the API key's role, session or chat scope, or IP allow-list does not allow this operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List dashboard accounts (admin only)",
+        "tags": [
+          "auth"
+        ]
+      },
+      "post": {
+        "operationId": "AuthUsersController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUserDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Account created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credential",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Role below ADMIN, or a session-scoped key. Also returned when the API key's role, session or chat scope, or IP allow-list does not allow this operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A user with that email already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Create a dashboard account (admin only)",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/users/{id}": {
+      "patch": {
+        "operationId": "AuthUsersController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUserDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Account updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credential",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Role below ADMIN, or a session-scoped key. Also returned when the API key's role, session or chat scope, or IP allow-list does not allow this operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such account",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The change would remove the last admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Update a dashboard account (admin only)",
+        "tags": [
+          "auth"
+        ]
+      },
+      "delete": {
+        "operationId": "AuthUsersController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Account deleted"
+          },
+          "401": {
+            "description": "Missing or invalid credential",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Role below ADMIN, or a session-scoped key. Also returned when the API key's role, session or chat scope, or IP allow-list does not allow this operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such account",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The account is the last admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Delete an account and its linked API key (admin only)",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/users/{id}/reset-password": {
+      "post": {
+        "operationId": "AuthUsersController_resetPassword",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetPasswordDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Password replaced; every session of the account was revoked"
+          },
+          "400": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credential",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Role below ADMIN, or a session-scoped key. Also returned when the API key's role, session or chat scope, or IP allow-list does not allow this operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such account",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Set a new password for an account and revoke its sessions (admin only)",
         "tags": [
           "auth"
         ]
@@ -4316,6 +4853,446 @@
         "summary": "Delete an autoreply rule",
         "tags": [
           "automation"
+        ]
+      }
+    },
+    "/api/sessions/{sessionId}/divisions": {
+      "get": {
+        "operationId": "DivisionController_list",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "required": true,
+            "in": "path",
+            "description": "Session ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Divisions ordered by sortOrder, then name.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DivisionDto"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API key is missing, unknown, revoked, or expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key's role, session or chat scope, or IP allow-list does not allow this operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List the session’s divisions in menu order",
+        "tags": [
+          "divisions"
+        ]
+      },
+      "post": {
+        "operationId": "DivisionController_create",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "required": true,
+            "in": "path",
+            "description": "Session ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDivisionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Division created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DivisionDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid keyword (only digits), unknown or inactive agent key, or the per-session limit is reached.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API key is missing, unknown, revoked, or expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key's role, session or chat scope, or IP allow-list does not allow this operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No session with this id.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A division with this name already exists in the session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Create a division",
+        "tags": [
+          "divisions"
+        ]
+      }
+    },
+    "/api/sessions/{sessionId}/divisions/settings": {
+      "get": {
+        "operationId": "DivisionController_getSettings",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "required": true,
+            "in": "path",
+            "description": "Session ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Settings, with defaults when never saved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DivisionSettingsDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API key is missing, unknown, revoked, or expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key's role, session or chat scope, or IP allow-list does not allow this operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Get the session’s routing settings",
+        "tags": [
+          "divisions"
+        ]
+      },
+      "patch": {
+        "operationId": "DivisionController_updateSettings",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "required": true,
+            "in": "path",
+            "description": "Session ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateDivisionSettingsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated settings.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DivisionSettingsDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The body is malformed, fails validation, or carries a field the DTO does not declare",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API key is missing, unknown, revoked, or expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key's role, session or chat scope, or IP allow-list does not allow this operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No session with this id.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Update the session’s routing settings",
+        "tags": [
+          "divisions"
+        ]
+      }
+    },
+    "/api/sessions/{sessionId}/divisions/{divisionId}": {
+      "patch": {
+        "operationId": "DivisionController_update",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "required": true,
+            "in": "path",
+            "description": "Session ID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "divisionId",
+            "required": true,
+            "in": "path",
+            "description": "Division ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateDivisionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated division.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DivisionDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid keyword, or an unknown or inactive agent key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API key is missing, unknown, revoked, or expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key's role, session or chat scope, or IP allow-list does not allow this operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such division in this session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A division with this name already exists in the session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Update a division, including its agents",
+        "tags": [
+          "divisions"
+        ]
+      },
+      "delete": {
+        "operationId": "DivisionController_remove",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "required": true,
+            "in": "path",
+            "description": "Session ID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "divisionId",
+            "required": true,
+            "in": "path",
+            "description": "Division ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Division deleted. Routed conversations keep their assignee."
+          },
+          "401": {
+            "description": "The API key is missing, unknown, revoked, or expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key's role, session or chat scope, or IP allow-list does not allow this operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such division in this session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Delete a division",
+        "tags": [
+          "divisions"
         ]
       }
     },
@@ -16050,6 +17027,15 @@
             }
           },
           {
+            "name": "division",
+            "required": false,
+            "in": "query",
+            "description": "`unassigned`, or a division id. Omit for every conversation.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "name": "q",
             "required": false,
             "in": "query",
@@ -20934,6 +21920,10 @@
       "description": "Team inbox (per-chat assignment, status and notes)"
     },
     {
+      "name": "divisions",
+      "description": "Division routing on a shared number (menu, keywords and CS assignment)"
+    },
+    {
       "name": "crm",
       "description": "Sales pipeline (stages, deals and activity history)"
     },
@@ -21400,6 +22390,270 @@
         "required": [
           "id",
           "name"
+        ]
+      },
+      "LoginDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "Email address of the dashboard account",
+            "example": "admin@example.com"
+          },
+          "password": {
+            "type": "string",
+            "description": "Account password",
+            "example": "a-long-passphrase"
+          }
+        },
+        "required": [
+          "email",
+          "password"
+        ]
+      },
+      "UserResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "User id"
+          },
+          "email": {
+            "type": "string",
+            "description": "Email address (lowercased)"
+          },
+          "name": {
+            "type": "string",
+            "description": "Display name"
+          },
+          "role": {
+            "type": "string",
+            "description": "Role",
+            "enum": [
+              "admin",
+              "operator",
+              "viewer"
+            ]
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "Whether the account may sign in"
+          },
+          "apiKeyId": {
+            "type": "string",
+            "description": "The linked API key id (its plaintext is never issued)"
+          },
+          "lastLoginAt": {
+            "type": "string",
+            "description": "Last successful sign-in",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "Creation time",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "name",
+          "role",
+          "isActive",
+          "apiKeyId",
+          "lastLoginAt",
+          "createdAt"
+        ]
+      },
+      "LoginResponseDto": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "description": "Opaque session token. Send it as `Authorization: Bearer <token>`. It is shown once and never stored in plaintext."
+          },
+          "expiresAt": {
+            "type": "string",
+            "description": "When the token stops working",
+            "format": "date-time"
+          },
+          "user": {
+            "description": "The signed-in account",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UserResponseDto"
+              }
+            ]
+          },
+          "role": {
+            "type": "string",
+            "description": "Role resolved for this session",
+            "enum": [
+              "admin",
+              "operator",
+              "viewer"
+            ]
+          },
+          "scoped": {
+            "type": "boolean",
+            "description": "Whether the linked key is scoped to selected sessions"
+          },
+          "engineType": {
+            "type": "string",
+            "description": "Engine the gateway is running",
+            "example": "baileys"
+          }
+        },
+        "required": [
+          "token",
+          "expiresAt",
+          "user",
+          "role",
+          "scoped",
+          "engineType"
+        ]
+      },
+      "MeResponseDto": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "description": "The signed-in account",
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UserResponseDto"
+              }
+            ]
+          },
+          "role": {
+            "type": "string",
+            "description": "Role resolved for this credential",
+            "enum": [
+              "admin",
+              "operator",
+              "viewer"
+            ]
+          },
+          "scoped": {
+            "type": "boolean",
+            "description": "Whether the credential is scoped to selected sessions"
+          },
+          "engineType": {
+            "type": "string",
+            "description": "Engine the gateway is running",
+            "example": "baileys"
+          },
+          "keyId": {
+            "type": "string",
+            "description": "The API key id behind this credential"
+          },
+          "keyName": {
+            "type": "string",
+            "description": "The API key name behind this credential"
+          }
+        },
+        "required": [
+          "user",
+          "role",
+          "scoped",
+          "engineType",
+          "keyId",
+          "keyName"
+        ]
+      },
+      "ChangePasswordDto": {
+        "type": "object",
+        "properties": {
+          "currentPassword": {
+            "type": "string",
+            "description": "The password in use now",
+            "example": "a-long-passphrase"
+          },
+          "newPassword": {
+            "type": "string",
+            "description": "New password, at least 12 characters. Other sessions of the account are revoked.",
+            "example": "another-long-passphrase",
+            "minLength": 12
+          }
+        },
+        "required": [
+          "currentPassword",
+          "newPassword"
+        ]
+      },
+      "CreateUserDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "Email address, stored lowercased; must be unique",
+            "example": "agent@example.com"
+          },
+          "name": {
+            "type": "string",
+            "description": "Display name, also used for the linked API key",
+            "example": "Siti"
+          },
+          "role": {
+            "type": "string",
+            "description": "Role the account and its linked key receive",
+            "enum": [
+              "admin",
+              "operator",
+              "viewer"
+            ],
+            "default": "operator"
+          },
+          "password": {
+            "type": "string",
+            "description": "Initial password, at least 12 characters",
+            "example": "a-long-passphrase",
+            "minLength": 12
+          }
+        },
+        "required": [
+          "email",
+          "name",
+          "password"
+        ]
+      },
+      "UpdateUserDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Display name",
+            "example": "Siti Rahma"
+          },
+          "role": {
+            "type": "string",
+            "description": "Role, mirrored onto the linked API key",
+            "enum": [
+              "admin",
+              "operator",
+              "viewer"
+            ]
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "Set false to disable the account immediately; every live session is revoked"
+          }
+        }
+      },
+      "ResetPasswordDto": {
+        "type": "object",
+        "properties": {
+          "password": {
+            "type": "string",
+            "description": "New password, at least 12 characters. Every live session of the account is revoked.",
+            "example": "another-long-passphrase",
+            "minLength": 12
+          }
+        },
+        "required": [
+          "password"
         ]
       },
       "CreateSessionDto": {
@@ -22831,6 +24085,234 @@
           "enabled": {
             "type": "boolean",
             "description": "Whether the rule is active"
+          }
+        }
+      },
+      "DivisionAgentDto": {
+        "type": "object",
+        "properties": {
+          "apiKeyId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "apiKeyId",
+          "name"
+        ]
+      },
+      "DivisionDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "sessionId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "keywords": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "menuLabel": {
+            "type": "object",
+            "nullable": true
+          },
+          "welcomeText": {
+            "type": "object",
+            "nullable": true
+          },
+          "sortOrder": {
+            "type": "integer"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "agents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DivisionAgentDto"
+            }
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "sessionId",
+          "name",
+          "keywords",
+          "sortOrder",
+          "isActive",
+          "agents",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "CreateDivisionDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Division name, also the default menu label",
+            "example": "CS SMP Putra",
+            "maxLength": 100
+          },
+          "keywords": {
+            "description": "Words or short phrases a customer may type instead of the menu number, matched as whole words against the message (case and punctuation are ignored). Example: [\"smp\", \"smp putra\"]. A keyword that is only digits is refused: it would collide with the menu numbering.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "menuLabel": {
+            "type": "object",
+            "description": "Menu line shown instead of the name",
+            "maxLength": 100,
+            "nullable": true
+          },
+          "welcomeText": {
+            "type": "object",
+            "description": "Message sent once the customer selects this division. Omit for the built-in default.",
+            "maxLength": 2000,
+            "nullable": true
+          },
+          "sortOrder": {
+            "type": "integer",
+            "description": "Menu position; ties fall back to the name",
+            "default": 0,
+            "minimum": 0,
+            "maximum": 1000
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "Whether the division appears in the menu and matches keywords",
+            "default": true
+          },
+          "agentKeyIds": {
+            "description": "Active API keys that answer for this division. Replaces the whole set on update.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "DivisionSettingsDto": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "menuHeader": {
+            "type": "object",
+            "nullable": true
+          },
+          "invalidReply": {
+            "type": "object",
+            "nullable": true
+          },
+          "idleHours": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "sessionId",
+          "enabled",
+          "idleHours"
+        ]
+      },
+      "UpdateDivisionSettingsDto": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "description": "Turn routing on or off for this session",
+            "default": true
+          },
+          "menuHeader": {
+            "type": "object",
+            "description": "Line above the numbered list. Null uses the built-in default.",
+            "maxLength": 2000,
+            "nullable": true
+          },
+          "invalidReply": {
+            "type": "object",
+            "description": "Sent when a reply matches no division and no menu number. Null uses the built-in default.",
+            "maxLength": 2000,
+            "nullable": true
+          },
+          "idleHours": {
+            "type": "integer",
+            "description": "Hours of customer silence after which a routed chat is shown the menu again. 0 disables it.",
+            "default": 24,
+            "minimum": 0,
+            "maximum": 720
+          }
+        }
+      },
+      "UpdateDivisionDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Division name",
+            "maxLength": 100
+          },
+          "keywords": {
+            "description": "Words or short phrases a customer may type instead of the menu number, matched as whole words against the message (case and punctuation are ignored). Example: [\"smp\", \"smp putra\"]. A keyword that is only digits is refused: it would collide with the menu numbering.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "menuLabel": {
+            "type": "object",
+            "description": "Menu line shown instead of the name",
+            "maxLength": 100,
+            "nullable": true
+          },
+          "welcomeText": {
+            "type": "object",
+            "description": "Message sent once the customer selects this division. Null restores the default.",
+            "maxLength": 2000,
+            "nullable": true
+          },
+          "sortOrder": {
+            "type": "integer",
+            "description": "Menu position; ties fall back to the name",
+            "minimum": 0,
+            "maximum": 1000
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "Whether the division appears in the menu and matches keywords"
+          },
+          "agentKeyIds": {
+            "description": "Active API keys that answer for this division",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         }
       },
@@ -25730,6 +27212,30 @@
               "type": "object"
             }
           },
+          "divisions": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "divisionAgents": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "divisionSettings": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "divisionChatStates": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
           "inboxConversations": {
             "type": "array",
             "items": {
@@ -25790,6 +27296,10 @@
           "integrationDeliveryFailures",
           "statusUpdates",
           "automationRules",
+          "divisions",
+          "divisionAgents",
+          "divisionSettings",
+          "divisionChatStates",
           "inboxConversations",
           "inboxNotes",
           "crmDeals",
@@ -25866,6 +27376,22 @@
             "type": "number",
             "example": 2
           },
+          "divisions": {
+            "type": "number",
+            "example": 0
+          },
+          "divisionAgents": {
+            "type": "number",
+            "example": 0
+          },
+          "divisionSettings": {
+            "type": "number",
+            "example": 0
+          },
+          "divisionChatStates": {
+            "type": "number",
+            "example": 0
+          },
           "inboxConversations": {
             "type": "number",
             "example": 0
@@ -25912,6 +27438,10 @@
           "integrationDeliveryFailures",
           "statusUpdates",
           "automationRules",
+          "divisions",
+          "divisionAgents",
+          "divisionSettings",
+          "divisionChatStates",
           "inboxConversations",
           "inboxNotes",
           "crmDeals",
@@ -25995,7 +27525,7 @@
         "properties": {
           "tables": {
             "type": "object",
-            "description": "Every one of the 23 migration tables is emptied before the restore runs, so a key omitted here is restored EMPTY rather than left untouched. Post the whole GET /api/infra/export-data payload, not a hand-built subset.",
+            "description": "Every one of the 27 migration tables is emptied before the restore runs, so a key omitted here is restored EMPTY rather than left untouched. Post the whole GET /api/infra/export-data payload, not a hand-built subset.",
             "properties": {
               "sessions": {
                 "type": "array"
@@ -26043,6 +27573,18 @@
                 "type": "array"
               },
               "automationRules": {
+                "type": "array"
+              },
+              "divisions": {
+                "type": "array"
+              },
+              "divisionAgents": {
+                "type": "array"
+              },
+              "divisionSettings": {
+                "type": "array"
+              },
+              "divisionChatStates": {
                 "type": "array"
               },
               "inboxConversations": {
@@ -28101,6 +29643,16 @@
             "type": "string",
             "nullable": true
           },
+          "divisionId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Division this conversation was routed to."
+          },
+          "divisionName": {
+            "type": "string",
+            "nullable": true,
+            "description": "Snapshot of the division name at routing time."
+          },
           "resolvedAt": {
             "type": "string",
             "nullable": true,
@@ -28240,6 +29792,16 @@
             "type": "string",
             "nullable": true
           },
+          "divisionId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Division this conversation was routed to."
+          },
+          "divisionName": {
+            "type": "string",
+            "nullable": true,
+            "description": "Snapshot of the division name at routing time."
+          },
           "resolvedAt": {
             "type": "string",
             "nullable": true,
@@ -28281,6 +29843,11 @@
             "type": "string",
             "nullable": true,
             "description": "API key id of the agent to assign. `null` releases the conversation."
+          },
+          "divisionId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Division id to tag the conversation with. `null` clears the tag."
           }
         }
       },

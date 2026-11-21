@@ -28,6 +28,7 @@ import { resolveFeatureFlags } from '../../config/feature-flags';
 import { StatusStoreService } from '../status-store/status-store.service';
 import { ChatMediaArchiveService } from '../chat-media/chat-media-archive.service';
 import { AutomationRulesService } from '../automation/automation-rules.service';
+import { DivisionRouterService } from '../division/division-router.service';
 import { buildIncomingStatus } from '../status-store/incoming-status';
 import type { StatusUpdate } from '../status-store/entities/status-update.entity';
 import {
@@ -339,6 +340,10 @@ export class MessageProjector {
     @Optional()
     private readonly automationRules?: AutomationRulesService,
     @Optional() private readonly lidMappingStore?: LidMappingStoreService,
+    // Optional for the same reason. Appended last so the positional constructor calls in the specs
+    // keep resolving every earlier dependency. Absent simply means no division routing.
+    @Optional()
+    private readonly divisionRouter?: DivisionRouterService,
   ) {
     this.mutationProjector = new MessageMutationProjector(
       this.messageRepository,
@@ -1343,11 +1348,21 @@ export class MessageProjector {
     if (!announced) return;
     // Dispatch to webhooks with potentially modified message
     void this.webhookService.dispatch(id, 'message.received', announced);
-    // Autoreply rules ride the same at-most-once dispatch (the insert oracle above dedupes engine
-    // re-fires) and stay fail-open like the webhook: a broken rule must never break the receive path.
-    void this.automationRules?.evaluateInbound(id, announced).catch(() => undefined);
+    // Routing and autoreply ride the same at-most-once dispatch (the insert oracle above dedupes
+    // engine re-fires) and stay fail-open: a broken rule or menu must never break the receive path.
+    // The router goes first and claims the message when it sends something, so a customer never
+    // gets the division menu and an auto-reply stacked; a chat that is already routed lets the
+    // rules answer as before.
+    void this.routeThenAutomate(id, announced);
     // Emit real-time event to WebSocket clients
     this.eventsGateway.emitMessage(id, announced);
+  }
+
+  /** Router first, automation only when it had nothing to say. Both stay off the receive path. */
+  private async routeThenAutomate(id: string, message: InboundMessageData): Promise<void> {
+    const handled = (await this.divisionRouter?.evaluateInbound(id, message).catch(() => false)) ?? false;
+    if (handled) return;
+    await this.automationRules?.evaluateInbound(id, message).catch(() => undefined);
   }
 
   /**

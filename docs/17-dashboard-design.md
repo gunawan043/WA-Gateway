@@ -125,6 +125,8 @@ flowchart TB
 
     subgraph "Admin-only"
         APIKEYS[API Keys /api-keys]
+        USERS[Users /users]
+        DIVISIONS[Divisions /divisions]
         INFRA[Infrastructure /infrastructure]
         PLUGINS[Plugins /plugins]
         LOGS[Logs /logs]
@@ -139,10 +141,10 @@ flowchart TB
 
 The route table lives in `src/App.tsx`; the sidebar items in `src/components/Layout.tsx`. Routes
 guarded by `role === 'admin'` are only mounted (and only shown in the sidebar) for an admin key —
-a non-admin hitting the path falls through to the `*` redirect. API Keys, Infrastructure and Plugins
-also need a key not restricted to selected sessions (`role === 'admin' && !scoped`, with `scoped`
-from `POST /api/auth/validate`), because their routes refuse a session-scoped key; `/logs` is
-mounted for any admin key.
+a non-admin hitting the path falls through to the `*` redirect. API Keys, Users, Infrastructure and
+Plugins also need a key not restricted to selected sessions (`role === 'admin' && !scoped`, with
+`scoped` from `POST /api/auth/validate` or `GET /api/auth/me`), because their routes refuse a
+session-scoped key; `/logs` is mounted for any admin key.
 
 ```
 /                  → Dashboard (overview + charts)
@@ -160,6 +162,8 @@ mounted for any admin key.
 /message-tester    → Message Tester (ad-hoc send-* + check-number)
 /logs              → Activity / Audit Logs            [admin only]
 /api-keys          → API Keys Management              [admin, unscoped key only]
+/users             → Users (dashboard accounts)       [admin, unscoped key only]
+/divisions         → Divisions (shared-number menu, keywords and CS assignment) [admin]
 /infrastructure    → Infrastructure status & config   [admin, unscoped key only]
 /plugins           → Plugins (install / enable / configure) [admin, unscoped key only]
 *                  → redirect to /
@@ -423,6 +427,43 @@ mounted for any admin key.
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
+### Division Routing
+
+Configuration only: the routing itself runs on the inbound message path and its result is read in
+the Inbox, so this page never sends anything.
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  Divisions                                  [Session: Nomor Pusat ▾] │
+│  One number, several teams. Customers pick a team and the           │
+│  conversation is handed to its CS.                                  │
+├─────────────────────────────────────────────────────────────────────┤
+│  Menu                                              [+ New division] │
+│  ┌───────────────────────────────────────────────────────────────┐  │
+│  │ 1  SMP Putra                                                  │  │
+│  │    SMP Putra (1)                                              │  │
+│  │    [smp] [smp putra]                                          │  │
+│  │    CS: Rina, Budi                              [✎] [🗑]        │  │
+│  └───────────────────────────────────────────────────────────────┘  │
+│  ┌───────────────────────────────────────────────────────────────┐  │
+│  │ 2  SMA Putri                                      [Inactive]  │  │
+│  │    SMA Putri                                                  │  │
+│  │    No CS assigned                              [✎] [🗑]        │  │
+│  └───────────────────────────────────────────────────────────────┘  │
+│                                                                     │
+│  Routing settings                                                   │
+│  [x] Routing enabled                                                │
+│  Menu header        [ Welcome! Please choose the team you need: ]   │
+│  Reply when nothing matches [ Sorry, I did not catch that...    ]   │
+│  Idle hours before the menu returns [ 24 ]                          │
+│  [Save]                                                             │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+The Inbox page reads the same data from the other side: a `division` filter beside the status and
+assignee filters, a division chip on each row, a division selector in the conversation pane, and the
+last 20 messages plus a reply composer, so a CS answers the routed chat without leaving the inbox.
+
 ## 17.4 Component Library
 
 > **No component framework is installed.** shadcn/ui is _not_ adopted — there is no `npx shadcn`
@@ -565,6 +606,21 @@ Three pages keep a server list in local state instead of the query cache:
   so installed cards can show an update chip, fetches it again when the Catalog tab opens with an
   empty list, and reloads it after any install, update or uninstall.
 
+### Sign-in — an account for people, a key for machines
+
+`Login.tsx` opens on an email + password form and offers **Use an API key instead** as a one-click
+switch; a refusal from one form is cleared when the other is shown. Both paths end in the same place:
+`App.tsx` stores the credential under `openwa_api_key` and hands the role, the engine and the session
+scope to `RoleProvider`. An account sign-in also caches `{ id, email, name }` under `openwa_user`, so
+the Users page can mark the caller's own row; an API-key sign-in clears that entry, so a machine
+credential is never presented as a person.
+
+A reload re-reads the credential through `GET /api/auth/me`, which answers for a token and a key
+alike and refreshes the cached account; a 401/403 there signs out, while a 429/5xx keeps the cached
+role so a transient outage does not eject anyone. The request is not cancelled on logout, so an
+answer that lands after a new sign-in is ignored by comparing the credential it was sent with
+against the one stored now.
+
 ### API client — raw payloads, no `{ data }` envelope
 
 The client lives in `src/services/api.ts`. A single `request<T>()` helper attaches the `X-API-Key`
@@ -575,14 +631,23 @@ key's `allowedIps` refuse this client, clears the stored key and redirects to lo
 stored key is the one the request carried: a late answer for a key since replaced fails like any other
 error, and a keyless request answered after sign-out stays silent. Any other `403` leaves the key in
 place.) Endpoints are grouped into typed namespaces — `sessionApi`, `webhookApi`,
-`templateApi`, `apiKeyApi`, `auditApi`, `messageApi`, `infraApi`, `pluginsApi`, `statsApi`, ...
+`templateApi`, `apiKeyApi`, `usersApi`, `authApi`, `auditApi`, `messageApi`, `infraApi`, `pluginsApi`,
+`statsApi`, ...
+
+The credential is read through `utils/credential.ts` (`readCredential()`), never straight from
+`sessionStorage`. The tab holds one credential under `openwa_api_key` — an API key (`owa_k1_…`) or a
+dashboard session token (`owa_s1_…`) — and both travel in the same header; the gateway resolves a
+token to the account's linked key before the guard runs, so the rest of the client needed no change.
+Two calls deliberately skip `request()`: `authApi.login` (a stale credential must not be sent, and a
+401 there means a wrong password) and `authApi.changePassword` (a 401 means the *current* password
+was wrong, so it must not clear the session).
 
 ```typescript
 // src/services/api.ts (abridged)
 export const API_BASE_URL = `${(import.meta.env.VITE_API_URL ?? '').replace(/\/+$/, '')}/api`;
 
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const apiKey = sessionStorage.getItem('openwa_api_key');
+  const apiKey = readCredential();
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
     ...options,
     headers: {

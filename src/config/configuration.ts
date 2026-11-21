@@ -172,6 +172,18 @@ export default () => ({
     enabled: process.env.CACHE_ENABLED === 'true',
   },
 
+  // Dashboard sign-in. API keys remain the credential for programmatic clients; this only governs
+  // the email/password sessions the browser holds.
+  auth: {
+    // How long a session token stays valid. 168 h = 7 days, long enough that a daily user is not
+    // asked to sign in again, short enough that a forgotten browser stops working within a week.
+    sessionTtlHours: Number(process.env.AUTH_SESSION_TTL_HOURS) || 168,
+    // Read once, on the boot that finds the users table empty (see UserSeedService). Both must be
+    // set; ADMIN_PASSWORD is never read again afterwards and should be removed from the environment.
+    adminEmail: process.env.ADMIN_EMAIL?.trim() || undefined,
+    adminPassword: process.env.ADMIN_PASSWORD || undefined,
+  },
+
   // Main Database configuration (always SQLite for boot config)
   database: {
     type: 'sqlite' as const,

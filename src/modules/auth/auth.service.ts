@@ -16,6 +16,8 @@ import { randomBytes } from 'crypto';
 import { ipMatches } from '../../common/utils/ip';
 import { hashApiKey } from './api-key-hash';
 import { ApiKey, ApiKeyRole } from './entities/api-key.entity';
+import { User } from './entities/user.entity';
+import { SESSION_TOKEN_PREFIX } from './session-token';
 import { CreateApiKeyDto, UpdateApiKeyDto } from './dto';
 import { createLogger } from '../../common/services/logger.service';
 import { setRequestActor } from '../../common/services/request-context';
@@ -65,6 +67,14 @@ export const MASTER_KEY_PREFIX = '(master key)';
  */
 export function resolveSeedApiKey(): string {
   const masterKey = configuredMasterKey();
+  // A master key that starts with the session-token prefix would be read as a dashboard session and
+  // never reach the key table, so it could not authenticate anywhere. Refuse it at boot instead of
+  // leaving an operator with a key that silently does nothing.
+  if (masterKey?.startsWith(SESSION_TOKEN_PREFIX)) {
+    throw new Error(
+      `API_MASTER_KEY must not start with "${SESSION_TOKEN_PREFIX}": that prefix marks a dashboard session token`,
+    );
+  }
   if (masterKey) {
     return masterKey;
   }
@@ -121,6 +131,11 @@ export class AuthService implements OnModuleInit, OnModuleDestroy {
     private readonly usageTracker: ApiKeyUsageTracker,
     private readonly moduleRef: ModuleRef,
     @Optional() private readonly keyIndex?: ActiveKeyIndex,
+    // Optional so a spec can build the service without the users table; the lifecycle guards below
+    // then simply find no owner and behave as before.
+    @Optional()
+    @InjectRepository(User, 'main')
+    private readonly userRepository?: Repository<User>,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -308,6 +323,7 @@ export class AuthService implements OnModuleInit, OnModuleDestroy {
 
   async update(id: string, dto: UpdateApiKeyDto): Promise<ApiKey> {
     const apiKey = await this.findOne(id);
+    await this.assertNotUserManaged(id);
 
     // Scoping the last unscoped admin (non-empty allowedSessions) strips key-management just as
     // surely as demoting or expiring it: @RequireUnscopedKey would then 403 every lifecycle route.
@@ -373,6 +389,7 @@ export class AuthService implements OnModuleInit, OnModuleDestroy {
 
   async delete(id: string): Promise<void> {
     const apiKey = await this.findOne(id);
+    await this.assertNotUserManaged(id);
     // Guarded whatever role the pre-read saw, so the statement judges the live row (see update).
     const result = await this.withLastAdminGuard(
       this.apiKeyRepository.createQueryBuilder().delete().from(ApiKey),
@@ -392,6 +409,7 @@ export class AuthService implements OnModuleInit, OnModuleDestroy {
 
   async revoke(id: string): Promise<ApiKey> {
     const apiKey = await this.findOne(id);
+    await this.assertNotUserManaged(id);
     // Guarded whatever role the pre-read saw, so the statement judges the live row (see update).
     const result = await this.withLastAdminGuard(
       this.apiKeyRepository.createQueryBuilder().update(ApiKey).set({ isActive: false }),
@@ -408,6 +426,22 @@ export class AuthService implements OnModuleInit, OnModuleDestroy {
     this.evictActiveSockets(id, 'revoked');
     this.keyIndex?.refreshSoon();
     return saved;
+  }
+
+  /**
+   * A key that backs a dashboard user is not a free-standing credential: UsersService writes its
+   * name, role and active flag so the two rows never disagree. Editing or removing it here would
+   * silently break that account's login (or demote it out of its own role), so the lifecycle routes
+   * point at the Users page instead.
+   */
+  private async assertNotUserManaged(id: string): Promise<void> {
+    if (!this.userRepository) return;
+    const owner = await this.userRepository.findOne({ where: { apiKeyId: id } });
+    if (owner) {
+      throw new ConflictException(
+        `API key '${id}' belongs to the dashboard user '${owner.email}'; change that account from the Users page`,
+      );
+    }
   }
 
   /**
@@ -449,7 +483,7 @@ export class AuthService implements OnModuleInit, OnModuleDestroy {
    * columns (UTC "YYYY-MM-DD HH:mm:ss.SSS" — what AbstractSqliteDriver writes for a Date), so the
    * guard's comparison against stored expiresAt values is chronological.
    */
-  private static guardNowParam(at = new Date()): string {
+  static guardNowParam(at = new Date()): string {
     return at.toISOString().slice(0, 23).replace('T', ' ');
   }
 
@@ -582,6 +616,21 @@ export class AuthService implements OnModuleInit, OnModuleDestroy {
     // outside a request scope (WebSocket frames, workers).
     setRequestActor({ apiKeyId: apiKey.id, apiKeyName: apiKey.name });
 
+    this.assertKeyUsable(apiKey, clientIp, sessionId);
+
+    // Advisory stats only; the tracker coalesces the write and never throws. A caller that validates
+    // the same key again later in the request (the MCP mount gate) opts out, so a request counts once.
+    if (recordUsage) await this.usageTracker.record(apiKey);
+
+    return apiKey;
+  }
+
+  /**
+   * The state checks a resolved key must pass, shared by the API-key path and the dashboard session
+   * path so the two cannot drift: a key revoked, expired, IP-refused or session-refused behaves the
+   * same however the caller proved who it is.
+   */
+  assertKeyUsable(apiKey: ApiKey, clientIp?: string, sessionId?: string): void {
     if (!apiKey.isActive) {
       throw new UnauthorizedException('API key is revoked');
     }
@@ -616,12 +665,6 @@ export class AuthService implements OnModuleInit, OnModuleDestroy {
         throw new ForbiddenException('API key not authorized for this session');
       }
     }
-
-    // Advisory stats only; the tracker coalesces the write and never throws. A caller that validates
-    // the same key again later in the request (the MCP mount gate) opts out, so a request counts once.
-    if (recordUsage) await this.usageTracker.record(apiKey);
-
-    return apiKey;
   }
 
   private hashKey(rawKey: string): string {

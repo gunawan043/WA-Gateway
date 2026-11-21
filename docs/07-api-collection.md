@@ -20,13 +20,40 @@ Every request carries the key in the `X-API-Key` header — REST auth is **heade
 -H "X-API-Key: $API_KEY"
 ```
 
+A **person** can sign in with an email and a password instead, and the session token it returns goes
+in that same header — so every example below works unchanged with `$SESSION_TOKEN` in place of
+`$API_KEY`. A token is not a second kind of principal: it resolves to the account's linked key, so it
+carries the same role and scopes. Accounts are managed with an ADMIN key under `/api/auth/users`
+(§6.4.21).
+
+```bash
+# sign in; the token is returned once and stored only as a hash
+export SESSION_TOKEN=$(curl -s -X POST "$BASE/api/auth/login" \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@example.com","password":"your-password"}' | jq -r .token)
+
+# who is this credential? (user is null for a plain API key)
+curl -s "$BASE/api/auth/me" -H "X-API-Key: $SESSION_TOKEN"
+
+# sign out: revokes this token only
+curl -s -X POST "$BASE/api/auth/logout" -H "X-API-Key: $SESSION_TOKEN"
+
+# change your own password: every other session of the account is revoked
+curl -s -X POST "$BASE/api/auth/change-password" -H "X-API-Key: $SESSION_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"currentPassword":"your-password","newPassword":"a-longer-new-one"}'
+```
+
+`POST /api/auth/login` is the only route in this document that needs no credential at all; it is
+throttled per IP to 5 requests a minute and 20 an hour.
+
 ### Responses
 
 Responses are the **raw payload** — no `{ success, data }` envelope. A resource route returns the object directly; most list routes return a bare JSON array, and the object-shaped ones are messages (`{ messages, total, unknownTimestampTotal? }`), status (`{ statuses }`), search (`{ hits, total, tookMs, provider }`), catalog products (`{ products, pagination }`) and audit (`{ data, total }`). Errors return `{ "statusCode", "message", "error"? }`, where `error` is optional, unless a route defines its own error body (the readiness probe's `503` is `{ "status", "details" }`, some plugin ingress rejections use a short plain-text body and `/mcp` transport errors, with its `405` for `GET` and `DELETE`, use a JSON-RPC error); a DTO validation `400` with detail disabled (the production default) returns `{ "statusCode": 400, "message": "Bad Request" }` without it, as described in [Error Response](./06-api-specification.md#error-response). Add `Content-Type: application/json` only when sending a body.
 
 ### Sections
 
-Sessions · Messages · Webhooks · Groups · Contacts · Chats · Labels · Channels · Catalog · Templates · Plugins · Settings · Auth (API Keys) · Health · Infrastructure · Stats · Audit · Metrics · Profile · Search · Media conversion · Events (WebSocket).
+Sessions · Messages · Webhooks · Groups · Contacts · Chats · Labels · Channels · Catalog · Templates · Plugins · Settings · Auth (API Keys, dashboard accounts) · Health · Infrastructure · Stats · Audit · Metrics · Profile · Search · Media conversion · Events (WebSocket).
 
 ## 07.2 Endpoints
 
@@ -1500,6 +1527,10 @@ curl -X POST "$BASE/api/infra/import-data" \
       "lidMappings": [], "chatStates": [], "pluginInstances": [], "conversationMappings": [], "ingressEvents": [],
       "webhookDeliveryFailures": [], "webhookOutboxEvents": [], "integrationDeliveryFailures": [], "statusUpdates": [],
       "automationRules": [],
+      "divisions": [],
+      "divisionAgents": [],
+      "divisionSettings": [],
+      "divisionChatStates": [],
       "inboxConversations": [],
       "inboxNotes": [],
       "crmDeals": [],

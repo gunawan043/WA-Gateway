@@ -906,6 +906,10 @@ export class InfraDataService {
         // not reach it. Clear it first: the archive re-inserts it with its original ids and a restore
         // onto the same instance would otherwise collide on the primary key.
         await clearTable('inbox_notes');
+        // Division routing: division_agents references divisions, not sessions, so the sessions
+        // DELETE below never reaches it — clear it first or a restore onto the source instance
+        // collides on its primary key. The other three carry a session FK and cascade.
+        await clearTable('division_agents');
         // Sales pipeline: neither table carries a FK to sessions. Clear activities before deals (the
         // FK cascades, but explicit clearing keeps the order correct where it is not enforced) so a
         // restore onto the instance that produced the archive does not collide on primary keys.

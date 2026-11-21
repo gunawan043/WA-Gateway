@@ -6,6 +6,10 @@ import { CrmDealActivity } from '../crm/entities/crm-deal-activity.entity';
 import { Campaign } from '../campaign/entities/campaign.entity';
 import { CampaignRecipient } from '../campaign/entities/campaign-recipient.entity';
 import { CampaignSegment } from '../campaign/entities/campaign-segment.entity';
+import { Division } from '../division/entities/division.entity';
+import { DivisionAgent } from '../division/entities/division-agent.entity';
+import { DivisionSettings } from '../division/entities/division-settings.entity';
+import { DivisionChatState } from '../division/entities/division-chat-state.entity';
 import { CrmDeal } from '../crm/entities/crm-deal.entity';
 import { CrmStage } from '../crm/entities/crm-stage.entity';
 import { InboxConversation } from '../inbox/entities/inbox-conversation.entity';
@@ -64,6 +68,10 @@ describe('Post-import scope-binding resync retracts secrets of retired or rolled
     Campaign,
     CampaignRecipient,
     CampaignSegment,
+    Division,
+    DivisionAgent,
+    DivisionSettings,
+    DivisionChatState,
   ];
 
   function buildStatefulLoader(

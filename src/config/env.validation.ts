@@ -184,6 +184,30 @@ export function validateEnv(config: EnvConfig): EnvConfig {
       `QUEUE_PREFIX must be 1 to 64 letters, digits, dots, underscores or hyphens, starting with a letter or digit (got ${JSON.stringify(queuePrefix)})`,
     );
   }
+  // Dashboard sign-in. The first admin account is seeded from ADMIN_EMAIL + ADMIN_PASSWORD, so the
+  // pair is all-or-nothing: an email with no password (or the reverse) would boot a deployment that
+  // silently has no way in other than an API key. The password is checked here because it becomes
+  // the only interactive way into a fresh install.
+  const adminEmail = str('ADMIN_EMAIL');
+  const adminPassword = typeof config.ADMIN_PASSWORD === 'string' ? config.ADMIN_PASSWORD : undefined;
+  const hasAdminEmail = adminEmail !== undefined;
+  const hasAdminPassword = adminPassword !== undefined && adminPassword !== '';
+  if (hasAdminEmail !== hasAdminPassword) {
+    errors.push('ADMIN_EMAIL and ADMIN_PASSWORD must be set together (both or neither)');
+  }
+  if (adminEmail !== undefined && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(adminEmail)) {
+    errors.push(`ADMIN_EMAIL must be an email address (got ${JSON.stringify(adminEmail)})`);
+  }
+  if (hasAdminPassword && adminPassword.length < 12) {
+    errors.push('ADMIN_PASSWORD must be at least 12 characters');
+  }
+  const sessionTtl = str('AUTH_SESSION_TTL_HOURS');
+  if (sessionTtl !== undefined && (!/^\d+$/.test(sessionTtl) || Number(sessionTtl) < 1)) {
+    errors.push(
+      `AUTH_SESSION_TTL_HOURS must be a whole number of hours of at least 1 (got ${JSON.stringify(sessionTtl)})`,
+    );
+  }
+
   // Every production hardening in the repo gates on the exact string 'production', so an
   // unrecognised value silently selects the permissive branch of each one — CORS, Swagger, DTO
   // error detail, the default-secret guard and the ALLOW_DEV_API_KEY rejection that stops the public

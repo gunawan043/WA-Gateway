@@ -19,17 +19,19 @@ import { WebhookModule } from '../webhook/webhook.module';
 import { StatusStoreModule } from '../status-store/status-store.module';
 import { ChatMediaModule } from '../chat-media/chat-media.module';
 import { AutomationModule } from '../automation/automation.module';
+import { DivisionModule } from '../division/division.module';
 import { PLUGIN_SESSION_PORT } from '../../core/plugins/plugin-host-ports';
 
 @Module({
-  // WebhookModule/StatusStoreModule/ChatMediaModule/AutomationModule do not import SessionModule
-  // back, so the dependency is one-directional — no forwardRef() needed.
+  // WebhookModule/StatusStoreModule/ChatMediaModule/AutomationModule/DivisionModule do not import
+  // SessionModule back, so the dependency is one-directional — no forwardRef() needed.
   imports: [
     TypeOrmModule.forFeature([Session, Message], 'data'),
     WebhookModule,
     StatusStoreModule,
     ChatMediaModule,
     AutomationModule,
+    DivisionModule,
   ],
   controllers: [SessionController],
   providers: [

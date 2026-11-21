@@ -53,6 +53,8 @@ describe('ApiKeyGuard chat fence cost', () => {
       { get: jest.fn().mockReturnValue([]) } as never as ConfigService,
       { logWarn: jest.fn() } as never,
       new ChatScopeService(),
+      // This spec is about the chat allowlist; no dashboard session reaches it.
+      { resolve: jest.fn() } as never,
     );
   }
 

@@ -24,7 +24,9 @@ import {
   PanelRightOpen,
   Languages,
   UserCheck,
+  Users,
   Inbox as InboxIcon,
+  Network,
   KanbanSquare,
   Megaphone,
 } from 'lucide-react';
@@ -46,6 +48,9 @@ const allNavItems = [
   { to: '/sessions', icon: Smartphone, key: 'sessions' as const, adminOnly: false },
   { to: '/chats', icon: MessageSquare, key: 'chats' as const, adminOnly: false },
   { to: '/inbox', icon: InboxIcon, key: 'inbox' as const, adminOnly: false },
+  // Session-scoped configuration (the menu a customer sees on the shared number). Reading is
+  // VIEWER, every write is ADMIN, so the item is shown to admins only.
+  { to: '/divisions', icon: Network, key: 'divisions' as const, adminOnly: true },
   // The pipeline is deployment-global and fenced with @RequireUnscopedKey, so a session-restricted
   // key is refused by the API and the item is hidden.
   { to: '/pipeline', icon: KanbanSquare, key: 'pipeline' as const, adminOnly: false, unscopedOnly: true },
@@ -56,6 +61,8 @@ const allNavItems = [
   { to: '/webhooks', icon: Webhook, key: 'webhooks' as const, adminOnly: false },
   { to: '/templates', icon: ClipboardList, key: 'templates' as const, adminOnly: false },
   { to: '/api-keys', icon: Key, key: 'apiKeys' as const, adminOnly: true, unscopedOnly: true },
+  // Accounts are managed through /auth/users, which is ADMIN-only and refused to a session-scoped key.
+  { to: '/users', icon: Users, key: 'users' as const, adminOnly: true, unscopedOnly: true },
   { to: '/message-tester', icon: Send, key: 'messageTester' as const, adminOnly: false },
   // Backend /infra/* is ADMIN-only; hide the nav item from non-admins (UX + defense-in-depth).
   { to: '/infrastructure', icon: Server, key: 'infrastructure' as const, adminOnly: true, unscopedOnly: true },

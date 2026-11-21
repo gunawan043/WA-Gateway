@@ -367,6 +367,15 @@ export const EXPORT_TABLES: AnyExportTable[] = [
   // every autoreply rule.
   defineExportTable({ key: 'automationRules', table: 'automation_rules', optional: true, sessionFk: true }),
 
+  // Division routing. Divisions cascade from sessions and their agents from a division; settings
+  // and chat states cascade from sessions too (a chat state's divisionId is SET NULL, which would
+  // silently lose every routing decision). Inserted in FK order: divisions, agents, settings, then
+  // the chat states that reference a division.
+  defineExportTable({ key: 'divisions', table: 'divisions', optional: true, sessionFk: true }),
+  defineExportTable({ key: 'divisionAgents', table: 'division_agents', optional: true }),
+  defineExportTable({ key: 'divisionSettings', table: 'division_settings', optional: true, sessionFk: true }),
+  defineExportTable({ key: 'divisionChatStates', table: 'division_chat_states', optional: true, sessionFk: true }),
+
   // Team inbox. Conversations cascade from sessions, notes cascade from a conversation: both must be
   // exported and re-inserted (conversations first) or a restore loses every assignment and note.
   defineExportTable({ key: 'inboxConversations', table: 'inbox_conversations', optional: true, sessionFk: true }),

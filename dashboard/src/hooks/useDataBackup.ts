@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { shouldOfferStopOrphansRetry } from '../utils/importRefusal';
 import { keepsSameKey } from '../utils/authLifecycle';
+import { readCredential } from '../utils/credential';
 import { useTranslation } from 'react-i18next';
 import { infraApi } from '../services/api';
 import { useToast } from './useToast';
@@ -135,7 +136,7 @@ export function useDataBackup(): DataBackup {
   // Restore a previously-exported backup into the CURRENT database (use after switching + restart).
   // Import REPLACES all current data, so validate + confirm (showing the row count) before any call.
   const importBackup = async (file: File) => {
-    if (!sessionStorage.getItem('openwa_api_key') || importOwnerRef.current === null) return;
+    if (!readCredential() || importOwnerRef.current === null) return;
     // A newer selection or an unmount retires what has not been sent yet, including a delayed refusal retry.
     const owner = {};
     importOwnerRef.current = owner;

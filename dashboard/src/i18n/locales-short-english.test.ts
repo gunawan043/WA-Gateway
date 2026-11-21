@@ -22,10 +22,16 @@ const SAME_EVERYWHERE = new Set([
   'infrastructure.storage.s3',
   'numberChecker.result.jid',
   'numberChecker.table.id',
+  'login.emailPlaceholder',
+  'users.emailPlaceholder',
+  'apiKeys.presetLaravel',
   'sessions.proxy.urlPlaceholder',
   'messageTester.forwardFromPlaceholder',
   'messageTester.filenamePlaceholder',
   'messageTester.contactNamePlaceholder',
+  // Example inputs: the value a CS team types is the same text in every language.
+  'divisions.namePlaceholder',
+  'divisions.keywordsPlaceholder',
 ]);
 const isFontName = (key: string) => key.startsWith('chats.status.fonts.') && key !== 'chats.status.fonts.system';
 // Hebrew writes the terms Session and proxy in Latin script, in its sentences as in its labels.

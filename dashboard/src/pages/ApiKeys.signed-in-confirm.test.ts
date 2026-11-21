@@ -47,6 +47,7 @@ afterEach(() => {
   queryClient?.clear();
   queryClient = undefined;
   window.sessionStorage.removeItem('openwa_api_key');
+  window.sessionStorage.removeItem('openwa_key_id');
 });
 
 /** The confirmation dialog `action` opens on the row of the key called `name`, the dashboard signed in with billing-bot. */
@@ -81,3 +82,23 @@ for (const action of ['Revoke', 'Delete'] as const) {
     assert.equal(rtl.within(dialog).getByText(otherKey.name).tagName, 'STRONG');
   });
 }
+
+// An email sign-in stores a session token instead of the key, and no key prefix matches `owa_s1_…`, so
+// the id /auth/me reported is what marks the account's own linked key on this page.
+test('an email sign-in marks its linked key through the cached key id', async () => {
+  window.sessionStorage.setItem('openwa_api_key', 'owa_s1_sessiontoken');
+  window.sessionStorage.setItem('openwa_key_id', signedInKey.id);
+  queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 1_000 } } });
+  rtl.render(
+    createElement(
+      QueryClientProvider,
+      { client: queryClient },
+      createElement(ToastProvider, null, createElement(ApiKeys)),
+    ),
+  );
+  await rtl.screen.findByText(signedInKey.name);
+  const row = rtl.screen.getByText(signedInKey.name).closest('tr') as HTMLElement;
+  rtl.fireEvent.click(rtl.within(row).getByTitle('Revoke'));
+  const dialog = await rtl.screen.findByRole('dialog');
+  assert.equal(rtl.within(dialog).getByRole('note').textContent, SIGNED_IN_NOTE);
+});

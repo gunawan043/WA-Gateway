@@ -483,6 +483,15 @@ LOG_FORMAT=json
 # (openssl rand -base64 32); setting or changing it invalidates every API key issued before.
 # API_KEY_PEPPER=
 
+# Dashboard accounts: people sign in with email + password, machines keep using X-API-Key.
+# Seeded once, on the first boot of an empty users table; a later boot never overwrites the row.
+# Set both or neither; the password must be at least 12 characters.
+# ADMIN_EMAIL=admin@example.com
+# ADMIN_PASSWORD=
+# How long a dashboard sign-in stays valid, in hours (default 168 = 7 days). Changing it does not
+# extend sessions already issued.
+# AUTH_SESSION_TTL_HOURS=168
+
 # ===========================================
 # WEBHOOK
 # ===========================================

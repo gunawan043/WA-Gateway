@@ -23,6 +23,15 @@ export class UpdateInboxConversationDto {
   @IsOptional()
   @IsUUID()
   assigneeKeyId?: string | null;
+
+  @ApiPropertyOptional({
+    type: String,
+    nullable: true,
+    description: 'Division id to tag the conversation with. `null` clears the tag.',
+  })
+  @IsOptional()
+  @IsUUID()
+  divisionId?: string | null;
 }
 
 export class AddInboxNoteDto {
@@ -74,6 +83,12 @@ export class InboxConversationDto {
 
   @ApiPropertyOptional({ type: String, nullable: true })
   assigneeName!: string | null;
+
+  @ApiPropertyOptional({ type: String, nullable: true, description: 'Division this conversation was routed to.' })
+  divisionId!: string | null;
+
+  @ApiPropertyOptional({ type: String, nullable: true, description: 'Snapshot of the division name at routing time.' })
+  divisionName!: string | null;
 
   @ApiPropertyOptional({ type: String, nullable: true, description: 'ISO instant the conversation was resolved.' })
   resolvedAt!: string | null;

@@ -26,6 +26,10 @@ import { CrmDealActivity } from '../crm/entities/crm-deal-activity.entity';
 import { Campaign } from '../campaign/entities/campaign.entity';
 import { CampaignRecipient } from '../campaign/entities/campaign-recipient.entity';
 import { CampaignSegment } from '../campaign/entities/campaign-segment.entity';
+import { Division } from '../division/entities/division.entity';
+import { DivisionAgent } from '../division/entities/division-agent.entity';
+import { DivisionSettings } from '../division/entities/division-settings.entity';
+import { DivisionChatState } from '../division/entities/division-chat-state.entity';
 import { CrmStage } from '../crm/entities/crm-stage.entity';
 import { EngineRegistry } from '../../engine/engine-registry.service';
 import type { IWhatsAppEngine } from '../../engine/interfaces/whatsapp-engine.interface';
@@ -163,6 +167,10 @@ describe('import-data and the writes of the sessions it removes', () => {
         Campaign,
         CampaignRecipient,
         CampaignSegment,
+        Division,
+        DivisionAgent,
+        DivisionSettings,
+        DivisionChatState,
         SendIdempotencyKey,
       ],
       synchronize: true,

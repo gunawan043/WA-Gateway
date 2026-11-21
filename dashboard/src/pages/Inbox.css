@@ -477,3 +477,118 @@
     border: 1px solid ButtonText;
   }
 }
+
+/* Division tag on a conversation row: the routing decision, visible before the row is opened. */
+.inbox-page .inbox-division {
+  padding: 0.05rem 0.45rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background-color: var(--bg-light);
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+
+/* Compact reply pane: the inbox is for triage, the full thread (media, paging) lives on Chats. */
+.inbox-page .inbox-thread {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.inbox-page .inbox-thread h3 {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.inbox-page .inbox-thread-state {
+  display: flex;
+  justify-content: center;
+  padding: 0.75rem 0;
+}
+
+.inbox-page .inbox-thread-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  max-height: 18rem;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.inbox-page .inbox-thread-list li {
+  max-width: 85%;
+  padding: 0.45rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background-color: var(--bg-light);
+  font-size: 0.85rem;
+}
+
+.inbox-page .inbox-thread-list li.is-out {
+  align-self: flex-end;
+  background-color: rgba(37, 211, 102, 0.12);
+}
+
+.inbox-page .inbox-thread-list li p {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.inbox-page .inbox-thread-list li time {
+  display: block;
+  margin-top: 0.2rem;
+  color: var(--text-muted);
+  font-size: 0.7rem;
+}
+
+.inbox-page .inbox-reply-composer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.inbox-page .inbox-reply-composer textarea {
+  padding: 0.6rem;
+  border: 1px solid var(--control-border);
+  border-radius: 8px;
+  background-color: var(--bg-white);
+  color: var(--text-primary);
+  font: inherit;
+  resize: vertical;
+}
+
+.inbox-page .inbox-reply-composer button {
+  align-self: flex-end;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.45rem 0.9rem;
+  border: 0;
+  border-radius: 8px;
+  background-color: var(--brand, #25d366);
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+}
+
+.inbox-page .inbox-reply-composer button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* The reply composer's send button is a fill alone; forced colours paint the fill in the page colour. The
+   block comes after the button's own rules so it is not overridden by them. */
+@media (forced-colors: active) {
+  .inbox-page .inbox-reply-composer button {
+    border: 1px solid ButtonText;
+  }
+}

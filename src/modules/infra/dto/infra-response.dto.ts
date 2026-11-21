@@ -492,6 +492,10 @@ export class MigrationTablesDto {
   @ApiProperty({ type: [Object] }) integrationDeliveryFailures!: object[];
   @ApiProperty({ type: [Object] }) statusUpdates!: object[];
   @ApiProperty({ type: [Object] }) automationRules!: object[];
+  @ApiProperty({ type: [Object] }) divisions!: object[];
+  @ApiProperty({ type: [Object] }) divisionAgents!: object[];
+  @ApiProperty({ type: [Object] }) divisionSettings!: object[];
+  @ApiProperty({ type: [Object] }) divisionChatStates!: object[];
   @ApiProperty({ type: [Object] }) inboxConversations!: object[];
   @ApiProperty({ type: [Object] }) inboxNotes!: object[];
   @ApiProperty({ type: [Object] }) crmDeals!: object[];
@@ -519,6 +523,10 @@ export class TableCountsDto {
   @ApiProperty({ example: 0 }) integrationDeliveryFailures!: number;
   @ApiProperty({ example: 5 }) statusUpdates!: number;
   @ApiProperty({ example: 2 }) automationRules!: number;
+  @ApiProperty({ example: 0 }) divisions!: number;
+  @ApiProperty({ example: 0 }) divisionAgents!: number;
+  @ApiProperty({ example: 0 }) divisionSettings!: number;
+  @ApiProperty({ example: 0 }) divisionChatStates!: number;
   @ApiProperty({ example: 0 }) inboxConversations!: number;
   @ApiProperty({ example: 0 }) inboxNotes!: number;
   @ApiProperty({ example: 0 }) crmDeals!: number;

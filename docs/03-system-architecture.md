@@ -395,11 +395,11 @@ flowchart TB
 
 ### NestJS Module Organization
 
-Trimmed to the load-bearing directories — `src/modules/` holds 31 feature modules. Only `*.module.ts`
+Trimmed to the load-bearing directories — `src/modules/` holds 35 feature modules. Only `*.module.ts`
 is common to all of them; the rest of the shape varies. Most pair a `*.controller.ts` with a
 `*.service.ts`, but `events/` is a WebSocket gateway, `mcp/` an MCP server and `queue/` pure BullMQ
 wiring (none of the three has either); `docker/`, `status-store/`, `chat-media/` and `takeover/` are
-service-only; `health/` and `settings/` are controller-only (`infra/` gained `infra-data.service.ts`); and 9 modules own an `entities/` directory:
+service-only; `health/` and `settings/` are controller-only (`infra/` gained `infra-data.service.ts`); and 13 modules own an `entities/` directory:
 
 ```
 src/
@@ -439,6 +439,7 @@ src/
 │   ├── integration/            # Integration fabric (plugin instances, ingress, mappings)
 │   ├── automation/            # Autoreply rules (automation_rules, exported and restored with the other migration tables)
 │   ├── media/  chat-media/    # Inbound media handling + the optional chat-media archive
+│   ├── division/              # Shared-number routing: divisions, menu/keyword router, CS assignment
 │   ├── takeover/
 │   └── plugins/  mcp/  events/  infra/  docker/  settings/  metrics/  audit/  health/
 │

@@ -274,6 +274,8 @@ export interface InboxConversationRow {
   status: string;
   assigneeKeyId: string | null;
   assigneeName: string | null;
+  divisionId: string | null;
+  divisionName: string | null;
   resolvedAt: string | Date | null;
   lastInboundAt: string | Date | null;
   createdAt: string | Date;
@@ -375,6 +377,59 @@ export interface CampaignSegmentRow {
   updatedAt: string | Date;
 }
 
+/**
+ * Division routing. Divisions cascade from sessions, agents cascade from a division, and settings
+ * and chat states cascade from sessions too — so a restore that skipped them would lose the menu,
+ * the membership and every routing decision. Restored in FK order: divisions, agents, settings,
+ * then chat states (whose divisionId references a division).
+ */
+export interface DivisionRow {
+  id: string;
+  sessionId: string;
+  name: string;
+  keywords: string;
+  menuLabel: string | null;
+  welcomeText: string | null;
+  sortOrder: number;
+  isActive: boolean | number;
+  createdAt: string | Date;
+  updatedAt: string | Date;
+}
+
+export interface DivisionAgentRow {
+  id: string;
+  divisionId: string;
+  apiKeyId: string;
+  agentName: string;
+  createdAt: string | Date;
+}
+
+export interface DivisionSettingsRow {
+  id: string;
+  sessionId: string;
+  enabled: boolean | number;
+  menuHeader: string | null;
+  invalidReply: string | null;
+  idleHours: number;
+  createdAt: string | Date;
+  updatedAt: string | Date;
+}
+
+export interface DivisionChatStateRow {
+  id: string;
+  sessionId: string;
+  chatId: string;
+  status: string;
+  divisionId: string | null;
+  menuDivisionIds: string | null;
+  promptedAt: string | Date | null;
+  invalidReplyAt: string | Date | null;
+  routedAt: string | Date | null;
+  lastInboundAt: string | Date | null;
+  createdAt: string | Date;
+  updatedAt: string | Date;
+}
+
 export interface MigrationTables {
   sessions: SessionRow[];
   webhooks: WebhookRow[];
@@ -392,6 +447,10 @@ export interface MigrationTables {
   integrationDeliveryFailures: IntegrationDeliveryFailureRow[];
   statusUpdates: StatusUpdateRow[];
   automationRules: AutomationRuleRow[];
+  divisions: DivisionRow[];
+  divisionAgents: DivisionAgentRow[];
+  divisionSettings: DivisionSettingsRow[];
+  divisionChatStates: DivisionChatStateRow[];
   inboxConversations: InboxConversationRow[];
   inboxNotes: InboxNoteRow[];
   crmDeals: CrmDealRow[];

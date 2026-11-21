@@ -30,6 +30,7 @@ import { useProfilePicture } from '../hooks/useProfilePicture';
 import { useProfilePictures } from '../hooks/useProfilePictures';
 import { useResolvedPhone, resolvedPhoneQuery, isResolvedPhoneHeld } from '../hooks/useResolvedPhone';
 import { keepsSameKey } from '../utils/authLifecycle';
+import { readCredential } from '../utils/credential';
 import { chatTitle, formatPhoneForDisplay } from '../utils/formatPhone';
 import {
   sessionApi,
@@ -846,7 +847,7 @@ export function Chats() {
   // read flushed then goes out keyless and its 401 reloads the login form, so drop it instead.
   useEffect(
     () => () => {
-      if (sessionStorage.getItem('openwa_api_key')) markReadCoalescer.flush();
+      if (readCredential()) markReadCoalescer.flush();
       else markReadCoalescer.cancel();
     },
     [markReadCoalescer],

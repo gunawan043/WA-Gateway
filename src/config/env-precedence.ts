@@ -110,6 +110,11 @@ export const BLANK_SHADOWED_ENV_KEYS: string[] = [
   'CACHE_ENABLED',
   'DATABASE_LOGGING',
   'MAIN_DATABASE_SYNCHRONIZE',
+  // Dashboard sign-in. Blank-forwarded by compose so an operator who sets nothing does not pin an
+  // empty seed pair (which the validator refuses) or a zero TTL against .env / data/.env.generated.
+  'ADMIN_EMAIL',
+  'ADMIN_PASSWORD',
+  'AUTH_SESSION_TTL_HOURS',
   // Redis selection + connection details (#488)
   'REDIS_ENABLED',
   'REDIS_HOST',

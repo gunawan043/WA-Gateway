@@ -2,6 +2,8 @@ import { SetMetadata, createParamDecorator, ExecutionContext } from '@nestjs/com
 import { ApiKeyRole } from '../entities/api-key.entity';
 import { Request } from 'express';
 import { ApiKey } from '../entities/api-key.entity';
+import { User } from '../entities/user.entity';
+import { UserSession } from '../entities/user-session.entity';
 
 export const REQUIRED_ROLE_KEY = 'requiredRole';
 export const PUBLIC_KEY = 'isPublic';
@@ -82,4 +84,26 @@ export const ChatQuotedAllowed = () => SetMetadata(CHAT_QUOTED_ALLOWED_KEY, true
 export const CurrentApiKey = createParamDecorator((data: unknown, ctx: ExecutionContext): ApiKey | undefined => {
   const request = ctx.switchToHttp().getRequest<Request & { apiKey?: ApiKey }>();
   return request.apiKey;
+});
+
+/**
+ * The dashboard session that authenticated this request, when the credential was a session token.
+ * Undefined for an API-key caller — a key has no session to log out or to attribute a password
+ * change to.
+ * @example @CurrentAuthSession() session: UserSession | undefined
+ */
+export const CurrentAuthSession = createParamDecorator(
+  (data: unknown, ctx: ExecutionContext): UserSession | undefined => {
+    const request = ctx.switchToHttp().getRequest<Request & { authSession?: UserSession }>();
+    return request.authSession;
+  },
+);
+
+/**
+ * The dashboard account behind a session token. Undefined for an API-key caller.
+ * @example @CurrentUser() user: User | undefined
+ */
+export const CurrentUser = createParamDecorator((data: unknown, ctx: ExecutionContext): User | undefined => {
+  const request = ctx.switchToHttp().getRequest<Request & { authUser?: User }>();
+  return request.authUser;
 });

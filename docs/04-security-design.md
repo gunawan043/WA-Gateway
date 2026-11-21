@@ -75,6 +75,63 @@ as the admin key. The startup banner of a later boot prints the first 8 characte
 A chosen key in the `owa_k1_` shape that an earlier release seeded cannot be told from a generated one once `API_MASTER_KEY` is removed
 from the environment or set to another value, and still shows them until it is replaced.
 
+### Dashboard Sign-in (email + password)
+
+People sign in to the dashboard with an email and a password; machines keep using `X-API-Key`. The
+two are not separate principal types. Every account owns exactly one `api_keys` row, and a session
+token resolves to that row before the guard runs, so the role hierarchy, the IP/session/chat scopes,
+audit attribution, inbox assignment and the WebSocket per-key socket cap all behave identically for
+a person and for a key. A dashboard account's key is never handed out — its plaintext is generated
+and discarded at creation — so the account cannot be used as an API credential by anyone, and the
+key-management routes answer **409** for it rather than let an admin delete the row out from under a
+live account.
+
+```
+Session token: owa_s1_<64 hex chars>   (32 random bytes, hex-encoded)
+Storage:       SHA-256/HMAC hash only — the same hash and API_KEY_PEPPER as api_keys.keyHash
+Lifetime:      AUTH_SESSION_TTL_HOURS, default 168 (7 days), fixed at issue time
+```
+
+The token travels in `X-API-Key` (or `Authorization: Bearer`) like an API key, which is why the
+dashboard keeps one header helper for both. `POST /api/auth/login` is the only unauthenticated route
+in this group and is throttled per IP to **5 requests per minute and 20 per hour** — tighter than the
+global tiers, because a password guess is worth far less throughput than a message.
+
+**Password storage.** `scrypt` from `node:crypto` with `N = 2^15`, `r = 8`, `p = 1`, a 16-byte random
+salt and a 64-byte key, encoded `scrypt$N$r$p$saltB64$hashB64`. The cost parameters are read back
+from the stored string on verify, so raising them later does not invalidate existing hashes. Password
+input is NFKC-normalised first, comparison is `timingSafeEqual`, and a malformed or unknown-format
+hash answers "wrong password" rather than throwing. An unknown email still pays for one scrypt
+verification against a dummy hash, and a disabled account answers exactly like a wrong password:
+one message, `401 Email or password is incorrect`, for all three. New passwords must be at least 12
+characters; there is no composition rule and no maximum below 128.
+
+**What ends a session.**
+
+| Trigger                                                       | Effect                                                        |
+| ------------------------------------------------------------- | ------------------------------------------------------------- |
+| `POST /api/auth/logout`                                       | That session only; the row stays with `revokedAt` set          |
+| `POST /api/auth/change-password` (self)                       | Every session of the account **except** the caller's           |
+| `POST /api/auth/users/:id/reset-password` (ADMIN)             | Every session of that account, including the admin's if self   |
+| `PATCH /api/auth/users/:id` with `isActive: false` (ADMIN)     | Every session of that account                                 |
+| `DELETE /api/auth/users/:id` (ADMIN)                          | Every session, and the rows are deleted with the account       |
+| Token past `expiresAt`                                        | Refused; the row is swept hourly                              |
+| The linked key revoked, expired, IP-refused or disabled       | Refused — the key is judged exactly as it would be for a key   |
+
+A revoked or expired session is also cut off on the WebSocket: the existing sweep re-reads the
+session rows for every connected socket and disconnects the ones that no longer resolve, so a logout
+does not leave a live event stream behind. Rows are kept after revocation rather than deleted
+precisely so that sweep can see them; the hourly prune removes only rows past `expiresAt`.
+
+**The last-admin invariant covers accounts too.** Demoting or disabling the last admin *user* is
+refused unless another usable unscoped admin key survives — a hand-minted API admin counts. The
+check is made against `api_keys`, not `users`, because every account's authority lives there.
+
+**There is no email delivery.** No reset link, no verification mail, no "forgot password". The first
+account is seeded from `ADMIN_EMAIL`/`ADMIN_PASSWORD` on the first boot of an empty `users` table and
+a later boot does not overwrite it; a lost password is reset by another admin, or by the recovery
+steps below when no admin remains.
+
 ### Permission Model
 
 API keys carry **no permission strings**. Authorization is a role hierarchy on the key itself, plus

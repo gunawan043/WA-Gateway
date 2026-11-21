@@ -20,6 +20,7 @@ import {
   AlertTriangle,
   AlertCircle,
   Pencil,
+  Sparkles,
 } from 'lucide-react';
 import type { ApiKey } from '../services/api';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
@@ -37,6 +38,7 @@ import { SessionScopePicker } from '../components/SessionScopePicker';
 import { useToast } from '../hooks/useToast';
 import { copyToClipboard } from '../utils/clipboard';
 import { captionLength } from '../utils/bulkMedia';
+import { readCredential } from '../utils/credential';
 import {
   apiKeyDraft,
   apiKeyPatch,
@@ -61,11 +63,41 @@ const emptyKeyForm = { name: '', role: 'operator', allowedSessions: [] as string
 // What the gateway lists for the key seeded from API_MASTER_KEY: its first characters are secret, so none is shown.
 const MASTER_KEY_PREFIX = '(master key)';
 
+// What an app needs to send a message with the key just created. Plain text on purpose: the
+// dashboard never calls the gateway on the app's behalf, and the key is shown only once, here.
+function laravelSnippet(key: string): string {
+  return `# .env
+OPENWA_URL=https://your-gateway.example.com
+OPENWA_API_KEY=${key}
+
+# config/services.php
+'openwa' => [
+    'url' => env('OPENWA_URL'),
+    'key' => env('OPENWA_API_KEY'),
+],
+
+# app/Services/WhatsApp.php
+use Illuminate\\Support\\Facades\\Http;
+
+public function send(string $sessionId, string $chatId, string $text): void
+{
+    Http::withHeaders(['X-API-Key' => config('services.openwa.key')])
+        ->post(config('services.openwa.url') . "/api/sessions/{$sessionId}/messages/send-text", [
+            'chatId' => $chatId,
+            'text' => $text,
+        ])
+        ->throw();
+}`;
+}
+
 // The key this dashboard signed in with: the list only carries each key's prefix, which is the first
 // 12 characters of the raw key. The key seeded from API_MASTER_KEY lists a fixed marker instead, so it is the
-// one that no other key's prefix matches.
+// one that no other key's prefix matches. An email sign-in holds a session token instead of the key, so
+// the tab's cached key id answers for it; /auth/me supplies that id.
 function isSignedInKey(apiKey: ApiKey, keys: ApiKey[]): boolean {
-  const signedIn = sessionStorage.getItem('openwa_api_key');
+  const signedInKeyId = sessionStorage.getItem('openwa_key_id');
+  if (signedInKeyId) return apiKey.id === signedInKeyId;
+  const signedIn = readCredential();
   if (!signedIn || !apiKey.keyPrefix) return false;
   if (apiKey.keyPrefix !== MASTER_KEY_PREFIX) return signedIn.startsWith(apiKey.keyPrefix);
   return !keys.some(other => other.id !== apiKey.id && !!other.keyPrefix && signedIn.startsWith(other.keyPrefix));
@@ -275,6 +307,18 @@ export function ApiKeys() {
     setNewKey(emptyKeyForm);
     // The answer holds the plaintext key too; drop it with the dialog.
     createMutation.reset();
+  };
+
+  // An app key: the operator role, one session to start with, and a one-year expiry. The name is left
+  // for the operator to type — the preset fills the fields that decide what the key can do.
+  const applyAppPreset = () => {
+    const inAYear = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
+    setNewKey({
+      ...emptyKeyForm,
+      role: 'operator',
+      allowedSessions: sessions.length > 0 ? [sessions[0].id] : [],
+      expires: toDateTimeLocal(inAYear.toISOString()),
+    });
   };
 
   // A datetime-local with a blank segment reports an empty value, the same as no expiry at all, and
@@ -624,9 +668,28 @@ export function ApiKeys() {
                   {copied === 'modal' ? <Check size={16} /> : <Copy size={16} />}
                 </button>
               </div>
+
+              <div className="laravel-snippet-block">
+                <h3>{t('apiKeys.snippetTitle')}</h3>
+                <p className="key-field-hint">{t('apiKeys.snippetHint')}</p>
+                <pre className="laravel-snippet">{laravelSnippet(createdKey)}</pre>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => void handleCopy(laravelSnippet(createdKey), 'snippet')}
+                >
+                  {copied === 'snippet' ? <Check size={16} /> : <Copy size={16} />}
+                  {copied === 'snippet' ? t('apiKeys.snippetCopied') : t('apiKeys.copySnippet')}
+                </button>
+              </div>
             </div>
           ) : (
             <>
+              <button type="button" className="preset-btn" onClick={applyAppPreset} disabled={createMutation.isPending}>
+                <Sparkles size={16} />
+                {t('apiKeys.appPreset')}
+              </button>
+              <span className="key-field-hint">{t('apiKeys.appPresetHint')}</span>
               <label htmlFor="ak-1">{t('common.name')}</label>
               <input
                 id="ak-1"

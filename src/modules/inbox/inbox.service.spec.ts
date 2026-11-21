@@ -24,6 +24,8 @@ function makeService() {
     findOne: jest.fn().mockResolvedValue(null),
     save: jest.fn((row: unknown) => Promise.resolve(row)),
     create: jest.fn((row: unknown) => row),
+    update: jest.fn().mockResolvedValue({ affected: 1 }),
+    createQueryBuilder: jest.fn(),
   };
   const notes = {
     find: jest.fn().mockResolvedValue([]),
@@ -32,10 +34,11 @@ function makeService() {
     create: jest.fn((row: unknown) => row),
     remove: jest.fn(),
   };
-  const apiKeys = { findOne: jest.fn() };
+  const apiKeys = { findOne: jest.fn(), find: jest.fn().mockResolvedValue([]) };
   const sessionService = { listChats: jest.fn().mockResolvedValue([chat()]) };
   const audit = { logInfo: jest.fn().mockResolvedValue(null) };
   const events = { emitInboxUpdated: jest.fn() };
+  const divisions = { rearm: jest.fn().mockResolvedValue(undefined), lookup: jest.fn().mockResolvedValue(null) };
 
   const service = new InboxService(
     conversations as never,
@@ -44,9 +47,10 @@ function makeService() {
     sessionService as never,
     audit as never,
     events as never,
+    divisions as never,
   );
 
-  return { service, conversations, notes, apiKeys, sessionService, audit, events };
+  return { service, conversations, notes, apiKeys, sessionService, audit, events, divisions };
 }
 
 const actor = { id: 'key-1', name: 'Agen A' } as never;
@@ -269,5 +273,133 @@ describe('InboxService.summarize', () => {
       unassigned: 2,
       mine: 1,
     });
+  });
+});
+
+describe('InboxService division routing', () => {
+  /** `pickLeastBusy` reads one grouped count through a query builder. */
+  function countBuilder(rows: Array<{ assigneeKeyId: string; load: string | number }>) {
+    const builder: Record<string, jest.Mock> = {};
+    for (const method of ['select', 'addSelect', 'where', 'andWhere', 'groupBy']) {
+      builder[method] = jest.fn(() => builder);
+    }
+    builder.getRawMany = jest.fn().mockResolvedValue(rows);
+    return builder;
+  }
+
+  it('tags the conversation and assigns the least busy active agent', async () => {
+    const { service, conversations, apiKeys, events } = makeService();
+    conversations.findOne.mockResolvedValue(null);
+    apiKeys.find.mockResolvedValue([
+      { id: 'key-1', name: 'Agen A', isActive: true },
+      { id: 'key-2', name: 'Agen B', isActive: true },
+    ]);
+    conversations.createQueryBuilder.mockReturnValue(
+      countBuilder([
+        { assigneeKeyId: 'key-1', load: '4' },
+        { assigneeKeyId: 'key-2', load: '1' },
+      ]),
+    );
+
+    const result = await service.routeConversation({
+      sessionId: 'sess-1',
+      chatId: '628111@c.us',
+      divisionId: 'div-1',
+      divisionName: 'CS SMP Putra',
+      agentKeyIds: ['key-1', 'key-2'],
+    });
+
+    expect(result).toEqual({ assigneeKeyId: 'key-2', assigneeName: 'Agen B' });
+    expect(conversations.save).toHaveBeenCalledWith(
+      expect.objectContaining({ divisionId: 'div-1', divisionName: 'CS SMP Putra', assigneeKeyId: 'key-2' }),
+    );
+    expect(events.emitInboxUpdated).toHaveBeenCalledWith(
+      'sess-1',
+      expect.objectContaining({ divisionId: 'div-1', assigneeKeyId: 'key-2' }),
+    );
+  });
+
+  it('keeps the current CS when the chat already belongs to that division', async () => {
+    const { service, conversations, apiKeys } = makeService();
+    conversations.findOne.mockResolvedValue({
+      id: 'conv-1',
+      sessionId: 'sess-1',
+      chatId: '628111@c.us',
+      status: 'open',
+      divisionId: 'div-1',
+      assigneeKeyId: 'key-1',
+      assigneeName: 'Agen A',
+    });
+    apiKeys.find.mockResolvedValue([{ id: 'key-1', name: 'Agen A', isActive: true }]);
+
+    const result = await service.routeConversation({
+      sessionId: 'sess-1',
+      chatId: '628111@c.us',
+      divisionId: 'div-1',
+      divisionName: 'CS SMP Putra',
+      agentKeyIds: ['key-1'],
+    });
+
+    expect(result.assigneeKeyId).toBe('key-1');
+    expect(conversations.createQueryBuilder).not.toHaveBeenCalled();
+  });
+
+  it('tags without an assignee when no member key is active', async () => {
+    const { service, conversations, apiKeys } = makeService();
+    conversations.findOne.mockResolvedValue(null);
+    apiKeys.find.mockResolvedValue([{ id: 'key-1', name: 'Agen A', isActive: false }]);
+
+    const result = await service.routeConversation({
+      sessionId: 'sess-1',
+      chatId: '628111@c.us',
+      divisionId: 'div-1',
+      divisionName: 'CS SMP Putra',
+      agentKeyIds: ['key-1'],
+    });
+
+    expect(result).toEqual({ assigneeKeyId: null, assigneeName: null });
+    expect(conversations.save).toHaveBeenCalledWith(
+      expect.objectContaining({ divisionId: 'div-1', assigneeKeyId: null }),
+    );
+  });
+
+  it('rejects a division that belongs to another session', async () => {
+    const { service, conversations, divisions } = makeService();
+    conversations.findOne.mockResolvedValue({ id: 'conv-1', sessionId: 'sess-1', chatId: '628111@c.us' });
+    divisions.lookup.mockResolvedValue(null);
+
+    await expect(service.update('sess-1', '628111@c.us', { divisionId: 'div-other' }, actor)).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+  });
+
+  it('re-arms the routing when the conversation is resolved', async () => {
+    const { service, conversations, divisions } = makeService();
+    conversations.findOne.mockResolvedValue({
+      id: 'conv-1',
+      sessionId: 'sess-1',
+      chatId: '628111@c.us',
+      status: 'open',
+      assigneeKeyId: null,
+      divisionId: null,
+    });
+
+    await service.update('sess-1', '628111@c.us', { status: 'resolved' }, actor);
+
+    expect(divisions.rearm).toHaveBeenCalledWith('sess-1', '628111@c.us');
+  });
+
+  it('filters the list by division, with `unassigned` meaning untagged', async () => {
+    const { service, conversations } = makeService();
+    conversations.find.mockResolvedValue([
+      { sessionId: 'sess-1', chatId: '628111@c.us', status: 'open', divisionId: 'div-1', divisionName: 'Putra' },
+    ]);
+
+    const tagged = await service.listAll('sess-1', { division: 'div-1' });
+    const untagged = await service.listAll('sess-1', { division: 'unassigned' });
+
+    expect(tagged).toHaveLength(1);
+    expect(tagged[0].divisionName).toBe('Putra');
+    expect(untagged).toHaveLength(0);
   });
 });

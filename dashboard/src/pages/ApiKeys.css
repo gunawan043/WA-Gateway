@@ -651,3 +651,58 @@
     padding: 0.75rem;
   }
 }
+
+/* The application preset: a quiet secondary action at the top of the create dialog, before the
+   fields it fills, so it reads as a shortcut rather than another field. */
+.api-keys-page .preset-btn {
+  align-items: center;
+  background: rgba(37, 211, 102, 0.08);
+  border: 1px solid rgba(37, 211, 102, 0.35);
+  border-radius: 8px;
+  color: var(--primary-text);
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 0.875rem;
+  font-weight: 600;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+  padding: 0.5rem 0.875rem;
+}
+
+.api-keys-page .preset-btn:hover:not(:disabled) {
+  background: rgba(37, 211, 102, 0.14);
+}
+
+.api-keys-page .preset-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* The Laravel snippet shown with a freshly created key. It scrolls on its own: a long line must not
+   widen the dialog or force the whole body sideways. */
+.api-keys-page .laravel-snippet-block {
+  border-top: 1px solid var(--border);
+  margin-top: 1.5rem;
+  padding-top: 1.25rem;
+}
+
+.api-keys-page .laravel-snippet-block h3 {
+  font-size: 0.9375rem;
+  margin: 0 0 0.25rem;
+}
+
+.api-keys-page .laravel-snippet {
+  background: var(--bg-light);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  direction: ltr;
+  font-family: monospace;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  margin: 0.75rem 0;
+  max-height: 16rem;
+  overflow: auto;
+  padding: 0.75rem;
+  text-align: start;
+  white-space: pre;
+}

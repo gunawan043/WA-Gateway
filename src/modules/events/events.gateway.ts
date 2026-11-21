@@ -9,7 +9,7 @@ import {
   ConnectedSocket,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { ForbiddenException, OnModuleDestroy, UnauthorizedException } from '@nestjs/common';
+import { ForbiddenException, OnModuleDestroy, Optional, UnauthorizedException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { createLogger } from '../../common/services/logger.service';
 import { getRequestActor, runWithRequestId } from '../../common/services/request-context';
@@ -30,6 +30,8 @@ import { DEFAULT_WEBHOOK_MEDIA_INLINE_MAX_BYTES, shedInlineMedia } from '../../c
 import { isSafeSessionName } from '../../common/utils/path-safety';
 import { ApiKeyRole, type ApiKey } from '../auth/entities/api-key.entity';
 import { apiKeyAuthorizationFingerprint, apiKeyExpiryTime } from '../auth/api-key-authorization';
+import { SessionAuthService } from '../auth/session-auth.service';
+import { isSessionToken } from '../auth/session-token';
 import {
   readWsRateLimitConfig,
   TokenBucketLimiter,
@@ -244,6 +246,9 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
     private readonly auditService: AuditService,
     private readonly configService: ConfigService,
     private readonly chatScope: ChatScopeService = new ChatScopeService(),
+    // Optional so the gateway can be constructed in a spec without the auth module; without it a
+    // session token is simply not accepted here.
+    @Optional() private readonly sessions?: SessionAuthService,
   ) {
     this.rateLimits = readWsRateLimitConfig();
     this.frameLimiter = new TokenBucketLimiter(this.rateLimits.framePerSecond, this.rateLimits.frameBurst);
@@ -299,6 +304,44 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
     for (const keyId of keyIds) {
       const reason = this.evictionReason(byId.get(keyId), this.socketsByKeyId.get(keyId), now);
       if (reason) this.evictApiKey(keyId, reason);
+    }
+    await this.sweepSessions(now);
+  }
+
+  /**
+   * Ends sockets whose dashboard session was revoked, expired or whose account was disabled.
+   *
+   * The key sweep above cannot cover this: a session token resolves to the account's key, which stays
+   * perfectly valid after a logout. Only the `user_sessions` row says the browser must stop receiving
+   * events, so it is read here in one batch. Sockets are dropped one by one — the same key may also
+   * serve a raw API-key connection that has no session to revoke.
+   */
+  private async sweepSessions(now: number): Promise<void> {
+    if (!this.sessions) return;
+
+    const bySession = new Map<string, Socket[]>();
+    for (const sockets of this.socketsByKeyId.values()) {
+      for (const client of sockets) {
+        const sessionId = (client.data as { sessionId?: string }).sessionId;
+        if (!sessionId) continue;
+        const bucket = bySession.get(sessionId);
+        if (bucket) bucket.push(client);
+        else bySession.set(sessionId, [client]);
+      }
+    }
+    if (bySession.size === 0) return;
+
+    const states = await this.sessions.findStates(Array.from(bySession.keys()));
+    for (const [sessionId, sockets] of bySession) {
+      const row = states.get(sessionId);
+      const expiresAt = row ? new Date(row.expiresAt).getTime() : Number.NaN;
+      const ended = !row || Boolean(row.revokedAt) || !Number.isFinite(expiresAt) || expiresAt <= now;
+      if (!ended) continue;
+      this.logger.log(`Evicting ${sockets.length} WebSocket connection(s): session ${sessionId} ended`);
+      for (const client of sockets) {
+        client.emit('message', this.createError('UNAUTHORIZED', 'Your session has ended; sign in again'));
+        client.disconnect(true);
+      }
     }
   }
 
@@ -385,6 +428,21 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
   }
 
   /**
+   * Resolves whatever the client presented — an API key or a dashboard session token — to the key
+   * the rest of the gateway speaks in.
+   *
+   * Shared by the handshake and every re-subscribe: the two used to call `validateApiKey` directly,
+   * so a session-token socket would have connected and then failed on its first subscribe.
+   */
+  private async resolveCredential(raw: string, clientIp: string): Promise<{ apiKey: ApiKey; sessionId?: string }> {
+    if (this.sessions && isSessionToken(raw)) {
+      const { apiKey, session } = await this.sessions.resolve(raw, clientIp);
+      return { apiKey, sessionId: session.id };
+    }
+    return { apiKey: await this.authService.validateApiKey(raw, clientIp) };
+  }
+
+  /**
    * Tear down every active socket authenticated with `keyId`. Called by AuthService when a key is
    * revoked, deleted, or has its authorization (role/allowedSessions/allowedChats/allowedIps/expiry) narrowed, and
    * by sweepApiKeyAuthorization for the same changes when they only reach this process through the
@@ -465,13 +523,14 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
       // path is the catch below — a separate `if (!validKey)` branch here was dead code. The clientIp
       // is passed so an IP-restricted key (allowedIps set) is ENFORCED rather than blanket-rejected
       // for "Client IP could not be determined".
-      const validKey = await runWithRequestId(randomUUID(), () =>
-        this.authService.validateApiKey(apiKey, clientIp).catch((error: unknown) => {
+      const credential = await runWithRequestId(randomUUID(), () =>
+        this.resolveCredential(apiKey, clientIp).catch((error: unknown) => {
           const actor = getRequestActor();
           if (actor?.apiKeyId) refusedKey = { id: actor.apiKeyId, name: actor.apiKeyName ?? '' };
           throw error;
         }),
       );
+      const validKey = credential.apiKey;
 
       // Cap simultaneous sockets per key: each socket holds rooms, engine fan-out, and memory,
       // so one key must not open connections without bound. Enough for multi-tab dashboards;
@@ -494,9 +553,14 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
       }
 
       // Store the validated key AND the raw key — the raw key lets handleSubscribe
-      // RE-validate on each subscription so a key revoked mid-connection is caught.
+      // RE-validate on each subscription so a key revoked mid-connection is caught. The session id
+      // (when the credential was a dashboard token) is kept so the sweep can end a socket whose
+      // session was revoked or expired without touching the other sockets of the same key.
       (client.data as { apiKey: unknown; rawApiKey: string }).apiKey = validKey;
       (client.data as { rawApiKey: string }).rawApiKey = apiKey;
+      if (credential.sessionId) {
+        (client.data as { sessionId?: string }).sessionId = credential.sessionId;
+      }
       this.trackSocket(validKey.id, client);
       // The handshake window is charged pre-auth to keep an unauthenticated flood off the DB. This
       // one turned out to be authentic, so give the slot back: the window then bounds FAILED
@@ -659,7 +723,7 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
     let subscriberKey: ApiKey | null;
     let unreadable = false;
     try {
-      subscriberKey = rawApiKey ? await this.authService.validateApiKey(rawApiKey, clientIp) : null;
+      subscriberKey = rawApiKey ? (await this.resolveCredential(rawApiKey, clientIp)).apiKey : null;
     } catch (error) {
       subscriberKey = null;
       if (isKeyRefusal(error)) {

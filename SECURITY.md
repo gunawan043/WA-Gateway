@@ -46,9 +46,9 @@ and a Docker socket-proxy as the sole gateway to the Docker daemon.
 
 When exposing OpenWA, please review the security-relevant configuration documented in
 the README and `docs/` — in particular `CORS_ORIGINS`, `ALLOW_DEV_API_KEY`,
-`ENABLE_SWAGGER`, `WEBHOOK_SSRF_PROTECT`, `BODY_SIZE_LIMIT`, and the Docker proxy setup.
-Never expose the dashboard/API to the public internet with the development API key
-enabled.
+`ENABLE_SWAGGER`, `WEBHOOK_SSRF_PROTECT`, `BODY_SIZE_LIMIT`, `ADMIN_EMAIL` /
+`ADMIN_PASSWORD` and the Docker proxy setup. Never expose the dashboard/API to the
+public internet with the development API key enabled.
 
 If you created your `.env` by copying `.env.example` before 0.16.0, check it for
 `ENABLE_SWAGGER=true`. Earlier templates shipped that line uncommented alongside
@@ -112,6 +112,40 @@ deletes (profile teardown is stop-only). If you do not use the built-in datastor
 orchestration (Dashboard → Infrastructure built-in toggles), disable the proxy entirely —
 see the `docker-proxy` comments in `docker-compose.yml`; `DockerService` then reports
 Docker unavailable and orchestration degrades gracefully.
+
+### Dashboard accounts (email + password)
+
+The dashboard can be signed in to with an email and a password instead of pasting an API
+key. This does not add a second kind of principal: every account owns exactly one
+`api_keys` row, and a session token resolves to that row before the guard runs, so roles,
+scopes and audit attribution are the same. What an operator should know:
+
+- **The account's key is never handed out.** Its plaintext is generated and discarded at
+  creation, so the only way to use it is by signing in. `PATCH`/`DELETE` on
+  `/api/auth/api-keys/:id` answer `409` for a user-managed key rather than orphan the
+  account — delete the user instead.
+- **Sessions are revocable server-side.** The token (`owa_s1_<64 hex>`) is stored only as a
+  hash; logout, a password change, an admin reset and disabling the account each cut the
+  matching sessions immediately, including a connected WebSocket (the sweep re-reads the
+  session rows and disconnects what no longer resolves). Sessions expire after
+  `AUTH_SESSION_TTL_HOURS` (default 168).
+- **Login is throttled per IP** at 5 requests a minute and 20 an hour. An unknown email, a
+  wrong password and a disabled account all answer the same `401`, and an unknown email
+  still pays for one scrypt verification, so the route is not an account oracle.
+- **Passwords are scrypt** (`N=2^15, r=8, p=1`, 16-byte salt, 64-byte key) and must be at
+  least 12 characters. There is no email delivery — no reset link and no verification mail
+  — so a lost password is reset by another admin.
+- **Seed the first account from the environment, not from a default.** `ADMIN_EMAIL` and
+  `ADMIN_PASSWORD` are read only on the first boot of an empty `users` table, must be set
+  together, and a password under 12 characters refuses the boot. Change the seeded password
+  after the first sign-in; the seed does not overwrite an existing row.
+- **The last-admin invariant covers accounts too.** Demoting or disabling the last admin
+  user is refused unless another usable unscoped admin key survives, so an operator cannot
+  lock everyone out by editing the one account.
+
+See [docs/04-security-design.md](docs/04-security-design.md#dashboard-sign-in-email--password)
+for the full model and [docs/32-laravel-integration.md](docs/32-laravel-integration.md) for
+giving an application its own scoped key instead.
 
 ### Session-restricted API keys
 

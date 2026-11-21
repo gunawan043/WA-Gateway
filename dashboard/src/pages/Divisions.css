@@ -1,0 +1,235 @@
+.divisions-page {
+  padding: 2rem;
+  width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.divisions-page .page-header {
+  margin-bottom: 0;
+}
+
+.divisions-page .divisions-session-select {
+  min-width: 12rem;
+}
+
+.divisions-page .divisions-list,
+.divisions-page .divisions-settings {
+  background: var(--bg-white);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-sm);
+  padding: 1.25rem;
+}
+
+.divisions-page .divisions-list-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.divisions-page .divisions-list-head h2,
+.divisions-page .divisions-settings h2 {
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.divisions-page .divisions-items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.divisions-page .divisions-items > li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.875rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.875rem 1rem;
+}
+
+.divisions-page .divisions-items > li.is-inactive {
+  opacity: 0.6;
+}
+
+.divisions-page .divisions-index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 50%;
+  background: var(--bg-light);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.divisions-page .divisions-body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.divisions-page .divisions-name-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.divisions-page .divisions-badge {
+  background: var(--bg-light);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-secondary);
+  font-size: 0.7rem;
+  padding: 0.1rem 0.5rem;
+}
+
+.divisions-page .divisions-menu-label {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  margin: 0.2rem 0 0;
+}
+
+.divisions-page .divisions-keywords {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+}
+
+.divisions-page .divisions-keywords li {
+  background: rgba(37, 211, 102, 0.1);
+  border-radius: 999px;
+  font-size: 0.72rem;
+  padding: 0.1rem 0.5rem;
+}
+
+.divisions-page .divisions-agents {
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  margin: 0.5rem 0 0;
+}
+
+.divisions-page .divisions-actions {
+  display: flex;
+  gap: 0.25rem;
+  flex: 0 0 auto;
+}
+
+.divisions-page .divisions-actions button {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0.35rem;
+}
+
+.divisions-page .divisions-actions button:hover {
+  background: var(--bg-light);
+}
+
+.divisions-page .divisions-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text-secondary);
+  padding: 2rem 1rem;
+  text-align: center;
+}
+
+.divisions-page .divisions-error {
+  color: var(--error-text);
+}
+
+.divisions-page .divisions-settings label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin: 0.875rem 0 0.3rem;
+}
+
+.divisions-page .divisions-settings input[type='text'],
+.divisions-page .divisions-settings input[type='number'],
+.divisions-page .divisions-settings textarea {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.divisions-page .divisions-settings input[type='number'] {
+  max-width: 8rem;
+}
+
+.divisions-page .divisions-hint {
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  margin: 0.25rem 0 0;
+}
+
+.divisions-page .divisions-check {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  margin: 0.75rem 0 0;
+}
+
+.divisions-page .divisions-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 1.5rem;
+  margin-top: 0.5rem;
+}
+
+.divisions-page .divisions-agents-field {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin: 1rem 0 0;
+  padding: 0.5rem 0.875rem 0.875rem;
+}
+
+.divisions-page .divisions-agents-field legend {
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0 0.25rem;
+}
+
+.divisions-page .divisions-agents-field ul {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+}
+
+.divisions-page .divisions-note {
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  margin: 0;
+}
+
+@media (max-width: 720px) {
+  .divisions-page {
+    padding: 1rem;
+  }
+
+  .divisions-page .divisions-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

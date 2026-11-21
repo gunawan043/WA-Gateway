@@ -159,6 +159,10 @@ services:
       # Security / boot knobs the app reads. Like the blocks above, this list is the only path into
       # the container; compose-parity.spec.ts derives the required set from .env.example.
       - API_MASTER_KEY=${API_MASTER_KEY:-}
+      # First dashboard account, seeded on the boot that finds no accounts. Both must be set.
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
+      - AUTH_SESSION_TTL_HOURS=${AUTH_SESSION_TTL_HOURS:-}
       - ALLOW_DEV_API_KEY=${ALLOW_DEV_API_KEY:-}
       - API_KEY_PEPPER=${API_KEY_PEPPER:-}
       - BOOTSTRAP_KEY_FILE=${BOOTSTRAP_KEY_FILE:-}

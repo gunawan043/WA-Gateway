@@ -19,6 +19,10 @@ function installFetchStub(): void {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
     const path = url.replace(/^https?:\/\/[^/]+/, '');
     requested.push(path);
+    if (path === '/api/auth/me')
+      return Promise.resolve(
+        jsonResponse({ user: null, role, scoped, engineType: 'baileys', keyId: 'k1', keyName: 'key' }),
+      );
     if (path === '/api/auth/validate') return Promise.resolve(jsonResponse({ valid: true, role, scoped }));
     if (path === '/api/audit' || path.startsWith('/api/audit?'))
       return Promise.resolve(jsonResponse({ data: [], total: 0 }));
@@ -66,6 +70,8 @@ afterEach(() => {
   rtl.cleanup();
   scoped = false;
   window.sessionStorage.removeItem('openwa_key_scoped');
+  window.sessionStorage.removeItem('openwa_user');
+  window.sessionStorage.removeItem('openwa_key_id');
 });
 
 function renderAt(path: string, as: string): void {
@@ -78,6 +84,23 @@ function renderAt(path: string, as: string): void {
 }
 
 const logsLink = (): Element | null => document.querySelector('a[href="/logs"]');
+
+// The login form opens on the email + password side; a machine credential is one toggle away.
+async function signInWithKey(key: string): Promise<void> {
+  const toggle = await rtl.waitFor(() => {
+    const button = document.querySelector('.login-mode-toggle');
+    assert.ok(button, 'the API-key toggle is missing');
+    return button;
+  });
+  rtl.fireEvent.click(toggle);
+  const input = await rtl.waitFor(() => {
+    const field = document.getElementById('apiKey');
+    assert.ok(field);
+    return field;
+  });
+  rtl.fireEvent.change(input, { target: { value: key } });
+  rtl.fireEvent.submit(input.closest('form')!);
+}
 
 test('an operator gets no Logs entry and /logs sends them home', async () => {
   renderAt('/logs', 'operator');
@@ -126,11 +149,13 @@ test('a startup validation that lands after a sign-in with another key is ignore
   let answerStale: ((res: Response) => void) | undefined;
   globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
-    if (url.endsWith('/api/auth/validate')) {
+    if (url.endsWith('/api/auth/me')) {
       if (new Headers(init?.headers).get('X-API-Key') === 'old-admin-key')
         return new Promise<Response>(resolve => (answerStale = resolve));
-      return Promise.resolve(jsonResponse({ valid: true, role: 'viewer' }));
+      return Promise.resolve(jsonResponse({ user: null, role: 'viewer', scoped: false, keyId: 'k2', keyName: 'new' }));
     }
+    if (url.endsWith('/api/auth/validate'))
+      return Promise.resolve(jsonResponse({ valid: true, role: 'viewer', scoped: false }));
     return previous(input, init);
   }) as typeof fetch;
   try {
@@ -145,23 +170,116 @@ test('a startup validation that lands after a sign-in with another key is ignore
       return button;
     });
     rtl.fireEvent.click(logout);
-    const input = await rtl.waitFor(() => {
-      const field = document.getElementById('apiKey');
-      assert.ok(field);
-      return field;
-    });
-    rtl.fireEvent.change(input, { target: { value: 'new-viewer-key' } });
-    rtl.fireEvent.submit(input.closest('form')!);
+    await signInWithKey('new-viewer-key');
     await rtl.waitFor(() => assert.ok(document.querySelector('a[href="/sessions"]')));
     assert.equal(logsLink() === null, true, 'the Logs nav entry is shown to a viewer');
 
     assert.ok(answerStale, 'the startup validation was never sent');
     await rtl.act(async () => {
-      answerStale!(jsonResponse({ valid: true, role: 'admin' }));
+      answerStale!(jsonResponse({ user: null, role: 'admin', scoped: false, keyId: 'k1', keyName: 'old' }));
       await new Promise(resolve => setTimeout(resolve, 50));
     });
     assert.equal(logsLink() === null, true, "the old key's admin role was applied to the new viewer session");
     assert.equal(window.sessionStorage.getItem('openwa_api_key'), 'new-viewer-key');
+  } finally {
+    globalThis.fetch = previous;
+  }
+});
+
+// People sign in with an email and a password. The token the gateway answers with is the tab's
+// credential, and the account is cached beside it so the Users page can mark the caller's own row.
+test('an email sign-in stores the session token and the account for the rest of the tab', async () => {
+  const previous = globalThis.fetch;
+  const account = { id: 'u1', email: 'ada@example.com', name: 'Ada', role: 'admin', isActive: true };
+  globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+    if (url.endsWith('/api/auth/login'))
+      return Promise.resolve(
+        jsonResponse({
+          token: 'owa_s1_fresh',
+          expiresAt: '2026-12-01T00:00:00.000Z',
+          user: account,
+          role: 'admin',
+          scoped: false,
+          engineType: 'baileys',
+        }),
+      );
+    if (url.endsWith('/api/auth/me'))
+      return Promise.resolve(
+        jsonResponse({
+          user: account,
+          role: 'admin',
+          scoped: false,
+          engineType: 'baileys',
+          keyId: 'k9',
+          keyName: 'Ada',
+        }),
+      );
+    return previous(input, init);
+  }) as typeof fetch;
+  try {
+    window.history.replaceState(null, '', '/');
+    window.sessionStorage.removeItem('openwa_api_key');
+    window.sessionStorage.removeItem('openwa_user_role');
+    rtl.render(createElement(App));
+
+    const email = await rtl.waitFor(() => {
+      const field = document.getElementById('email');
+      assert.ok(field, 'the login form did not open on the account side');
+      return field;
+    });
+    rtl.fireEvent.change(email, { target: { value: 'ada@example.com' } });
+    rtl.fireEvent.change(document.getElementById('password')!, { target: { value: 'correct horse battery' } });
+    rtl.fireEvent.submit(email.closest('form')!);
+
+    await rtl.waitFor(() => assert.ok(document.querySelector('a[href="/sessions"]')));
+    assert.equal(window.sessionStorage.getItem('openwa_api_key'), 'owa_s1_fresh');
+    assert.deepEqual(JSON.parse(window.sessionStorage.getItem('openwa_user') ?? 'null'), {
+      id: 'u1',
+      email: 'ada@example.com',
+      name: 'Ada',
+    });
+    assert.equal(window.sessionStorage.getItem('openwa_user_role'), 'admin');
+  } finally {
+    globalThis.fetch = previous;
+  }
+});
+
+// A reload keeps the session token; the startup check is /auth/me, which answers for a token and a key
+// alike and re-reads the account, so a renamed account or a replaced credential does not leave a stale
+// name in the tab.
+test('a stored session token hydrates the account on startup', async () => {
+  const previous = globalThis.fetch;
+  globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+    if (url.endsWith('/api/auth/me'))
+      return Promise.resolve(
+        jsonResponse({
+          user: { id: 'u2', email: 'grace@example.com', name: 'Grace', role: 'operator', isActive: true },
+          role: 'operator',
+          scoped: false,
+          engineType: 'baileys',
+          keyId: 'k7',
+          keyName: 'Grace',
+        }),
+      );
+    return previous(input, init);
+  }) as typeof fetch;
+  try {
+    window.history.replaceState(null, '', '/');
+    window.sessionStorage.setItem('openwa_api_key', 'owa_s1_stored');
+    window.sessionStorage.removeItem('openwa_user_role');
+    window.sessionStorage.removeItem('openwa_user');
+    rtl.render(createElement(App));
+
+    await rtl.waitFor(() => assert.ok(document.querySelector('a[href="/sessions"]')));
+    assert.deepEqual(JSON.parse(window.sessionStorage.getItem('openwa_user') ?? 'null'), {
+      id: 'u2',
+      email: 'grace@example.com',
+      name: 'Grace',
+    });
+    assert.equal(window.sessionStorage.getItem('openwa_user_role'), 'operator');
+    assert.equal(window.sessionStorage.getItem('openwa_key_id'), 'k7');
   } finally {
     globalThis.fetch = previous;
   }
@@ -215,13 +333,11 @@ test('signing out ends a bulk Number Checker run, and the next sign-in starts wi
   const { lookups, restore } = await startBulkRun();
   try {
     rtl.fireEvent.click(document.querySelector('.logout-btn')!);
-    await rtl.waitFor(() => assert.ok(document.getElementById('apiKey')));
+    await rtl.waitFor(() => assert.ok(document.querySelector('.login-mode-toggle')));
     await new Promise(resolve => setTimeout(resolve, 1_500));
     assert.deepEqual(lookups, ['911111111111']);
 
-    const input = document.getElementById('apiKey')!;
-    rtl.fireEvent.change(input, { target: { value: 'next-key' } });
-    rtl.fireEvent.submit(input.closest('form')!);
+    await signInWithKey('next-key');
     await rtl.waitFor(() => assert.ok(document.querySelector('a[href="/number-checker"]')));
     window.history.replaceState(null, '', '/number-checker');
     rtl.fireEvent.click(document.querySelector('a[href="/number-checker"]')!);

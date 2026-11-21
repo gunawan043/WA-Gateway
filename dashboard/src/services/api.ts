@@ -3,6 +3,7 @@
 
 import { warnIfInsecureHttpUrl } from '../utils/urlSecurity';
 import { isKeyUnusable } from '../utils/authLifecycle';
+import { clearCredential, readCredential } from '../utils/credential';
 import { fetchAllPages } from '../utils/fetchAllPages';
 
 // Resolve the API base URL. By default this is the same-origin relative path '/api',
@@ -217,6 +218,54 @@ export interface ApiKey {
 /** The creation response: every list/detail field plus the plaintext key, shown exactly once. */
 export interface CreatedApiKey extends ApiKey {
   apiKey: string;
+}
+
+/**
+ * A dashboard account. Never carries the password hash: the API returns the account without it, and
+ * `apiKeyId` is the linked key row, which the key list shows as user-managed.
+ */
+export interface AuthUser {
+  id: string;
+  email: string;
+  name: string;
+  role: 'admin' | 'operator' | 'viewer';
+  isActive: boolean;
+  apiKeyId: string;
+  lastLoginAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface LoginResult {
+  token: string;
+  expiresAt: string;
+  user: AuthUser;
+  role: string;
+  scoped: boolean;
+  engineType: string;
+}
+
+/** `GET /auth/me`: the account is null when the caller authenticated with a plain API key. */
+export interface MeResult {
+  user: AuthUser | null;
+  role: string;
+  scoped: boolean;
+  engineType: string;
+  keyId: string;
+  keyName: string;
+}
+
+export interface CreateUserInput {
+  email: string;
+  name: string;
+  password: string;
+  role?: 'admin' | 'operator' | 'viewer';
+}
+
+export interface UpdateUserInput {
+  name?: string;
+  role?: 'admin' | 'operator' | 'viewer';
+  isActive?: boolean;
 }
 
 export interface AuditLog {
@@ -821,9 +870,9 @@ async function handleErrorResponse<T>(response: Response, sentKey: string | null
   // rather than statusText: the toast folds an exact `HTTP 502`/`HTTP 503` into its connection-lost
   // toast (a 504 keeps its own), and statusText is empty over HTTP/2 anyway.
   const error = await response.json().catch(() => ({}));
-  const storedKey = sessionStorage.getItem('openwa_api_key');
+  const storedKey = readCredential();
   if (isKeyUnusable(response.status, error.message) && (storedKey === sentKey || storedKey === null)) {
-    sessionStorage.removeItem('openwa_api_key');
+    clearCredential();
     if (typeof window !== 'undefined') {
       if (sentKey !== null && storedKey === sentKey) window.location.assign('/');
       return new Promise<T>(() => {});
@@ -851,8 +900,8 @@ async function handleErrorResponse<T>(response: Response, sentKey: string | null
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`;
 
-  // Get API key from sessionStorage for authentication
-  const apiKey = sessionStorage.getItem('openwa_api_key');
+  // The credential is an API key or a dashboard session token; both go in the same header.
+  const apiKey = readCredential();
 
   // For FormData (file uploads) let the browser set multipart/form-data + boundary itself.
   const isFormData = options.body instanceof FormData;
@@ -877,7 +926,7 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
 
 /** Like {@link request} but returns the raw response text — e.g. a plugin's HTML config-UI bundle. */
 async function requestText(endpoint: string): Promise<string> {
-  const apiKey = sessionStorage.getItem('openwa_api_key');
+  const apiKey = readCredential();
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
     headers: { ...(apiKey ? { 'X-API-Key': apiKey } : {}) },
   });
@@ -893,8 +942,8 @@ async function requestText(endpoint: string): Promise<string> {
 async function requestBlob(endpoint: string, signal?: AbortSignal): Promise<Blob> {
   const url = `${API_BASE_URL}${endpoint}`;
 
-  // Get API key from sessionStorage for authentication
-  const apiKey = sessionStorage.getItem('openwa_api_key');
+  // The credential is an API key or a dashboard session token; both go in the same header.
+  const apiKey = readCredential();
 
   const headers: HeadersInit = {
     ...(apiKey ? { 'X-API-Key': apiKey } : {}),
@@ -1275,6 +1324,83 @@ export const apiKeyApi = {
     }),
   delete: (id: string) => request<void>(`/auth/api-keys/${id}`, { method: 'DELETE' }),
   revoke: (id: string) => request<ApiKey>(`/auth/api-keys/${id}/revoke`, { method: 'POST' }),
+};
+
+// =============================================================================
+// Auth (dashboard accounts) API
+// =============================================================================
+
+/**
+ * Sign-in for people. `login` deliberately does not go through `request()`: it must not carry the
+ * stored credential (a stale one would make the gateway answer for the wrong actor), and a 401 there
+ * means "wrong email or password", not "the stored key died", so it must not trigger the sign-out
+ * side effect in `handleErrorResponse`.
+ */
+export const authApi = {
+  login: async (email: string, password: string): Promise<LoginResult> => {
+    const response = await fetch(`${API_BASE_URL}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+    if (!response.ok) {
+      const body: { message?: unknown } = await response.json().catch(() => ({}));
+      const err = new Error(typeof body.message === 'string' ? body.message : `HTTP ${response.status}`) as Error & {
+        status?: number;
+      };
+      err.status = response.status;
+      throw err;
+    }
+    return response.json() as Promise<LoginResult>;
+  },
+  /** The account behind a session token; `user` is null for a plain API key. */
+  me: () => request<MeResult>('/auth/me'),
+  logout: () => request<void>('/auth/logout', { method: 'POST' }),
+  /**
+   * Also kept off `request()`: the gateway answers 401 when the CURRENT password is wrong, and the
+   * transport's 401 handling would clear the session and send the operator back to the sign-in form
+   * for a typo. The credential itself is fine, so the dialog reports the message instead.
+   */
+  changePassword: async (currentPassword: string, newPassword: string): Promise<void> => {
+    const credential = readCredential();
+    const response = await fetch(`${API_BASE_URL}/auth/change-password`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(credential ? { 'X-API-Key': credential } : {}),
+      },
+      body: JSON.stringify({ currentPassword, newPassword }),
+    });
+    if (!response.ok) {
+      const body: { message?: unknown } = await response.json().catch(() => ({}));
+      const err = new Error(typeof body.message === 'string' ? body.message : `HTTP ${response.status}`) as Error & {
+        status?: number;
+      };
+      err.status = response.status;
+      throw err;
+    }
+  },
+};
+
+/** Account management. ADMIN-only and refused to session-scoped keys, like the key routes. */
+export const usersApi = {
+  list: () => request<AuthUser[]>('/auth/users'),
+  create: (data: CreateUserInput) =>
+    request<AuthUser>('/auth/users', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  update: (id: string, data: UpdateUserInput) =>
+    request<AuthUser>(`/auth/users/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+  resetPassword: (id: string, password: string) =>
+    request<void>(`/auth/users/${id}/reset-password`, {
+      method: 'POST',
+      body: JSON.stringify({ password }),
+    }),
+  remove: (id: string) => request<void>(`/auth/users/${id}`, { method: 'DELETE' }),
 };
 
 // =============================================================================
@@ -1724,6 +1850,8 @@ export interface InboxConversation {
   status: InboxStatus;
   assigneeKeyId: string | null;
   assigneeName: string | null;
+  divisionId: string | null;
+  divisionName: string | null;
   resolvedAt: string | null;
 }
 
@@ -1751,6 +1879,8 @@ export interface InboxSummary {
 export interface InboxListParams {
   status?: InboxStatus;
   assignee?: InboxAssigneeFilter;
+  /** `unassigned`, or a division id. */
+  division?: string;
   q?: string;
   limit?: number;
   offset?: number;
@@ -1768,6 +1898,7 @@ export const inboxApi = {
     const query = new URLSearchParams();
     if (params.status) query.set('status', params.status);
     if (params.assignee && params.assignee !== 'all') query.set('assignee', params.assignee);
+    if (params.division && params.division !== 'all') query.set('division', params.division);
     if (params.q) query.set('q', params.q);
     if (params.limit !== undefined) query.set('limit', String(params.limit));
     if (params.offset !== undefined) query.set('offset', String(params.offset));
@@ -1777,7 +1908,11 @@ export const inboxApi = {
   summary: (sessionId: string) => request<InboxSummary>(`/sessions/${sessionId}/inbox/summary`),
   get: (sessionId: string, chatId: string) =>
     request<InboxConversationDetail>(`/sessions/${sessionId}/inbox/conversations/${encodeURIComponent(chatId)}`),
-  update: (sessionId: string, chatId: string, data: { status?: InboxStatus; assigneeKeyId?: string | null }) =>
+  update: (
+    sessionId: string,
+    chatId: string,
+    data: { status?: InboxStatus; assigneeKeyId?: string | null; divisionId?: string | null },
+  ) =>
     request<InboxConversationDetail>(`/sessions/${sessionId}/inbox/conversations/${encodeURIComponent(chatId)}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
@@ -1792,6 +1927,68 @@ export const inboxApi = {
       `/sessions/${sessionId}/inbox/conversations/${encodeURIComponent(chatId)}/notes/${encodeURIComponent(noteId)}`,
       { method: 'DELETE' },
     ),
+};
+
+// =============================================================================
+// Division routing API (mirrors src/modules/division)
+// =============================================================================
+
+export interface DivisionAgent {
+  apiKeyId: string;
+  name: string;
+}
+
+export interface Division {
+  id: string;
+  sessionId: string;
+  name: string;
+  keywords: string[];
+  menuLabel: string | null;
+  welcomeText: string | null;
+  sortOrder: number;
+  isActive: boolean;
+  agents: DivisionAgent[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DivisionSettings {
+  sessionId: string;
+  enabled: boolean;
+  menuHeader: string | null;
+  invalidReply: string | null;
+  idleHours: number;
+}
+
+export interface DivisionInput {
+  name: string;
+  keywords?: string[];
+  menuLabel?: string | null;
+  welcomeText?: string | null;
+  sortOrder?: number;
+  isActive?: boolean;
+  agentKeyIds?: string[];
+}
+
+export type DivisionSettingsInput = Partial<Omit<DivisionSettings, 'sessionId'>>;
+
+export const divisionApi = {
+  list: (sessionId: string) => request<Division[]>(`/sessions/${sessionId}/divisions`),
+  create: (sessionId: string, data: DivisionInput) =>
+    request<Division>(`/sessions/${sessionId}/divisions`, { method: 'POST', body: JSON.stringify(data) }),
+  update: (sessionId: string, divisionId: string, data: Partial<DivisionInput>) =>
+    request<Division>(`/sessions/${sessionId}/divisions/${divisionId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+  remove: (sessionId: string, divisionId: string) =>
+    request<void>(`/sessions/${sessionId}/divisions/${divisionId}`, { method: 'DELETE' }),
+  getSettings: (sessionId: string) => request<DivisionSettings>(`/sessions/${sessionId}/divisions/settings`),
+  updateSettings: (sessionId: string, data: DivisionSettingsInput) =>
+    request<DivisionSettings>(`/sessions/${sessionId}/divisions/settings`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
 };
 
 // =============================================================================

@@ -1,6 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { AlertCircle, Check, Loader2, MessageSquare, Search, StickyNote, Trash2, UserPlus } from 'lucide-react';
+import {
+  AlertCircle,
+  Check,
+  Loader2,
+  MessageSquare,
+  Search,
+  Send,
+  StickyNote,
+  Trash2,
+  UserPlus,
+} from 'lucide-react';
 import { PageHeader } from '../components/PageHeader';
 import { useToast } from '../hooks/useToast';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
@@ -9,8 +19,11 @@ import {
   useAddInboxNoteMutation,
   useAgentsQuery,
   useDeleteInboxNoteMutation,
+  useDivisionsQuery,
   useInboxConversationQuery,
   useInboxQuery,
+  useInboxThreadQuery,
+  useSendInboxReplyMutation,
   useSessionsQuery,
   useUpdateInboxMutation,
 } from '../hooks/queries';
@@ -39,13 +52,14 @@ function formatTime(timestamp: number): string {
 export function Inbox() {
   const { t } = useTranslation();
   const toast = useToast();
-  const { keyId, keyName } = useRole();
+  const { keyId, keyName, canWrite } = useRole();
   useDocumentTitle(t('inbox.title'));
 
   const { data: sessions = [], isLoading: sessionsLoading } = useSessionsQuery();
   const [sessionId, setSessionId] = useState('');
   const [status, setStatus] = useState<StatusTab>('open');
   const [assignee, setAssignee] = useState<InboxAssigneeFilter>('all');
+  const [division, setDivision] = useState('all');
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [selectedChatId, setSelectedChatId] = useState('');
@@ -65,30 +79,36 @@ export function Inbox() {
     () => ({
       status: status === 'all' ? undefined : status,
       assignee,
+      division: division === 'all' ? undefined : division,
       q: debouncedSearch || undefined,
     }),
-    [status, assignee, debouncedSearch],
+    [status, assignee, division, debouncedSearch],
   );
 
   const conversations = useInboxQuery(sessionId, params);
   const detail = useInboxConversationQuery(sessionId, selectedChatId);
   const { data: agents = [] } = useAgentsQuery();
+  const { data: divisions = [] } = useDivisionsQuery(sessionId);
+  const thread = useInboxThreadQuery(sessionId, selectedChatId, canWrite);
   const updateConversation = useUpdateInboxMutation(sessionId);
+  const sendReply = useSendInboxReplyMutation(sessionId);
   const addNote = useAddInboxNoteMutation(sessionId);
   const deleteNote = useDeleteInboxNoteMutation(sessionId);
 
   const [noteDraft, setNoteDraft] = useState('');
+  const [replyDraft, setReplyDraft] = useState('');
 
   // A new session invalidates the selection: the chat belongs to the previous session.
   useEffect(() => {
     setSelectedChatId('');
     setNoteDraft('');
+    setReplyDraft('');
   }, [sessionId]);
 
   const rows = conversations.data ?? [];
   const active = detail.data;
 
-  const applyUpdate = (data: { status?: InboxStatus; assigneeKeyId?: string | null }) => {
+  const applyUpdate = (data: { status?: InboxStatus; assigneeKeyId?: string | null; divisionId?: string | null }) => {
     if (!selectedChatId) return;
     updateConversation.mutate(
       { chatId: selectedChatId, data },
@@ -110,6 +130,21 @@ export function Inbox() {
           toast.success(t('inbox.noteAdded'));
         },
         onError: error => toast.error(error instanceof Error ? error.message : t('inbox.updateFailed')),
+      },
+    );
+  };
+
+  const submitReply = () => {
+    const text = replyDraft.trim();
+    if (!text || !selectedChatId) return;
+    sendReply.mutate(
+      { chatId: selectedChatId, text },
+      {
+        onSuccess: () => {
+          setReplyDraft('');
+          toast.success(t('inbox.detail.replySent'));
+        },
+        onError: error => toast.error(error instanceof Error ? error.message : t('inbox.detail.replyFailed')),
       },
     );
   };
@@ -175,6 +210,19 @@ export function Inbox() {
                 <option value="me">{t('inbox.assignee.me')}</option>
                 <option value="unassigned">{t('inbox.assignee.unassigned')}</option>
               </select>
+              <select
+                value={division}
+                onChange={event => setDivision(event.target.value)}
+                aria-label={t('inbox.division.label')}
+              >
+                <option value="all">{t('inbox.division.all')}</option>
+                <option value="unassigned">{t('inbox.division.unassigned')}</option>
+                {divisions.map(item => (
+                  <option key={item.id} value={item.id}>
+                    {item.name}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div className="inbox-tabs" role="tablist">
@@ -233,6 +281,7 @@ export function Inbox() {
                           ) : (
                             <span className="inbox-assignee inbox-unassigned">{t('inbox.unassigned')}</span>
                           )}
+                          {row.divisionName && <span className="inbox-division">{row.divisionName}</span>}
                           {row.unreadCount > 0 && <span className="inbox-unread">{row.unreadCount}</span>}
                         </span>
                       </span>
@@ -301,6 +350,78 @@ export function Inbox() {
                       ))}
                   </select>
                 </div>
+
+                <div className="inbox-assignment">
+                  <span className="inbox-field-label">{t('inbox.detail.division')}</span>
+                  <span className="inbox-current-assignee">
+                    {active.divisionName ?? t('inbox.division.unassigned')}
+                  </span>
+                  <select
+                    value={active.divisionId ?? ''}
+                    disabled={updateConversation.isPending}
+                    onChange={event => applyUpdate({ divisionId: event.target.value || null })}
+                    aria-label={t('inbox.detail.division')}
+                  >
+                    <option value="">{t('inbox.division.unassigned')}</option>
+                    {divisions.map(item => (
+                      <option key={item.id} value={item.id}>
+                        {item.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <section className="inbox-thread">
+                  <h3>
+                    <MessageSquare size={16} />
+                    {t('inbox.detail.thread')}
+                  </h3>
+
+                  {thread.isLoading ? (
+                    <div className="inbox-thread-state">
+                      <Loader2 className="animate-spin" size={20} />
+                    </div>
+                  ) : thread.isError ? (
+                    <p className="inbox-notes-empty">{t('inbox.error.load')}</p>
+                  ) : (thread.data?.messages ?? []).length === 0 ? (
+                    <p className="inbox-notes-empty">{t('inbox.detail.noMessages')}</p>
+                  ) : (
+                    <ul className="inbox-thread-list">
+                      {(thread.data?.messages ?? []).map(item => (
+                        <li key={item.id} className={item.direction === 'outgoing' ? 'is-out' : 'is-in'}>
+                          <p>
+                            {item.type === 'text'
+                              ? item.body
+                              : t('inbox.detail.mediaMessage', { type: item.type })}
+                          </p>
+                          <time>
+                            {new Date(item.timestamp ? item.timestamp * 1000 : item.createdAt).toLocaleString()}
+                          </time>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+
+                  <div className="inbox-reply-composer">
+                    <textarea
+                      value={replyDraft}
+                      onChange={event => setReplyDraft(event.target.value)}
+                      placeholder={t('inbox.detail.replyPlaceholder')}
+                      maxLength={4000}
+                      rows={2}
+                      disabled={!canWrite}
+                      aria-label={t('inbox.detail.replyPlaceholder')}
+                    />
+                    <button
+                      type="button"
+                      onClick={submitReply}
+                      disabled={!canWrite || !replyDraft.trim() || sendReply.isPending}
+                    >
+                      {sendReply.isPending ? <Loader2 className="animate-spin" size={15} /> : <Send size={15} />}
+                      {t('inbox.detail.send')}
+                    </button>
+                  </div>
+                </section>
 
                 <section className="inbox-notes">
                   <h3>

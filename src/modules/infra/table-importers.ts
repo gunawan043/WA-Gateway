@@ -20,6 +20,10 @@ import type {
   IntegrationDeliveryFailureRow,
   StatusUpdateRow,
   AutomationRuleRow,
+  DivisionRow,
+  DivisionAgentRow,
+  DivisionSettingsRow,
+  DivisionChatStateRow,
   InboxConversationRow,
   InboxNoteRow,
   CrmDealRow,
@@ -598,13 +602,84 @@ export const TABLE_IMPORTERS: AnyTableImporter[] = [
       rule.updatedAt,
     ],
   }),
+  // Division routing: divisions before agents (an agent's divisionId is a FK), and both before the
+  // chat states whose divisionId references a division. All four cascade from the sessions DELETE.
+  defineTableImporter({
+    key: 'divisions',
+    label: 'division',
+    sql: `INSERT INTO divisions (id, "sessionId", name, keywords, "menuLabel", "welcomeText", "sortOrder", "isActive", "createdAt", "updatedAt")
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+    id: (row: DivisionRow) => row.id,
+    map: (row: DivisionRow) => [
+      row.id,
+      row.sessionId,
+      nulFree(row.name),
+      typeof row.keywords === 'string' ? row.keywords : JSON.stringify(row.keywords ?? []),
+      nulFree(row.menuLabel),
+      nulFree(row.welcomeText),
+      row.sortOrder ?? 0,
+      row.isActive ?? true,
+      row.createdAt,
+      row.updatedAt,
+    ],
+  }),
+  defineTableImporter({
+    key: 'divisionAgents',
+    label: 'division agent',
+    sql: `INSERT INTO division_agents (id, "divisionId", "apiKeyId", "agentName", "createdAt")
+               VALUES ($1, $2, $3, $4, $5)`,
+    id: (row: DivisionAgentRow) => row.id,
+    map: (row: DivisionAgentRow) => [row.id, row.divisionId, row.apiKeyId, nulFree(row.agentName), row.createdAt],
+  }),
+  defineTableImporter({
+    key: 'divisionSettings',
+    label: 'division setting',
+    sql: `INSERT INTO division_settings (id, "sessionId", enabled, "menuHeader", "invalidReply", "idleHours", "createdAt", "updatedAt")
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+    id: (row: DivisionSettingsRow) => row.id,
+    map: (row: DivisionSettingsRow) => [
+      row.id,
+      row.sessionId,
+      row.enabled ?? true,
+      nulFree(row.menuHeader),
+      nulFree(row.invalidReply),
+      row.idleHours ?? 24,
+      row.createdAt,
+      row.updatedAt,
+    ],
+  }),
+  defineTableImporter({
+    key: 'divisionChatStates',
+    label: 'division chat state',
+    sql: `INSERT INTO division_chat_states (id, "sessionId", "chatId", status, "divisionId", "menuDivisionIds", "promptedAt", "invalidReplyAt", "routedAt", "lastInboundAt", "createdAt", "updatedAt")
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+    id: (row: DivisionChatStateRow) => row.id,
+    map: (row: DivisionChatStateRow) => [
+      row.id,
+      row.sessionId,
+      row.chatId,
+      row.status,
+      row.divisionId ?? null,
+      row.menuDivisionIds == null
+        ? null
+        : typeof row.menuDivisionIds === 'string'
+          ? row.menuDivisionIds
+          : JSON.stringify(row.menuDivisionIds),
+      row.promptedAt ?? null,
+      row.invalidReplyAt ?? null,
+      row.routedAt ?? null,
+      row.lastInboundAt ?? null,
+      row.createdAt,
+      row.updatedAt,
+    ],
+  }),
   // Team inbox: conversations before notes, because a note's conversationId is a FK to a conversation
   // row that the sessions DELETE just removed. Ids are preserved so notes stay attached.
   defineTableImporter({
     key: 'inboxConversations',
     label: 'inbox conversation',
-    sql: `INSERT INTO inbox_conversations (id, "sessionId", "chatId", status, "assigneeKeyId", "assigneeName", "resolvedAt", "lastInboundAt", "createdAt", "updatedAt")
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+    sql: `INSERT INTO inbox_conversations (id, "sessionId", "chatId", status, "assigneeKeyId", "assigneeName", "divisionId", "divisionName", "resolvedAt", "lastInboundAt", "createdAt", "updatedAt")
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
     id: (row: InboxConversationRow) => row.id,
     map: (row: InboxConversationRow) => [
       row.id,
@@ -613,6 +688,8 @@ export const TABLE_IMPORTERS: AnyTableImporter[] = [
       row.status,
       nulFree(row.assigneeKeyId),
       nulFree(row.assigneeName),
+      row.divisionId ?? null,
+      nulFree(row.divisionName),
       row.resolvedAt ?? null,
       row.lastInboundAt ?? null,
       row.createdAt,
@@ -762,6 +839,10 @@ const EXPECTED_TABLE_KEYS: ReadonlyArray<keyof MigrationTables> = [
   'integrationDeliveryFailures',
   'statusUpdates',
   'automationRules',
+  'divisions',
+  'divisionAgents',
+  'divisionSettings',
+  'divisionChatStates',
   'inboxConversations',
   'inboxNotes',
   'crmDeals',

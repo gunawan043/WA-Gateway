@@ -50,6 +50,11 @@ export class InboxController {
     required: false,
     description: '`me`, `unassigned`, or an API key id. Omit for every conversation.',
   })
+  @ApiQuery({
+    name: 'division',
+    required: false,
+    description: '`unassigned`, or a division id. Omit for every conversation.',
+  })
   @ApiQuery({ name: 'q', required: false, description: 'Case-insensitive search on name, chat id or last message.' })
   @ApiQuery({
     name: 'limit',
@@ -64,6 +69,7 @@ export class InboxController {
     @CurrentApiKey() apiKey: ApiKey | undefined,
     @Query('status') status?: string,
     @Query('assignee') assignee?: string,
+    @Query('division') division?: string,
     @Query('q') q?: string,
     @Query('limit') limit?: string,
     @Query('offset') offset?: string,
@@ -74,7 +80,7 @@ export class InboxController {
 
     const all = await this.inbox.listAll(
       sessionId,
-      { status: status as InboxConversationStatus | undefined, assignee, q },
+      { status: status as InboxConversationStatus | undefined, assignee, division, q },
       apiKey?.id,
     );
     // Filter BEFORE paging: filtering the page would show a short window while an allowed chat sat
@@ -125,8 +131,8 @@ export class InboxController {
     @Body() dto: UpdateInboxConversationDto,
     @CurrentApiKey() apiKey: ApiKey | undefined,
   ): Promise<InboxConversationDetailDto> {
-    if (dto.status === undefined && dto.assigneeKeyId === undefined) {
-      throw new BadRequestException('Provide status and/or assigneeKeyId');
+    if (dto.status === undefined && dto.assigneeKeyId === undefined && dto.divisionId === undefined) {
+      throw new BadRequestException('Provide status, assigneeKeyId and/or divisionId');
     }
     return this.inbox.update(sessionId, chatId, dto, apiKey!);
   }

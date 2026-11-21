@@ -26,6 +26,7 @@ const billingBot = {
   createdAt: '2026-01-01T00:00:00.000Z',
 };
 let keyList: Record<string, unknown>[] = [billingBot];
+let sessionList: Record<string, unknown>[] = [];
 let createBody: Record<string, unknown> | undefined;
 // When set, POST /auth/api-keys answers only once this settles.
 let createGate: Promise<void> | undefined;
@@ -38,7 +39,7 @@ function installFetchStub(): void {
   globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
     const path = url.replace(/^https?:\/\/[^/]+/, '');
-    if (path === '/api/sessions') return Promise.resolve(jsonResponse([]));
+    if (path === '/api/sessions') return Promise.resolve(jsonResponse(sessionList));
     if (init?.method === 'POST' && path === '/api/auth/api-keys') {
       createBody = JSON.parse(String(init.body));
       const created = jsonResponse({ ...billingBot, id: 'key-new', apiKey: 'owa_k1_new' }, 201);
@@ -85,6 +86,7 @@ afterEach(() => {
   queryClient = undefined;
   listStatus = 200;
   keyList = [billingBot];
+  sessionList = [];
   createBody = undefined;
   createGate = undefined;
   updateBodies = [];
@@ -872,4 +874,41 @@ test('a refused delayed key update keeps the draft available for retry and cance
   assert.deepEqual(updateBodies, [{ role: 'viewer' }]);
   fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
   assert.equal(screen.queryByRole('dialog') === null, true);
+});
+
+// An app key is what a Laravel (or any) backend uses, so the preset fills the fields that decide
+// what such a key may do and leaves the name for the operator to type.
+test('the application preset sends the operator role, one session and a one-year expiry', async () => {
+  sessionList = [{ id: 's1', name: 'Primary', status: 'ready', phone: '1' }];
+  const { screen, fireEvent } = rtl;
+  const create = await openCreate();
+  // Expand the picker first: the preset reads the loaded session list, and the picker renders it.
+  fireEvent.click(screen.getByRole('button', { name: 'Choose sessions' }));
+  await screen.findByText('Primary');
+  fireEvent.click(screen.getByRole('button', { name: 'Create for an application' }));
+  fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'crm-app' } });
+  fireEvent.click(create);
+  await screen.findByText('owa_k1_new');
+
+  assert.equal(createBody?.role, 'operator');
+  assert.deepEqual(createBody?.allowedSessions, ['s1']);
+  const expiresAt = new Date(String(createBody?.expiresAt)).getTime();
+  const days = (expiresAt - Date.now()) / 86_400_000;
+  assert.ok(days > 360 && days < 367, `the expiry is ${days.toFixed(1)} days out`);
+});
+
+// The key is shown once. The snippet beside it is the shortest path from that key to a working call,
+// and it carries the key itself so it can be pasted without editing.
+test('a new key is shown with a Laravel snippet that carries the key', async () => {
+  const { screen, fireEvent } = rtl;
+  const create = await openCreate();
+  fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'crm-bot' } });
+  fireEvent.click(create);
+  await screen.findByText('owa_k1_new');
+
+  const snippet = document.querySelector('.laravel-snippet');
+  assert.ok(snippet, 'the created key is not shown with a snippet');
+  assert.match(snippet?.textContent ?? '', /OPENWA_API_KEY=owa_k1_new/);
+  assert.match(snippet?.textContent ?? '', /X-API-Key/);
+  assert.ok(screen.getByRole('button', { name: 'Copy snippet' }));
 });
