@@ -1,10 +1,10 @@
 <p align="center">
-  <img src="docs/logo/openwa_logo.webp" alt="OpenWA Logo" width="200"/>
+  <img src="docs/logo/openwa_logo.webp" alt="ALIM Connect Logo" width="200"/>
 </p>
 
-<h1 align="center">OpenWA</h1>
+<h1 align="center">ALIM Connect</h1>
 <p align="center">
-  <strong>Open Source WhatsApp API Gateway</strong>
+  <strong>WhatsApp customer-service gateway for ALIM</strong>
 </p>
 
 <p align="center">
@@ -28,11 +28,11 @@
 
 ---
 
-## ✨ Why OpenWA?
+## ✨ Why ALIM Connect?
 
-**OpenWA** is a free, open-source WhatsApp API Gateway designed for developers who need full control over their messaging infrastructure—without vendor lock-in or hidden paywalls.
+**ALIM Connect** is the customer-service layer of ALIM: one WhatsApp number per unit, a team inbox split into divisions, first-response SLA, campaigns and reporting — on a gateway that keeps full control of the messaging infrastructure, without vendor lock-in or hidden paywalls.
 
-Built on a **pluggable architecture**, OpenWA lets you select database engines (SQLite/PostgreSQL), media storage backends (Local/S3), and an optional Redis (queue, rate limits, WebSocket fan-out) through configuration rather than application-code changes. The storage backend is the live store for status media and, when chat-media archiving is enabled, archived chat media; other message media is returned inline to API and webhook consumers. Of the media, `scripts/backup.sh` archives only the local media directory, so an S3 bucket needs a backup of its own.
+It runs on the open-source **OpenWA** gateway, which stays in place: the HTTP API, the SDKs, the webhooks and the documentation below are the gateway's, and existing integrations keep working. Built on a **pluggable architecture**, OpenWA lets you select database engines (SQLite/PostgreSQL), media storage backends (Local/S3), and an optional Redis (queue, rate limits, WebSocket fan-out) through configuration rather than application-code changes. The storage backend is the live store for status media and, when chat-media archiving is enabled, archived chat media; other message media is returned inline to API and webhook consumers. Of the media, `scripts/backup.sh` archives only the local media directory, so an S3 bucket needs a backup of its own.
 
 |                               |                                                                                                                                          |
 | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
@@ -554,7 +554,7 @@ See [LICENSE](./LICENSE) for details.
 
 <div align="center">
 
-**OpenWA** – Free, Open Source WhatsApp API Gateway
+**ALIM Connect** – WhatsApp customer-service gateway, built on OpenWA
 
 [📖 Documentation](./docs/README.md) · [🔌 API Docs](http://localhost:2785/api/docs) · [🐛 Report Bug](https://github.com/rmyndharis/OpenWA/issues) · [💡 Request Feature](https://github.com/rmyndharis/OpenWA/issues)
 

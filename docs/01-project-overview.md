@@ -2,13 +2,16 @@
 
 ## 1.1 Executive Summary
 
-**OpenWA** is an open-source platform that provides an HTTP API for WhatsApp integration. This project is built as a free and fully open-source alternative to paid solutions such as WAHA Plus.
+**ALIM Connect** is the customer-service layer of ALIM: a WhatsApp gateway with a shared team
+inbox, divisions, first-response SLA, campaigns and reporting, served through one HTTP API and one
+dashboard. It runs on the open-source OpenWA gateway, so the API surface, SDKs and webhooks
+documented here are the gateway's and existing integrations keep working.
 
 ### Core Values
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                      OpenWA Values                          │
+│                     ALIM Connect Values                     │
 ├─────────────────────────────────────────────────────────────┤
 │  🆓 100% Free         │  No paywalled features               │
 │  📖 Open Source       │  MIT License, fork friendly          │
@@ -22,14 +25,15 @@
 
 ### Vision
 
-To become the most reliable open-source WhatsApp API gateway for production use.
+Every ALIM unit answers WhatsApp from one shared number, with service that is measured and
+accountable.
 
 ### Mission
 
-1. Provide a complete and free WhatsApp REST API
-2. Build an active open-source community
-3. Deliver excellent documentation and tooling
-4. Ensure user data security and privacy
+1. Give each unit a team inbox that routes a conversation to the right division and CS
+2. Measure service honestly: first response, resolution, and the people behind them
+3. Keep the gateway underneath self-hosted, open source and replaceable
+4. Protect the data of the people who write in
 
 ## 1.3 Problem Statement
 

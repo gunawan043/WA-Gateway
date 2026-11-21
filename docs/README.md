@@ -1,10 +1,10 @@
 <p align="center">
-  <img src="logo/openwa_logo.webp" alt="OpenWA Logo" width="200"/>
+  <img src="logo/openwa_logo.webp" alt="ALIM Connect Logo" width="200"/>
 </p>
 
-<h1 align="center">OpenWA Documentation</h1>
+<h1 align="center">ALIM Connect Documentation</h1>
 <p align="center">
-  <strong>Open Source WhatsApp API Gateway</strong>
+  <strong>WhatsApp customer-service gateway for ALIM</strong>
 </p>
 
 <p align="center">

@@ -198,7 +198,7 @@ export function documentErrorResponses(document: OpenAPIObject): OpenAPIObject {
 }
 
 /**
- * Builds the OpenAPI document configuration for the OpenWA API.
+ * Builds the OpenAPI document configuration for the ALIM Connect API.
  */
 export function createSwaggerConfig(): Omit<OpenAPIObject, 'paths'> {
   // Source the API version from package.json so it tracks releases automatically — no manual bump, no drift.
@@ -206,13 +206,13 @@ export function createSwaggerConfig(): Omit<OpenAPIObject, 'paths'> {
   const { version } = require('../../package.json') as { version: string };
   return (
     new DocumentBuilder()
-      .setTitle('OpenWA API')
+      .setTitle('ALIM Connect API')
       // Three refusals are issued by middleware BEFORE routing, so they apply to every operation
       // below and cannot be expressed as a per-operation @ApiResponse without repeating them 187
       // times. Documenting them here keeps the contract honest for clients that would otherwise
       // meet an undocumented status.
       .setDescription(
-        'Open Source WhatsApp API Gateway - Free, Self-Hosted HTTP API\n\n' +
+        'ALIM Connect — WhatsApp customer-service gateway. HTTP API for sessions, messages, the team inbox and reporting.\n\n' +
           '**Gateway-wide responses.** Three statuses are returned by middleware before routing, ' +
           'so any operation can emit them:\n\n' +
           '- `415 Unsupported Media Type` — the request body carries a `Content-Encoding` other ' +

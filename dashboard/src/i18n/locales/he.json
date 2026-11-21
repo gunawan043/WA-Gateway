@@ -6,7 +6,7 @@
     }
   },
   "common": {
-    "appName": "OpenWA",
+    "appName": "ALIM Connect",
     "updateAvailable": "גרסה v{{version}} זמינה",
     "loading": "טוען...",
     "cancel": "ביטול",

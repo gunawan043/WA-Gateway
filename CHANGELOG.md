@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The dashboard, the page titles and the OpenAPI document present the product as **ALIM Connect**. The npm package, the Docker image and chart, the `X-OpenWA-Signature` header, the `OPENWA_*` variables and the storage paths keep their names, so existing integrations, backups and runbooks are unchanged (see [34 - ALIM Connect Audit](./docs/34-alim-connect-audit.md)).
 - whatsapp-web.js: block and unblock use the library's own LID handling, so an unblock no longer also removes an entry the same person holds under a second id, such as a phone-keyed block from before the LID migration (see Upgrade notes), and a number WhatsApp holds no privacy id for answers `400`. The install-time block patch is retired.
 - The MCP `MessageList` tool lists a media message without its payload unless the call sets `inlineMedia: true`, where it carried the base64 inline up to the 8 MiB budget, so one photo made the result larger than an MCP client takes.
 - Dashboard: a document in a chat shows as a card with its file name, its size where known and a PDF mark, and a click still downloads it; one left out of the message list showed only `Media` (#2105). Thanks @mbdali.

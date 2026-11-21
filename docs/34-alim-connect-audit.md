@@ -99,6 +99,13 @@ Ada 368 file yang menyebut "OpenWA". Mengganti semuanya akan merusak kompatibili
 Aturan: **rebranding adalah lapisan identitas, bukan rename global.** Setiap penggantian harus
 disertai alasan kompatibilitas, dan gerbang tes tidak boleh dilonggarkan untuk itu.
 
+Di luar Fase 0 masih ada delapan kalimat di katalog locale yang menyebut "OpenWA" sebagai pelaku
+(`numberChecker.noSession.desc`, ketiga `infrastructure.*.builtInDesc`, `plugins.empty.description`,
+`sessions.restriction.passkey_required_note`, `infrastructure.migration.invalidFile`) dan rujukan
+ke katalog plugin OpenWA. Penggantiannya mekanis karena nama merek tetap Latin di semua bahasa,
+tetapi menyentuh 15 katalog, jadi dikerjakan bersama pass teks berikutnya. `login.footer` (atribusi
+penulis asli) dan `X-OpenWA-Signature` (kontrak webhook) tidak ikut diganti.
+
 ---
 
 ## 34.4 Role dan Permission
