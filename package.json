@@ -39,6 +39,8 @@
     "openapi:export": "ts-node scripts/export-openapi.ts openapi.json",
     "openapi:check": "ts-node scripts/export-openapi.ts /tmp/openapi.generated.json && diff -u openapi.json /tmp/openapi.generated.json",
     "rbac:verify": "ts-node scripts/rbac-verify.ts",
+    "test:contracts": "jest --config ./test/contracts/jest.config.js test/contracts/alim-core/contract.spec.ts",
+    "mock:alim-core": "ts-node test/contracts/alim-core/mock-server.ts",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\"",
     "lint:fix": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "test": "jest",

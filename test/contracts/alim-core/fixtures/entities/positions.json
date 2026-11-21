@@ -1,0 +1,42 @@
+[
+  {
+    "id": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+    "code": "tenaga_pengasuhan_keasramaan_kepala_asrama",
+    "name": "Kepala Asrama",
+    "kategori": "Jabatan",
+    "level": "pondok",
+    "hierarchy_level": 5,
+    "urutan": 1,
+    "description": null,
+    "jenis_gtk": {
+      "id": "7a7a7a7a-7a7a-4a7a-8a7a-7a7a7a7a7a7a",
+      "nama": "Tenaga Pengasuhan/Keasramaan"
+    },
+    "domain": {
+      "id": "8b8b8b8b-8b8b-4b8b-8b8b-8b8b8b8b8b8b",
+      "code": "asrama",
+      "name": "Asrama"
+    },
+    "is_active": true,
+    "created_at": "2026-02-14T13:50:00+08:00",
+    "updated_at": "2026-11-15T11:20:00+08:00"
+  },
+  {
+    "id": "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+    "code": "guru",
+    "name": "Guru",
+    "kategori": "Jabatan",
+    "level": "satuan_pendidikan",
+    "hierarchy_level": 3,
+    "urutan": 2,
+    "description": null,
+    "jenis_gtk": {
+      "id": "7b7b7b7b-7b7b-4b7b-8b7b-7b7b7b7b7b7b",
+      "nama": "Tenaga Kependidikan Satuan Pendidikan"
+    },
+    "domain": null,
+    "is_active": true,
+    "created_at": "2026-02-14T13:51:00+08:00",
+    "updated_at": "2026-11-15T11:21:00+08:00"
+  }
+]

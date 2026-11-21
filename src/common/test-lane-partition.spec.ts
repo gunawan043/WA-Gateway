@@ -13,7 +13,12 @@ import * as yaml from 'js-yaml';
 describe('Test lane partition', () => {
   const repoRoot = join(__dirname, '..', '..');
   const pkg = JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'utf8')) as {
-    scripts: { 'test:docs'?: string; 'test:scripts'?: string; 'test:engine-real'?: string };
+    scripts: {
+      'test:docs'?: string;
+      'test:scripts'?: string;
+      'test:engine-real'?: string;
+      'test:contracts'?: string;
+    };
     jest?: { testPathIgnorePatterns?: string[]; coveragePathIgnorePatterns?: string[] };
   };
 
@@ -128,6 +133,29 @@ describe('Test lane partition', () => {
     // Vacuity guard: an empty directory scan or an unparsed script would pass the diff below.
     expect(onDisk.length).toBeGreaterThanOrEqual(2);
     expect(named.length).toBeGreaterThanOrEqual(2);
+
+    expect({
+      neverRun: onDisk.filter(path => !named.includes(path)).sort(),
+      namedButAbsent: named.filter(path => !onDisk.includes(path)).sort(),
+    }).toEqual({ neverRun: [], namedButAbsent: [] });
+  });
+
+  /**
+   * `test/contracts/` is a third hand-listed lane. Its own jest config sets `rootDir` to that
+   * directory, so neither the unit lane (`rootDir: src`) nor the e2e lane (`testRegex` on
+   * `.e2e-spec.ts`) can run a spec there. `test:contracts` names its suites as positionals, so the
+   * same drift applies: a spec left out of the string runs nowhere, and a stale name makes jest
+   * exit non-zero on a pattern that matches nothing.
+   */
+  it('runs every contract spec under test/contracts/ in the test:contracts lane', () => {
+    const isSpec = (path: string): boolean => path.endsWith('.spec.ts');
+    const onDisk = (readdirSync(join(repoRoot, 'test', 'contracts'), { recursive: true }) as string[])
+      .map(path => `test/contracts/${path.split('\\').join('/')}`)
+      .filter(isSpec);
+    const named = (pkg.scripts['test:contracts'] ?? '').split(/\s+/).filter(isSpec);
+
+    expect(onDisk.length).toBeGreaterThanOrEqual(1);
+    expect(named.length).toBeGreaterThanOrEqual(1);
 
     expect({
       neverRun: onDisk.filter(path => !named.includes(path)).sort(),

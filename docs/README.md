@@ -69,6 +69,7 @@
 | 35  | [RBAC and Teams Design](./35-rbac-and-teams-design.md)                   | Roles, guards and divisions as they are, with the Fase 1 RBAC and team design     |
 | 35a | [ALIM Core Organization Mapping](./35a-alim-core-organization-mapping.md) | How Core's units, schools, positions and assignments map onto Connect's teams      |
 | 35b | [ALIM Core API Coordination and Safety](./35b-alim-core-api-coordination-and-safety-plan.md) | API needs for Core, production safety plan and the D9 go/no-go gate |
+| 35c | [ALIM Core Connect API Contract Draft](./35c-alim-core-connect-api-contract-draft.md) | Tahap 0: draft contract, mock server, fixtures and contract tests |
 
 **Examples**
 

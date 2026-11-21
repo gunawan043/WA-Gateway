@@ -1,0 +1,1715 @@
+openapi: 3.1.0
+info:
+  title: ALIM Core — Connect Organization API
+  version: 1.0.0-draft.1
+  summary: Draf kontrak baca-saja yang dibutuhkan ALIM Connect dari ALIM Core.
+  description: |
+    **DRAF TAHAP 0 — BUKAN KONTRAK FINAL.**
+
+    Dokumen ini adalah usulan Connect atas bentuk respons yang dibutuhkan, disusun dari
+    `docs/integration/alim-connect-api-design.md` milik ALIM Core dan dari pemetaan di
+    `docs/35a-alim-core-organization-mapping.md`. Setiap operasi membawa
+    `x-contract-status: provisional` dan daftar `x-needs-core-confirmation`; tidak ada operasi yang
+    boleh dianggap beku sebelum K1–K10 disepakati kedua pihak (lihat `docs/35c`).
+
+    Batas yang mengikat dokumen ini:
+
+    - hanya `GET`; tidak ada operasi tulis, dan tidak ada operasi yang mengubah data Core;
+    - hanya data yang tercantum di `docs/35a` §8.3; tidak ada `nik`, `no_kk`, alamat, atau
+      `nomor_sk`;
+    - tidak ada endpoint otorisasi: permission Core tidak dipakai Connect (D2);
+    - path, nama field, dan semantik waktu masih menunggu konfirmasi tim ALIM Core.
+
+    Dokumen ini bukan pengganti kontrak milik Core. Bila keduanya berbeda, kontrak Core yang
+    menang, dan dokumen ini diperbarui.
+  x-contract-status: provisional
+  x-needs-core-confirmation:
+    - Ketersediaan seluruh endpoint; per 2026-11-21 belum ada rute `/api/connect/v1` di Core.
+    - K1 semantik waktu (`updated_at`, `updated_since`, `snapshot_at`).
+    - K2 aturan versi dan kompatibilitas aditif.
+    - K3 bentuk pagination dan batas `per_page`.
+    - K4 urutan deterministik `changes`.
+    - K5 arti delete dan ketersediaan tombstone.
+    - K6 jaminan idempotensi pengiriman ulang.
+    - K7 nilai `null` yang diizinkan per field.
+    - K8 kunci komposit tugas tambahan.
+    - K9 skema autentikasi dan allowlist.
+    - K10 angka rate limit.
+servers:
+  - url: /api/connect/v1
+    description: |
+      Path relatif terhadap host Core. Mock Tahap 0 menyajikan prefix yang sama pada
+      `http://127.0.0.1:<port>/api/connect/v1`; tidak ada koneksi ke Core produksi.
+security:
+  - connectKey: []
+tags:
+  - name: Organization
+    description: Unit, sekolah, jabatan, orang, penempatan, dan penugasan.
+  - name: Sync
+    description: Snapshot dan feed perubahan.
+paths:
+  /organization/units:
+    get:
+      operationId: listOrganizationUnits
+      summary: Daftar unit organisasi
+      description: |
+        Daftar datar unit. Bentuk pohon (`tree=true`) belum dimasukkan ke draf karena bentuk
+        `children` belum disepakati; lihat `docs/35c` §10.
+      tags: [Organization]
+      x-contract-status: provisional
+      x-needs-core-confirmation:
+        - K1 inklusivitas `updated_since`
+        - K7 `parent_id` dan `divisi` boleh null
+        - Q1/Q2 kualitas `parent_id` (yatim dan siklus)
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/IsActive'
+        - $ref: '#/components/parameters/UpdatedSince'
+        - $ref: '#/components/parameters/Include'
+        - name: parent_id
+          in: query
+          description: Anak langsung dari unit tertentu.
+          schema:
+            type: string
+            format: uuid
+        - name: type
+          in: query
+          description: Tipe unit.
+          schema:
+            $ref: '#/components/schemas/UnitType'
+        - name: divisi_id
+          in: query
+          description: Filter divisi Core (bukan `divisions` Connect).
+          schema:
+            type: string
+            format: uuid
+        - name: q
+          in: query
+          description: Cari pada `name` atau `code`, maksimum 100 karakter.
+          schema:
+            type: string
+            maxLength: 100
+      responses:
+        '200':
+          description: Halaman unit.
+          headers:
+            X-ALIM-API-Version:
+              $ref: '#/components/headers/X-Alim-Api-Version'
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+            Cache-Control:
+              $ref: '#/components/headers/Cache-Control'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Unit'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /organization/units/{id}:
+    get:
+      operationId: getOrganizationUnit
+      summary: Detail satu unit
+      tags: [Organization]
+      x-contract-status: provisional
+      x-needs-core-confirmation:
+        - Bentuk `include` default (`parent,divisi,domain,schools`) belum disepakati.
+        - K7 `parent` dan `divisi` boleh null.
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/Include'
+        - $ref: '#/components/parameters/IncludeDeleted'
+      responses:
+        '200':
+          description: Satu unit.
+          headers:
+            X-ALIM-API-Version:
+              $ref: '#/components/headers/X-Alim-Api-Version'
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+            Cache-Control:
+              $ref: '#/components/headers/Cache-Control'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Unit'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /organization/schools:
+    get:
+      operationId: listOrganizationSchools
+      summary: Daftar satuan pendidikan
+      tags: [Organization]
+      x-contract-status: provisional
+      x-needs-core-confirmation:
+        - K5 sekolah tidak memiliki `deleted_at`; penghapusan hanya terlihat lewat rekonsiliasi.
+        - Nilai `boarding_type` belum diverifikasi.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/IsActive'
+        - $ref: '#/components/parameters/UpdatedSince'
+        - $ref: '#/components/parameters/Include'
+        - name: work_unit_id
+          in: query
+          description: Sekolah milik unit tertentu.
+          schema:
+            type: string
+            format: uuid
+        - name: school_level
+          in: query
+          schema:
+            type: string
+        - name: school_gender
+          in: query
+          schema:
+            type: string
+        - name: q
+          in: query
+          schema:
+            type: string
+            maxLength: 100
+      responses:
+        '200':
+          description: Halaman sekolah.
+          headers:
+            X-ALIM-API-Version:
+              $ref: '#/components/headers/X-Alim-Api-Version'
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+            Cache-Control:
+              $ref: '#/components/headers/Cache-Control'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/School'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /organization/schools/{id}:
+    get:
+      operationId: getOrganizationSchool
+      summary: Detail satu sekolah
+      tags: [Organization]
+      x-contract-status: provisional
+      x-needs-core-confirmation:
+        - K5 arti sekolah yang tidak lagi muncul.
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/Include'
+      responses:
+        '200':
+          description: Satu sekolah.
+          headers:
+            X-ALIM-API-Version:
+              $ref: '#/components/headers/X-Alim-Api-Version'
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+            Cache-Control:
+              $ref: '#/components/headers/Cache-Control'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/School'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /organization/positions:
+    get:
+      operationId: listOrganizationPositions
+      summary: Daftar jabatan struktural
+      description: |
+        Katalog jabatan. Ini bukan penugasan dan bukan identitas orang; lihat `docs/35a` §3.4.
+      tags: [Organization]
+      x-contract-status: provisional
+      x-needs-core-confirmation:
+        - K7 `domain` boleh null; `domain_id` posisi belum tersimpan saat seeding (P5).
+        - '`hierarchy_level` tidak konsisten dan tidak boleh dipakai sebagai otoritas.'
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/IsActive'
+        - $ref: '#/components/parameters/UpdatedSince'
+        - $ref: '#/components/parameters/Include'
+        - name: domain_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: jenis_gtk_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: q
+          in: query
+          schema:
+            type: string
+            maxLength: 100
+      responses:
+        '200':
+          description: Halaman jabatan.
+          headers:
+            X-ALIM-API-Version:
+              $ref: '#/components/headers/X-Alim-Api-Version'
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+            Cache-Control:
+              $ref: '#/components/headers/Cache-Control'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Position'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /organization/positions/{id}:
+    get:
+      operationId: getOrganizationPosition
+      summary: Detail satu jabatan
+      tags: [Organization]
+      x-contract-status: provisional
+      x-needs-core-confirmation:
+        - K7 `domain` boleh null.
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/Include'
+      responses:
+        '200':
+          description: Satu jabatan.
+          headers:
+            X-ALIM-API-Version:
+              $ref: '#/components/headers/X-Alim-Api-Version'
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+            Cache-Control:
+              $ref: '#/components/headers/Cache-Control'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Position'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /organization/people:
+    get:
+      operationId: listOrganizationPeople
+      summary: Daftar orang (GTK)
+      description: |
+        Identitas orang Core. `id` adalah UUID orang Core, bukan `users.id` Connect dan bukan
+        `api_keys.id` Connect; lihat `docs/35a` §5.
+      tags: [Organization]
+      x-contract-status: provisional
+      x-needs-core-confirmation:
+        - K7 `primary_unit` boleh null.
+        - Q7 orang tanpa `gtk_profile`/`gtk_employment`.
+        - Apakah `email` boleh dipakai sebagai petunjuk penautan akun (keputusan D3).
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/IsActive'
+        - $ref: '#/components/parameters/UpdatedSince'
+        - name: work_unit_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: school_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: status_kepegawaian
+          in: query
+          schema:
+            type: string
+        - name: q
+          in: query
+          schema:
+            type: string
+            maxLength: 100
+      responses:
+        '200':
+          description: Halaman orang.
+          headers:
+            X-ALIM-API-Version:
+              $ref: '#/components/headers/X-Alim-Api-Version'
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+            Cache-Control:
+              $ref: '#/components/headers/Cache-Control'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Person'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /organization/people/{id}:
+    get:
+      operationId: getOrganizationPerson
+      summary: Detail satu orang
+      tags: [Organization]
+      x-contract-status: provisional
+      x-needs-core-confirmation:
+        - K7 `primary_unit` dan `jenis_gtk` boleh null.
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/Include'
+      responses:
+        '200':
+          description: Satu orang.
+          headers:
+            X-ALIM-API-Version:
+              $ref: '#/components/headers/X-Alim-Api-Version'
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+            Cache-Control:
+              $ref: '#/components/headers/Cache-Control'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Person'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /organization/people/{id}/assignments:
+    get:
+      operationId: listPersonAssignments
+      summary: Semua penugasan satu orang
+      description: |
+        Gabungan tiga sumber (penempatan unit, penugasan struktural, tugas tambahan). Bentuk
+        seragamnya **belum ditetapkan**; draf ini hanya memaku `source`, `id`, dan `user_id`, dan
+        membiarkan sisanya terbuka. Lihat `docs/35c` §10.
+      tags: [Organization]
+      x-contract-status: provisional
+      x-shape: unresolved
+      x-needs-core-confirmation:
+        - Bentuk seragam tiga sumber belum disepakati.
+        - K8 kunci komposit untuk tugas tambahan.
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200':
+          description: Halaman penugasan.
+          headers:
+            X-ALIM-API-Version:
+              $ref: '#/components/headers/X-Alim-Api-Version'
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+            Cache-Control:
+              $ref: '#/components/headers/Cache-Control'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/PersonAssignment'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /organization/work-unit-assignments:
+    get:
+      operationId: listWorkUnitAssignments
+      summary: Penempatan GTK pada unit kerja
+      description: |
+        Baris `gtk_work_unit`. Tidak ada status, tanggal berlaku, atau `deleted_at`: baris yang
+        hilang berarti penempatan berakhir. `id` baris berubah bila baris dibuat ulang.
+      tags: [Organization]
+      x-contract-status: provisional
+      x-needs-core-confirmation:
+        - K5 tidak ada tombstone; penghapusan hanya terlihat lewat rekonsiliasi.
+        - Q4 lebih dari satu `is_primary` per orang.
+        - Apakah `id` baris stabil bila `(user_id, work_unit_id)` dibuat ulang.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/UpdatedSince'
+        - name: user_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: work_unit_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: is_primary
+          in: query
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: Halaman penempatan.
+          headers:
+            X-ALIM-API-Version:
+              $ref: '#/components/headers/X-Alim-Api-Version'
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+            Cache-Control:
+              $ref: '#/components/headers/Cache-Control'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/WorkUnitAssignment'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /organization/structural-assignments:
+    get:
+      operationId: listStructuralAssignments
+      summary: Penugasan struktural
+      description: |
+        Satu-satunya keluarga assignment Core dengan status, masa berlaku, dan soft delete.
+        `work_unit_id` diturunkan dari `school.work_unit_id`, bukan kolom tersimpan.
+      tags: [Organization]
+      x-contract-status: provisional
+      x-needs-core-confirmation:
+        - K1 arti `active_on` dan zona waktu `start_date`/`end_date`.
+        - K5 arti `status` dan `deleted_at` bila keduanya bertentangan.
+        - Q6 `school_id` yang menunjuk sekolah hilang.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/UpdatedSince'
+        - $ref: '#/components/parameters/IncludeDeleted'
+        - name: user_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: position_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: school_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: work_unit_id
+          in: query
+          description: Turunan dari `schools.work_unit_id`.
+          schema:
+            type: string
+            format: uuid
+        - name: academic_year_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [active, inactive, ended, all]
+        - name: active_on
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Halaman penugasan struktural.
+          headers:
+            X-ALIM-API-Version:
+              $ref: '#/components/headers/X-Alim-Api-Version'
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+            Cache-Control:
+              $ref: '#/components/headers/Cache-Control'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/StructuralAssignment'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /organization/additional-tasks:
+    get:
+      operationId: listAdditionalTasks
+      summary: Tugas tambahan dari dua sumber
+      description: |
+        `gtk_additional_tasks` dan `other_teacher_tasks` dibedakan oleh `source`. Identitas
+        komposit `(source, id)` wajib; `id` saja tidak unik.
+      tags: [Organization]
+      x-contract-status: provisional
+      x-needs-core-confirmation:
+        - K8 jaminan bahwa `(source, id)` unik dan stabil.
+        - K7 `unit_id`, `school_id`, `academic_year_id` boleh null pada sumber legacy.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/UpdatedSince'
+        - name: user_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: work_unit_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: school_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: academic_year_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: source
+          in: query
+          schema:
+            type: string
+            enum: [gtk_additional_tasks, other_teacher_tasks, all]
+        - name: active_on
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Halaman tugas tambahan.
+          headers:
+            X-ALIM-API-Version:
+              $ref: '#/components/headers/X-Alim-Api-Version'
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+            Cache-Control:
+              $ref: '#/components/headers/Cache-Control'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/AdditionalTask'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /organization/snapshot:
+    get:
+      operationId: getOrganizationSnapshot
+      summary: Snapshot organisasi
+      description: |
+        Bootstrap dan rekonsiliasi. `snapshot_at` adalah batas atas `updated_at`; semua baris dengan
+        `updated_at <= snapshot_at` disertakan. `checksums` dihitung dari daftar `id` terurut.
+      tags: [Sync]
+      x-contract-status: provisional
+      x-needs-core-confirmation:
+        - K1 `snapshot_at` sebagai batas atas dan zona waktunya.
+        - K3 batas ukuran; apakah `ndjson` tersedia.
+        - Q10 `updated_at` yang tidak bergerak membuat snapshot kehilangan perubahan.
+      parameters:
+        - name: types
+          in: query
+          description: Daftar tipe yang diminta, dipisah koma.
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/SnapshotType'
+        - name: active_only
+          in: query
+          schema:
+            type: boolean
+            default: true
+        - $ref: '#/components/parameters/IncludeDeleted'
+        - name: format
+          in: query
+          schema:
+            type: string
+            enum: [json, ndjson]
+            default: json
+        - name: schema_version
+          in: query
+          schema:
+            type: integer
+            default: 1
+      responses:
+        '200':
+          description: Snapshot.
+          headers:
+            X-ALIM-API-Version:
+              $ref: '#/components/headers/X-Alim-Api-Version'
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+            Cache-Control:
+              $ref: '#/components/headers/Cache-Control'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Snapshot'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /organization/changes:
+    get:
+      operationId: listOrganizationChanges
+      summary: Perubahan sejak waktu tertentu
+      description: |
+        **Belum dapat diimplementasikan secara andal**: Core belum memiliki change ledger dan
+        sebagian entitas tidak memiliki soft delete. Draf ini memaku amplop dan bentuk item agar
+        Connect dapat menyiapkan konsumennya, bukan menjanjikan endpoint tersedia.
+      tags: [Sync]
+      x-contract-status: provisional
+      x-availability: blocked-on-core-change-ledger
+      x-needs-core-confirmation:
+        - K4 urutan deterministik `(occurred_at, id, source)`.
+        - K5 jaminan tombstone untuk setiap tipe entitas.
+        - K6 sifat at-least-once dan jaminan idempotensi.
+        - Apakah endpoint ini akan ada sebelum change ledger Core selesai.
+      parameters:
+        - name: since
+          in: query
+          required: true
+          description: Wajib. Tanpa `since`, Core mengembalikan 422 dan klien harus memakai snapshot.
+          schema:
+            type: string
+            format: date-time
+        - name: cursor
+          in: query
+          description: Opaque; klien tidak boleh mem-parse.
+          schema:
+            type: string
+        - name: types
+          in: query
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/SnapshotType'
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+            default: 200
+      responses:
+        '200':
+          description: Halaman perubahan.
+          headers:
+            X-ALIM-API-Version:
+              $ref: '#/components/headers/X-Alim-Api-Version'
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+            Cache-Control:
+              $ref: '#/components/headers/Cache-Control'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Change'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+components:
+  securitySchemes:
+    connectKey:
+      type: apiKey
+      in: header
+      name: X-ALIM-CONNECT-KEY
+      description: |
+        Kunci integrasi khusus Connect, terpisah dari POS dan Recruitment (K9, D14). Alternatif
+        `Authorization: Bearer <key>` belum disepakati dan tidak dipakai mock.
+  headers:
+    X-Alim-Api-Version:
+      description: Versi kontrak yang melayani request.
+      schema:
+        type: string
+    X-Request-Id:
+      description: ID request untuk korelasi log.
+      schema:
+        type: string
+        format: uuid
+    Cache-Control:
+      description: Selalu `no-store, private`.
+      schema:
+        type: string
+        const: no-store, private
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    Page:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    PerPage:
+      name: per_page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 200
+        default: 50
+    IsActive:
+      name: is_active
+      in: query
+      description: Status aktif; `all` menonaktifkan filter.
+      schema:
+        type: string
+        enum: ['true', 'false', 'all']
+        default: 'true'
+    UpdatedSince:
+      name: updated_since
+      in: query
+      description: Perubahan sejak waktu tertentu (inklusif).
+      schema:
+        type: string
+        format: date-time
+    Include:
+      name: include
+      in: query
+      description: Relasi tambahan, dipisah koma.
+      schema:
+        type: string
+    IncludeDeleted:
+      name: include_deleted
+      in: query
+      description: Hanya berlaku pada snapshot dan changes; list biasa menolaknya.
+      schema:
+        type: boolean
+        default: false
+  responses:
+    Unauthorized:
+      description: Kunci integrasi tidak ada atau salah.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        Cache-Control:
+          $ref: '#/components/headers/Cache-Control'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    Forbidden:
+      description: IP tidak diizinkan, atau koneksi bukan HTTPS.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        Cache-Control:
+          $ref: '#/components/headers/Cache-Control'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    NotFound:
+      description: Entitas tidak ditemukan.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        Cache-Control:
+          $ref: '#/components/headers/Cache-Control'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    UnprocessableEntity:
+      description: Query tidak valid.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        Cache-Control:
+          $ref: '#/components/headers/Cache-Control'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    TooManyRequests:
+      description: Batas trafik terlampaui.
+      headers:
+        Retry-After:
+          description: Detik sampai permintaan berikutnya diterima.
+          schema:
+            type: integer
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        Cache-Control:
+          $ref: '#/components/headers/Cache-Control'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    ServiceUnavailable:
+      description: Integrasi dinonaktifkan atau kunci belum dikonfigurasi.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        Cache-Control:
+          $ref: '#/components/headers/Cache-Control'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+  schemas:
+    UnitType:
+      type: string
+      enum:
+        - Unsur Pimpinan
+        - Unit Akademik
+        - Unit Penunjang Akademik
+        - Unit Administrasi
+        - Unit Pelayanan
+        - Unit Humas Publikasi
+        - Pelayanan Kesehatan
+    SnapshotType:
+      type: string
+      enum:
+        - units
+        - schools
+        - positions
+        - people
+        - work_unit_assignments
+        - structural_assignments
+        - additional_tasks
+    SuccessEnvelope:
+      type: object
+      required: [success, message, data, meta, errors]
+      properties:
+        success:
+          type: boolean
+          const: true
+        message:
+          type: string
+        data: {}
+        meta:
+          $ref: '#/components/schemas/Meta'
+        errors:
+          type: 'null'
+    ErrorEnvelope:
+      type: object
+      required: [success, message, data, meta, errors]
+      properties:
+        success:
+          type: boolean
+          const: false
+        message:
+          type: string
+        data:
+          type: 'null'
+        meta:
+          $ref: '#/components/schemas/Meta'
+        errors:
+          type: [object, 'null']
+          additionalProperties: true
+    Meta:
+      type: object
+      required: [request_id, timestamp, server_time]
+      properties:
+        request_id:
+          type: string
+          format: uuid
+        timestamp:
+          type: string
+          format: date-time
+        server_time:
+          type: string
+          format: date-time
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+        next_cursor:
+          type: [string, 'null']
+        has_more:
+          type: boolean
+    Pagination:
+      type: object
+      required: [page, per_page, total, last_page]
+      properties:
+        page:
+          type: integer
+          minimum: 1
+        per_page:
+          type: integer
+          minimum: 1
+          maximum: 200
+        total:
+          type: integer
+          minimum: 0
+        last_page:
+          type: integer
+          minimum: 0
+    UnitRef:
+      type: object
+      required: [id, code, name]
+      properties:
+        id:
+          type: string
+          format: uuid
+        code:
+          type: string
+        name:
+          type: string
+    DivisiRef:
+      type: object
+      required: [id, kode, nama]
+      properties:
+        id:
+          type: string
+          format: uuid
+        kode:
+          type: string
+        nama:
+          type: string
+    DomainRef:
+      type: object
+      required: [id, code, name]
+      properties:
+        id:
+          type: string
+          format: uuid
+        code:
+          type: string
+        name:
+          type: string
+    JenisGtkRef:
+      type: object
+      required: [id, nama]
+      properties:
+        id:
+          type: string
+          format: uuid
+        nama:
+          type: string
+    PositionRef:
+      type: object
+      required: [id, code, name, domain_id]
+      properties:
+        id:
+          type: string
+          format: uuid
+        code:
+          type: string
+        name:
+          type: string
+        domain_id:
+          type: [string, 'null']
+          format: uuid
+    PersonRef:
+      type: object
+      required: [id, name, is_active]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        is_active:
+          type: boolean
+    AcademicYearRef:
+      type: object
+      required: [id, name, semester]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        semester:
+          type: string
+    DecreeRef:
+      type: object
+      required: [id, decree_number, decree_type, effective_date, end_date]
+      properties:
+        id:
+          type: string
+          format: uuid
+        decree_number:
+          type: string
+        decree_type:
+          type: string
+        effective_date:
+          type: string
+          format: date
+        end_date:
+          type: [string, 'null']
+          format: date
+    TaskTypeRef:
+      type: object
+      required: [id, nama]
+      properties:
+        id:
+          type: string
+          format: uuid
+        nama:
+          type: string
+    SchoolRef:
+      type: object
+      required: [id, npsn, name, school_level, school_gender, is_active]
+      properties:
+        id:
+          type: string
+          format: uuid
+        npsn:
+          type: string
+        name:
+          type: string
+        school_level:
+          type: string
+        school_gender:
+          type: string
+        is_active:
+          type: boolean
+    Unit:
+      type: object
+      additionalProperties: false
+      required: [id, code, name, type, parent_id, is_active, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        code:
+          type: string
+        name:
+          type: string
+        type:
+          $ref: '#/components/schemas/UnitType'
+        parent_id:
+          type: [string, 'null']
+          format: uuid
+        parent:
+          $ref: '#/components/schemas/UnitRef'
+        divisi:
+          anyOf:
+            - $ref: '#/components/schemas/DivisiRef'
+            - type: 'null'
+        domain:
+          anyOf:
+            - $ref: '#/components/schemas/DomainRef'
+            - type: 'null'
+        schools:
+          type: array
+          items:
+            $ref: '#/components/schemas/SchoolRef'
+        is_active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    School:
+      type: object
+      additionalProperties: false
+      required:
+        [id, work_unit_id, npsn, name, school_level, school_gender, school_status, is_active, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        work_unit_id:
+          type: string
+          format: uuid
+        work_unit:
+          $ref: '#/components/schemas/UnitRef'
+        npsn:
+          type: string
+        nss:
+          type: [string, 'null']
+        name:
+          type: string
+        school_level:
+          type: string
+        school_level_text:
+          type: [string, 'null']
+        school_gender:
+          type: string
+        school_status:
+          type: string
+          enum: [negeri, swasta]
+        boarding_type:
+          type: [string, 'null']
+        principal_user_id:
+          type: [string, 'null']
+          format: uuid
+        principal_name:
+          type: [string, 'null']
+        is_active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    Position:
+      type: object
+      additionalProperties: false
+      required:
+        [id, code, name, kategori, level, hierarchy_level, urutan, description, is_active, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        code:
+          type: string
+        name:
+          type: string
+        kategori:
+          type: string
+        level:
+          type: [string, 'null']
+        hierarchy_level:
+          type: [integer, 'null']
+        urutan:
+          type: [integer, 'null']
+        description:
+          type: [string, 'null']
+        jenis_gtk:
+          anyOf:
+            - $ref: '#/components/schemas/JenisGtkRef'
+            - type: 'null'
+        domain:
+          anyOf:
+            - $ref: '#/components/schemas/DomainRef'
+            - type: 'null'
+        is_active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    PersonUnit:
+      type: object
+      additionalProperties: false
+      required: [assignment_id, unit, position_id, position_name, jabatan, is_primary]
+      properties:
+        assignment_id:
+          type: string
+          format: uuid
+        unit:
+          $ref: '#/components/schemas/UnitRef'
+        position_id:
+          type: [string, 'null']
+          format: uuid
+        position_name:
+          type: [string, 'null']
+        jabatan:
+          type: [string, 'null']
+        is_primary:
+          type: boolean
+    Person:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          id,
+          name,
+          username,
+          email,
+          is_active,
+          status_kepegawaian,
+          primary_unit,
+          units,
+          active_structural_assignment_count,
+          created_at,
+          updated_at,
+        ]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        username:
+          type: [string, 'null']
+        email:
+          type: [string, 'null']
+        is_active:
+          type: boolean
+        status_kepegawaian:
+          type: [string, 'null']
+        status_kepegawaian_text:
+          type: [string, 'null']
+        jenis_gtk:
+          anyOf:
+            - $ref: '#/components/schemas/JenisGtkRef'
+            - type: 'null'
+        primary_unit:
+          anyOf:
+            - $ref: '#/components/schemas/UnitRef'
+            - type: 'null'
+        units:
+          type: array
+          items:
+            $ref: '#/components/schemas/PersonUnit'
+        active_structural_assignment_count:
+          type: integer
+          minimum: 0
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    WorkUnitAssignment:
+      type: object
+      additionalProperties: false
+      required: [id, user_id, work_unit_id, position_id, jabatan, is_primary, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        work_unit_id:
+          type: string
+          format: uuid
+        unit:
+          $ref: '#/components/schemas/UnitRef'
+        position_id:
+          type: [string, 'null']
+          format: uuid
+        position:
+          anyOf:
+            - $ref: '#/components/schemas/PositionRef'
+            - type: 'null'
+        jabatan:
+          type: [string, 'null']
+        is_primary:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    StructuralAssignment:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - user_id
+        - position_id
+        - school_id
+        - work_unit_id
+        - academic_year_id
+        - decree_id
+        - start_date
+        - end_date
+        - status
+        - is_effective
+        - created_at
+        - updated_at
+        - deleted_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        user:
+          $ref: '#/components/schemas/PersonRef'
+        position_id:
+          type: string
+          format: uuid
+        position:
+          $ref: '#/components/schemas/PositionRef'
+        school_id:
+          type: [string, 'null']
+          format: uuid
+        school:
+          anyOf:
+            - $ref: '#/components/schemas/SchoolRef'
+            - type: 'null'
+        work_unit_id:
+          type: [string, 'null']
+          format: uuid
+        academic_year_id:
+          type: string
+          format: uuid
+        academic_year:
+          $ref: '#/components/schemas/AcademicYearRef'
+        decree_id:
+          type: [string, 'null']
+          format: uuid
+        decree:
+          anyOf:
+            - $ref: '#/components/schemas/DecreeRef'
+            - type: 'null'
+        start_date:
+          type: string
+          format: date
+        end_date:
+          type: [string, 'null']
+          format: date
+        status:
+          type: string
+          enum: [active, inactive, ended]
+        is_effective:
+          type: boolean
+        additional_info:
+          type: [string, 'null']
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        deleted_at:
+          type: [string, 'null']
+          format: date-time
+    AdditionalTask:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - source
+        - user_id
+        - unit_id
+        - school_id
+        - academic_year_id
+        - task_type_id
+        - task_name
+        - task_code
+        - start_date
+        - end_date
+        - is_active
+        - decree_id
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        source:
+          type: string
+          enum: [gtk_additional_tasks, other_teacher_tasks]
+        user_id:
+          type: string
+          format: uuid
+        unit_id:
+          type: [string, 'null']
+          format: uuid
+        school_id:
+          type: [string, 'null']
+          format: uuid
+        academic_year_id:
+          type: [string, 'null']
+          format: uuid
+        task_type_id:
+          type: [string, 'null']
+          format: uuid
+        task_type:
+          anyOf:
+            - $ref: '#/components/schemas/TaskTypeRef'
+            - type: 'null'
+        task_name:
+          type: string
+        task_code:
+          type: [string, 'null']
+        start_date:
+          type: [string, 'null']
+          format: date
+        end_date:
+          type: [string, 'null']
+          format: date
+        is_active:
+          type: boolean
+        decree_id:
+          type: [string, 'null']
+          format: uuid
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    PersonAssignment:
+      type: object
+      additionalProperties: true
+      required: [source, id, user_id]
+      properties:
+        source:
+          type: string
+          enum: [work_unit, structural, additional_task]
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+    Snapshot:
+      type: object
+      additionalProperties: false
+      required: [generated_at, snapshot_at, schema_version, counts, checksums]
+      properties:
+        generated_at:
+          type: string
+          format: date-time
+        snapshot_at:
+          type: string
+          format: date-time
+        schema_version:
+          type: integer
+        counts:
+          type: object
+          additionalProperties:
+            type: integer
+            minimum: 0
+        checksums:
+          type: object
+          additionalProperties:
+            type: string
+        units:
+          type: array
+          items:
+            $ref: '#/components/schemas/Unit'
+        schools:
+          type: array
+          items:
+            $ref: '#/components/schemas/School'
+        positions:
+          type: array
+          items:
+            $ref: '#/components/schemas/Position'
+        people:
+          type: array
+          items:
+            $ref: '#/components/schemas/Person'
+        work_unit_assignments:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkUnitAssignment'
+        structural_assignments:
+          type: array
+          items:
+            $ref: '#/components/schemas/StructuralAssignment'
+        additional_tasks:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdditionalTask'
+    Change:
+      type: object
+      additionalProperties: false
+      required: [entity, action, id, source, updated_at, deleted_at, payload]
+      properties:
+        entity:
+          type: string
+          enum:
+            - unit
+            - school
+            - position
+            - person
+            - work_unit_assignment
+            - structural_assignment
+            - additional_task
+        action:
+          type: string
+          enum: [upsert, delete]
+        id:
+          type: string
+          format: uuid
+        source:
+          type: [string, 'null']
+          enum: [gtk_additional_tasks, other_teacher_tasks, null]
+        updated_at:
+          type: string
+          format: date-time
+        deleted_at:
+          type: [string, 'null']
+          format: date-time
+        payload:
+          type: [object, 'null']
+          additionalProperties: true

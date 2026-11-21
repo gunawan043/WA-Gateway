@@ -1,0 +1,14 @@
+[
+  {
+    "id": "77777777-7777-4777-8777-777777777777",
+    "code": "UAK-999",
+    "name": "Unit dengan induk yang tidak ada",
+    "type": "Unit Akademik",
+    "parent_id": "99999999-9999-4999-8999-999999999999",
+    "divisi": null,
+    "domain": null,
+    "is_active": true,
+    "created_at": "2026-02-10T08:07:00+08:00",
+    "updated_at": "2026-11-18T09:13:00+08:00"
+  }
+]

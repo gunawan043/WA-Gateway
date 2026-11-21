@@ -939,6 +939,10 @@ yang dapat berjalan.
 Dapat dimulai sekarang. Isi: tipe respons, error, versi kontrak, fixture per entitas, server palsu
 yang diaktifkan lewat env. Tidak ada endpoint Connect baru dan tidak ada perubahan Core.
 
+Hasilnya ada di [35c](./35c-alim-core-connect-api-contract-draft.md): kontrak OpenAPI draf, mock
+`node:http`, tujuh berkas fixture ditambah snapshot/changes dan tiga berkas anomali, serta
+`npm run test:contracts`. Kontrak itu **belum final** dan tidak mengubah keputusan D1–D14.
+
 ### 11.2 Tahap 1 — read model dan snapshot
 
 Menambah tabel `core_*`, scheduler, dan perintah sinkronisasi. Semua tabel di koneksi `data`, dengan

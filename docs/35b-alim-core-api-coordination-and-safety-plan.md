@@ -348,12 +348,12 @@ memperbaikinya; Connect hanya memilih perilaku yang tidak memperburuknya.
 
 ### 8.1 Artefak yang diserahkan
 
-| Artefak                                        | Isi                                           | Status                       |
-| ---------------------------------------------- | --------------------------------------------- | ---------------------------- |
-| [35a](./35a-alim-core-organization-mapping.md) | Pemetaan, prinsip, keputusan D1–D14           | Disetujui                    |
-| 35b (dokumen ini)                              | Kebutuhan API, safety plan, risiko, checklist | Untuk ditinjau               |
-| Desain API Core                                | Kontrak endpoint (milik Core)                 | Ada, belum diimplementasikan |
-| Fixture Connect                                | Contoh respons untuk mock dan uji kontrak     | Belum dibuat (Tahap 0)       |
+| Artefak                                              | Isi                                           | Status                              |
+| ---------------------------------------------------- | --------------------------------------------- | ----------------------------------- |
+| [35a](./35a-alim-core-organization-mapping.md)       | Pemetaan, prinsip, keputusan D1–D14           | Disetujui                           |
+| 35b (dokumen ini)                                    | Kebutuhan API, safety plan, risiko, checklist | Untuk ditinjau                      |
+| Desain API Core                                      | Kontrak endpoint (milik Core)                 | Ada, belum diimplementasikan        |
+| [35c](./35c-alim-core-connect-api-contract-draft.md) | Kontrak draf, mock, fixture, dan uji kontrak  | Dibuat (Tahap 0), menunggu tinjauan |
 
 ### 8.2 Peran
 
