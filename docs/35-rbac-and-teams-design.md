@@ -605,6 +605,8 @@ Aturan yang ditegakkan server:
 - `scopeType='team'` mewajibkan `scopeId` berupa id divisi yang ada.
 - `scopeType='object'` mewajibkan `scopeId` berupa chat id yang valid.
 - `scopeType='unit'` **ditolak** `400` di Fase 1 dengan pesan yang menyebut Fase 4 (lihat §35.9).
+  Rancangan bagaimana `unit` nanti diikat ke UUID unit ALIM Core — bukan tabel unit lokal — ada di
+  [35a](./35a-alim-core-organization-mapping.md) §7.
 - Penugasan hanya boleh menyebut `scopeId` yang dapat dijangkau pemberi: `system_admin` global boleh
   memberi scope apa pun; pemberi yang ter-scope hanya boleh memberi scope di dalam cakupannya sendiri
   (tidak ada eskalasi lewat pemberian).
