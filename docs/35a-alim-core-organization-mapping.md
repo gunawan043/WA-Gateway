@@ -1,13 +1,18 @@
 # 35a. Pemetaan Struktur Organisasi ALIM Core ke ALIM Connect
 
-> **Status:** audit dan rancangan, 2026-11-21. Tidak ada perubahan kode, migration, endpoint,
-> database, maupun deployment — baik di ALIM Connect maupun di ALIM Core.
+> **Status:** audit dan rancangan, 2026-11-21. **Disetujui pemilik sistem sebagai baseline arsitektur
+> integrasi pada 2026-11-21.** Persetujuan ini mencakup pemetaan dan prinsipnya, bukan implementasi:
+> tidak ada perubahan kode, migration, endpoint, database, maupun deployment — baik di ALIM Connect
+> maupun di ALIM Core. Keputusan D2, D5, D9, dan D12 ditetapkan pada tanggal yang sama (§12.1);
+> keputusan lain tetap terbuka.
 >
 > **Hubungan dengan dokumen lain:** [35](./35-rbac-and-teams-design.md) menetapkan RBAC dan tim
 > Fase 1 (sudah diimplementasikan sampai Fase 1a). Dokumen ini menjawab satu pertanyaan yang sengaja
 > ditunda di sana: bagaimana struktur organisasi ALIM Core nantinya dipakai ALIM Connect tanpa
 > membangun master organisasi duplikat. [34](./34-alim-connect-audit.md) §34.5 sudah menetapkan
 > batas integrasi dan menempatkannya di Fase 4; dokumen ini mengisi detail pemetaannya.
+> [35b](./35b-alim-core-api-coordination-and-safety-plan.md) adalah paket koordinasi kebutuhan API
+> dan Production Safety Plan yang menjadi gerbang D9.
 >
 > **Sumber yang dibaca (read-only):** repository ALIM Core pada `HEAD d38ea6e3` — migration, model,
 > route, middleware integrasi, dan tiga dokumen di `docs/integration/`
@@ -70,6 +75,11 @@ Enam kesimpulan utama:
 Yang **tidak berubah** oleh dokumen ini — dan tidak boleh diubah saat implementasi nanti:
 `role_assignments`, `PermissionService`, jembatan `hasPermission`, `authzVersion`, invalidasi cache,
 fingerprint otorisasi WebSocket, dan seluruh kontrak endpoint Fase 1a. Tidak ada Fase 1b/1c di sini.
+
+Keputusan pemilik sistem pada 2026-11-21 (rincian dan kutipan di §12.1): assignment dan domain Core
+hanya menjadi informasi referensi bagi Connect (D2); tidak ada hubungan langsung `session`–unit (D5);
+implementasi API menjadi tanggung jawab tim Core dan **belum disetujui**, dengan Production Safety
+Plan sebagai gerbang (D9); scope `unit` tetap ditolak `400` (D12).
 
 | Area                         | Kondisi hari ini                                        | Dampak ke rancangan                           |
 | ---------------------------- | ------------------------------------------------------- | --------------------------------------------- |
@@ -334,11 +344,12 @@ Status: `CORE` untuk data, `RANCANGAN` untuk penanganan.
 ### 3.10 Domain Reference → `domains`
 
 **Keputusan pemetaan:** domain disimpan sebagai **referensi baca** (`domainId`, `code`, `name`) pada
-unit dan posisi. Domain **bukan** permission Connect dan tidak dipetakan ke role Connect pada fase
-ini. Pemetaan domain → permission adalah keputusan terpisah (§12, D2) karena akan mencampur dua model
-otorisasi yang berbeda.
+unit dan posisi. Domain **bukan** permission Connect dan tidak dipetakan ke role Connect. Keputusan
+D2 (2026-11-21) menetapkan bahwa assignment dan domain Core hanya boleh dipakai sebagai informasi
+referensi, konteks, dan tampilan — bukan sumber pemberian permission Connect secara otomatis.
 
-Status: `CORE` untuk data, `KEPUTUSAN` untuk pemakaiannya.
+Status: `CORE` untuk data, `RANCANGAN` untuk pemakaiannya (D2: referensi dan tampilan saja, tidak
+dipetakan ke role Connect).
 
 ### 3.11 Pemetaan yang ditolak
 
@@ -449,8 +460,9 @@ tampilan, simpan sebagai `coreDivisiId`/`coreDivisiCode` pada read model unit �
 `assigneeKeyId`; keduanya konsep operasional Connect. Unit Core tidak muncul di jalur chat sampai
 ada keterkaitan kontak → unit (Fase 3/5, di luar dokumen ini). Karena itu:
 
-- menautkan `sessionId` ke unit hanya masuk akal bila satu nomor memang didedikasikan untuk satu
-  unit (keputusan D5);
+- menautkan `sessionId` ke unit **tidak dilakukan**; D5 (2026-11-21) menetapkan bahwa hubungan
+  division dengan unit ditangani lewat mapping eksplisit, dan satu division tidak diasumsikan
+  mewakili satu unit;
 - scope `unit` belum dapat mengekang inbox sampai keterkaitan kontak tersedia (§7.4).
 
 ---
@@ -581,7 +593,11 @@ Ini **tidak** diusulkan sekarang, tetapi perlu dicatat sebagai arah yang mungkin
 - Karena `structural_positions.id` dapat berubah saat seeder dijalankan, pemetaan berbasis posisi
   harus dapat dipulihkan tanpa kehilangan grant.
 
-Keputusan: D2.
+Keputusan D2 (2026-11-21): **tidak** untuk saat ini. Assignment dan domain Core hanya menjadi
+informasi referensi, konteks, dan tampilan; RBAC Connect tetap menjadi mekanisme otorisasi
+operasional sampai ada desain integrasi otorisasi lintas aplikasi yang ditinjau dan disetujui.
+Butir-butir di atas karena itu menjadi prasyarat untuk desain tersebut, bukan pekerjaan yang
+dijadwalkan.
 
 ---
 
@@ -644,6 +660,22 @@ Karena itu, sampai keterkaitan kontak → unit (Fase 3/5) ada, grant `unit` hany
 `unit` lebih awal akan menciptakan scope yang tampak membatasi tetapi tidak mengekang apa pun —
 lebih berbahaya daripada menolaknya.
 
+#### 7.4.1 Gerbang aktivasi (D12)
+
+D12 ditetapkan 2026-11-21: scope `unit` **tetap nonaktif** dan `scopeType=unit` tetap dijawab `400`.
+Aktivasi hanya boleh dipertimbangkan setelah **kelima** kondisi berikut terpenuhi dan dibuktikan:
+
+1. API organisasi Core tersedia dan stabil.
+2. Sinkronisasi master organisasi dan assignment berjalan.
+3. Mapping division Connect dengan unit Core sudah tervalidasi.
+4. Objek operasional seperti kontak dan percakapan sudah memiliki keterkaitan unit yang dapat
+   ditegakkan.
+5. Pengujian isolasi akses lintas unit membuktikan bahwa scope benar-benar membatasi data.
+
+Tidak satu pun dari kelima kondisi ini boleh diganti dengan asumsi. Masing-masing membutuhkan bukti:
+hasil uji, laporan sinkronisasi, atau validasi data. Sampai kelimanya ada, `unit` tetap `400` dan
+tidak ada perubahan pada RBAC Fase 1a.
+
 ### 7.5 Pemetaan konsep organisasi Core ke dimensi scope
 
 | Konsep Core            | Dimensi scope Connect | Alasan                                                         | Status      |
@@ -651,7 +683,7 @@ lebih berbahaya daripada menolaknya.
 | `work_units`           | `unit`                | Unit institusi adalah fence yang bermakna                      | `RANCANGAN` |
 | `schools`              | Tidak (turunan unit)  | Sekolah melekat pada unit; menambah `school` akan menduplikasi | `KEPUTUSAN` |
 | `structural_positions` | Tidak                 | Jabatan adalah atribut, bukan fence                            | `KEPUTUSAN` |
-| `domains`              | Tidak                 | Model otorisasi berbeda                                        | `KEPUTUSAN` |
+| `domains`              | Tidak                 | Model otorisasi berbeda; D2 menetapkan referensi saja          | `RANCANGAN` |
 | `divisis` (Core)       | Tidak                 | Bukan tim operasional; jangan dicampur dengan `team`           | `RANCANGAN` |
 | `divisions` (Connect)  | `team`                | Sudah berjalan di Fase 1a                                      | `CONNECT`   |
 
@@ -880,11 +912,27 @@ terpisah setelah Fase 1a ditinjau.
 | Tahap | Isi                                                                           | Prasyarat                       | Kriteria keluar                                                | Menyentuh Fase 1a? |
 | ----- | ----------------------------------------------------------------------------- | ------------------------------- | -------------------------------------------------------------- | ------------------ |
 | 0     | Kontrak + fixture + mock `alim-core`                                          | Tidak ada                       | Tipe dan fixture disetujui; mock menyajikan bentuk kontrak     | Tidak              |
-| 1     | Read model + snapshot (unit, sekolah, jabatan, orang, penempatan, assignment) | Endpoint Core tahap 1 tersedia  | Snapshot idempoten; rekonsiliasi dasar; tidak ada master lokal | Tidak              |
+| 1     | Read model + snapshot (unit, sekolah, jabatan, orang, penempatan, assignment) | Gerbang D9 + endpoint Core      | Snapshot idempoten; rekonsiliasi dasar; tidak ada master lokal | Tidak              |
 | 2     | Tautan person ↔ akun + UI pencarian/verifikasi                                | Tahap 1                         | Unique dua arah; audit; akun tanpa tautan tetap sah            | Tidak              |
 | 3     | Tautan unit ↔ tim (`division_core_units`) + tampilan                          | Tahap 1                         | Many-to-many terbukti; tidak ada derivasi otomatis             | Tidak              |
 | 4     | Aktivasi scope `unit` di RBAC                                                 | Tahap 1–3 + kontak → unit + D12 | Grant `unit` diuji; fail-closed; bridge tetap ≤ OPERATOR       | Ya (aditif)        |
 | 5     | Incremental `changes` + tombstone                                             | Change ledger Core              | Penghapusan terdeteksi < satu siklus; tidak ada regresi        | Tidak              |
+
+### Gerbang D9 — Production Safety Plan dan peninjauan risiko
+
+D9 ditetapkan 2026-11-21: implementasi API berada pada tim ALIM Core karena Core pemilik data, dan
+**belum disetujui**. Sebelum tahap implementasi apa pun dimulai, dua hal wajib selesai dan ditinjau:
+
+1. **Production Safety Plan** — jaminan baca-saja, kill switch, batas beban, observability, rollback,
+   dan kriteria go/no-go untuk menyentuh sistem produksi.
+2. **Peninjauan risiko terhadap sistem produksi** — termasuk temuan Core yang sudah diketahui
+   (seeder yang menghapus `structural_positions`, hard delete sekolah/SK, `parent_id` tanpa FK,
+   `domain_id` yang tidak tersimpan) dan dampaknya bila API diekspos.
+
+Keduanya disusun dalam [35b](./35b-alim-core-api-coordination-and-safety-plan.md). Setelah keduanya
+ditinjau dan disetujui, PIC, ruang lingkup, dan jadwal implementasi `/api/connect/v1` ditetapkan.
+Sampai saat itu Tahap 1 dan seterusnya tidak dimulai; hanya Tahap 0 (kontrak dan mock di Connect)
+yang dapat berjalan.
 
 ### 11.1 Tahap 0 — kontrak dan mock
 
@@ -911,7 +959,8 @@ dipakai untuk tampilan dan filter.
 ### 11.5 Tahap 4 — aktivasi scope `unit`
 
 Perubahan RBAC aditif sesuai §7.3, dengan feature flag dan uji regresi penuh terhadap titik
-`@RequireRole` yang ada. Tidak boleh dilakukan sebelum D12 disetujui.
+`@RequireRole` yang ada. D12 sudah ditetapkan (tetap nonaktif); aktivasi hanya setelah kelima gerbang
+di §7.4.1 terbukti.
 
 ### 11.6 Tahap 5 — incremental penuh
 
@@ -921,27 +970,71 @@ Menunggu change ledger Core. Sebelum itu, rekonsiliasi berkala menjadi pengganti
 
 ## 12. Hal yang Memerlukan Keputusan Pemilik Sistem
 
-| No  | Keputusan                                                               | Opsi                                                                             | Rekomendasi                                                  |
-| --- | ----------------------------------------------------------------------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------ |
-| D1  | Apakah grant `unit` mencakup subtree?                                   | (a) unit saja; (b) unit + turunan; (c) dua tipe grant terpisah                   | (a) untuk fase pertama; subtree ditunda                      |
-| D2  | Apakah kewenangan Connect boleh diturunkan dari assignment/domain Core? | (a) tidak, selamanya; (b) hanya tampilan; (c) pemetaan eksplisit ke role Connect | (b) sekarang; (c) keputusan terpisah dengan tabel pemetaan   |
-| D3  | Kebijakan penautan person ↔ akun                                        | (a) manual; (b) otomatis via email; (c) manual dengan saran otomatis             | (c)                                                          |
-| D4  | Perilaku saat person Core nonaktif/berhenti                             | (a) akun Connect dinonaktifkan otomatis; (b) hanya ditandai                      | (b) — operasional tidak boleh berhenti karena perubahan Core |
-| D5  | Apakah satu `session` boleh ditautkan ke unit?                          | (a) ya, untuk nomor khusus unit; (b) tidak, cukup lewat `division`               | (b) sampai ada kebutuhan nyata                               |
-| D6  | Apakah `school` menjadi dimensi scope sendiri?                          | (a) tidak, turunan unit; (b) ya, `scopeType='school'`                            | (a)                                                          |
-| D7  | Field person minimum yang boleh disalin                                 | (a) nama + status; (b) + email/username; (c) + unit dan jabatan                  | (b) untuk pencarian, tanpa data pribadi lain                 |
-| D8  | Frekuensi sinkronisasi dan staleness yang dapat diterima                | (a) 15 menit; (b) 1 jam; (c) harian                                              | (b) untuk master, (a) untuk assignment bila tersedia         |
-| D9  | Siapa yang mengimplementasikan endpoint Core dan kapan                  | Tim Core                                                                         | Perlu komitmen tanggal sebelum Tahap 1 dimulai               |
-| D10 | Apakah menunggu `changes` atau memakai snapshot + polling lebih dulu    | (a) tunggu; (b) snapshot + polling                                               | (b) — jangan blokir seluruh integrasi pada ledger            |
-| D11 | Penanganan banyak baris `gtk_employments` per user                      | (a) baris terbaru; (b) baris aktif; (c) tampilkan semua                          | (a) untuk status utama, (c) di halaman detail                |
-| D12 | Kapan `unit` diaktifkan dan dengan gerbang apa                          | (a) setelah Tahap 1–3 + kontak → unit; (b) lebih awal dengan flag                | (a); `400` tetap sampai gerbang terpenuhi                    |
-| D13 | Apakah grant yang menunjuk unit hilang dihapus atau dibiarkan           | (a) dibiarkan `unresolved`; (b) dihapus otomatis                                 | (a) — penghapusan otomatis dapat menghilangkan jejak audit   |
-| D14 | Apakah Connect boleh memakai kunci integrasi POS/Recruitment sementara  | (a) ya; (b) tidak, kunci terpisah                                                | (b)                                                          |
+Status per 2026-11-21: D2, D5, dan D12 ditetapkan; D9 ditetapkan sebagian (pemilik dan gerbangnya,
+bukan jadwalnya). Sepuluh keputusan lain masih terbuka. Keputusan yang belum ditetapkan tetap dicatat
+sebagai keputusan pemilik sistem dan **tidak boleh** diperlakukan sebagai persetujuan teknis.
+
+### 12.1 Keputusan yang sudah ditetapkan
+
+#### D2 — Kewenangan dari assignment/domain Core
+
+Ditetapkan 2026-11-21. Untuk saat ini, data assignment dan domain Core hanya boleh digunakan sebagai
+informasi referensi, konteks, dan tampilan di Connect. Data itu **bukan** sumber pemberian permission
+atau otorisasi Connect secara otomatis. RBAC Connect tetap menjadi mekanisme otorisasi operasional
+sampai ada desain integrasi otorisasi lintas aplikasi yang ditinjau dan disetujui.
+
+Konsekuensi: tidak ada tabel pemetaan domain/posisi → role Connect; tidak ada sinkronisasi permission;
+`role_assignments` tetap satu-satunya sumber otorisasi Connect.
+
+#### D5 — Hubungan session dengan unit
+
+Ditetapkan 2026-11-21. Belum perlu ada hubungan langsung antara session dan unit Core. Division
+Connect menjadi konteks operasional; hubungan division dengan unit Core ditangani melalui mekanisme
+mapping yang eksplisit. Satu division **tidak** diasumsikan mewakili satu unit.
+
+Konsekuensi: tidak ada kolom unit pada `sessions`; `division_core_units` (Tahap 3) menjadi
+satu-satunya jalur penghubung.
+
+#### D9 — Implementasi API ALIM Core
+
+Ditetapkan 2026-11-21. Tanggung jawab implementasi API berada pada tim ALIM Core karena Core pemilik
+data dan single source of truth. **Implementasi belum disetujui.** Sebelum tahap itu dimulai,
+Production Safety Plan dan peninjauan risiko terhadap sistem produksi wajib selesai dan ditinjau
+([35b](./35b-alim-core-api-coordination-and-safety-plan.md)). Setelah prasyarat keselamatan terpenuhi,
+PIC, ruang lingkup, dan jadwal implementasi `/api/connect/v1` ditetapkan.
+
+Konsekuensi: Tahap 1 dan seterusnya tidak dimulai; hanya Tahap 0 (kontrak dan mock di Connect) yang
+dapat berjalan. Sub-keputusan D9 (PIC, cakupan, jadwal) tetap terbuka.
+
+#### D12 — Aktivasi scope `unit`
+
+Ditetapkan 2026-11-21. Scope `unit` tetap nonaktif dan respons `400` untuk `scopeType=unit`
+dipertahankan. Aktivasi hanya boleh dipertimbangkan setelah kelima kondisi di §7.4.1 terpenuhi dan
+dibuktikan: API Core tersedia dan stabil; sinkronisasi master dan assignment berjalan; mapping
+division–unit tervalidasi; kontak dan percakapan memiliki keterkaitan unit yang dapat ditegakkan; dan
+pengujian isolasi lintas unit membuktikan scope benar-benar membatasi data.
+
+Konsekuensi: tidak ada perubahan pada RBAC Fase 1a; `unit` tetap `400` sampai kelima bukti ada.
+
+### 12.2 Keputusan yang masih terbuka
+
+| No  | Keputusan                                                              | Opsi                                                                 | Rekomendasi                                                  |
+| --- | ---------------------------------------------------------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------ |
+| D1  | Apakah grant `unit` mencakup subtree?                                  | (a) unit saja; (b) unit + turunan; (c) dua tipe grant terpisah       | (a) untuk fase pertama; subtree ditunda                      |
+| D3  | Kebijakan penautan person ↔ akun                                       | (a) manual; (b) otomatis via email; (c) manual dengan saran otomatis | (c)                                                          |
+| D4  | Perilaku saat person Core nonaktif/berhenti                            | (a) akun Connect dinonaktifkan otomatis; (b) hanya ditandai          | (b) — operasional tidak boleh berhenti karena perubahan Core |
+| D6  | Apakah `school` menjadi dimensi scope sendiri?                         | (a) tidak, turunan unit; (b) ya, `scopeType='school'`                | (a)                                                          |
+| D7  | Field person minimum yang boleh disalin                                | (a) nama + status; (b) + email/username; (c) + unit dan jabatan      | (b) untuk pencarian, tanpa data pribadi lain                 |
+| D8  | Frekuensi sinkronisasi dan staleness yang dapat diterima               | (a) 15 menit; (b) 1 jam; (c) harian                                  | (b) untuk master, (a) untuk assignment bila tersedia         |
+| D10 | Apakah menunggu `changes` atau memakai snapshot + polling lebih dulu   | (a) tunggu; (b) snapshot + polling                                   | (b) — jangan blokir seluruh integrasi pada ledger            |
+| D11 | Penanganan banyak baris `gtk_employments` per user                     | (a) baris terbaru; (b) baris aktif; (c) tampilkan semua              | (a) untuk status utama, (c) di halaman detail                |
+| D13 | Apakah grant yang menunjuk unit hilang dihapus atau dibiarkan          | (a) dibiarkan `unresolved`; (b) dihapus otomatis                     | (a) — penghapusan otomatis dapat menghilangkan jejak audit   |
+| D14 | Apakah Connect boleh memakai kunci integrasi POS/Recruitment sementara | (a) ya; (b) tidak, kunci terpisah                                    | (b)                                                          |
 
 Keputusan yang **sudah** ditetapkan oleh arahan pemilik sistem dan tidak perlu diulang: Core adalah
 single source of truth; tidak ada akses langsung ke database Core; Connect tidak mengubah master,
 assignment, atau permission Core; tidak ada Fase 1b/1c dalam pekerjaan ini; `unit` tidak diaktifkan
-sebelum fasenya.
+sebelum kelima gerbangnya terbukti.
 
 ---
 
@@ -957,7 +1050,7 @@ sebelum fasenya.
 | Skema `structural_assignments`        | migration `2026_02_14_135020`, `2026_09_22_051202`                                                               | Status + tanggal + soft delete + unique; `decree_id` nullable                                     |
 | Skema tugas tambahan                  | migration `2026_02_10_011139`, `2026_04_29_004344`                                                               | Dua tabel; unique hanya di `other_teacher_tasks`                                                  |
 | Autentikasi integrasi Core            | `app/Http/Middleware/VerifyIntegrationApiKey.php`, `app/Support/IntegrationApiConfig.php`, `app/Http/Kernel.php` | Static key per prefix, header `X-ALIM-<PREFIX>-KEY`, allowlist IP                                 |
-| Scope RBAC Connect                    | `src/modules/auth/permissions.ts`, `permission.service.ts`, `assignments.service.ts`                             | `global                                                                                           | session | team | object`; `unit` ditolak; bridge ≤ OPERATOR |
+| Scope RBAC Connect                    | `src/modules/auth/permissions.ts`, `permission.service.ts`, `assignments.service.ts`                             | `global`, `session`, `team`, `object`; `unit` ditolak; bridge ≤ OPERATOR                          |
 | Bentuk tim Connect                    | `src/modules/division/entities/division.entity.ts`                                                               | `sessionId` wajib, unique `(sessionId, name)`                                                     |
 | Identitas Connect                     | `src/modules/auth/entities/user.entity.ts`, `api-key.entity.ts`                                                  | Tidak ada kolom id eksternal/Core                                                                 |
 
