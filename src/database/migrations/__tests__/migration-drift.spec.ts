@@ -122,6 +122,13 @@ const dataConnection = (): DataSource =>
       join(repoRoot, 'src/modules/integration/**/*.entity{.ts,.js}'),
       join(repoRoot, 'src/modules/status-store/**/*.entity{.ts,.js}'),
       join(repoRoot, 'src/modules/automation/**/*.entity{.ts,.js}'),
+      // The inbox, CRM and campaign entities were missing from this list while their migrations
+      // landed, so a `campaigns` column named `scheduled_at` against a `scheduledAt` column reached
+      // production as a 500 `no such column` on the runner's first sweep. They carry the same
+      // cosmetic drift as the tables above (datetime vs text dates, hashed FK/index names).
+      join(repoRoot, 'src/modules/inbox/**/*.entity{.ts,.js}'),
+      join(repoRoot, 'src/modules/crm/**/*.entity{.ts,.js}'),
+      join(repoRoot, 'src/modules/campaign/**/*.entity{.ts,.js}'),
     ],
     migrations: importMigrations(join(repoRoot, 'src/database/migrations')) as never,
   });
