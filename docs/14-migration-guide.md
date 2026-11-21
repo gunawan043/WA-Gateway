@@ -186,7 +186,14 @@ curl -X POST 'http://localhost:2785/api/infra/import-data' \
     "webhookOutboxEvents": [...],
     "integrationDeliveryFailures": [...],
     "statusUpdates": [...],
-    "automationRules": [...]
+    "automationRules": [...],
+    "inboxConversations": [...],
+    "inboxNotes": [...],
+    "crmDeals": [...],
+    "crmDealActivities": [...],
+    "campaigns": [...],
+    "campaignRecipients": [...],
+    "campaignSegments": [...]
   },
   "counts": {
     "sessions": 5,
@@ -204,7 +211,14 @@ curl -X POST 'http://localhost:2785/api/infra/import-data' \
     "webhookOutboxEvents": 0,
     "integrationDeliveryFailures": 0,
     "statusUpdates": 19,
-    "automationRules": 7
+    "automationRules": 7,
+    "inboxConversations": 0,
+    "inboxNotes": 0,
+    "crmDeals": 0,
+    "crmDealActivities": 0,
+    "campaigns": 0,
+    "campaignRecipients": 0,
+    "campaignSegments": 0
   },
   "skippedTables": []
 }
@@ -212,6 +226,13 @@ curl -X POST 'http://localhost:2785/api/infra/import-data' \
 
 > [!NOTE]
 > `skippedTables` lists optional tables absent from an older schema; the import tolerates them.
+
+> [!NOTE]
+> **The CRM pipeline stages are not in the archive.** `crm_stages` is seeded by the migration on
+> every deployment with fixed ids (`New`, `Contacted`, `Qualified`, `Proposal`, `Won`, `Lost`), and a
+> deal stores only its `stageId`, so a restored deal always finds the stage it references. Renaming,
+> reordering or recolouring a stage is local configuration and is not carried by a backup; deals and
+> their activity history (`crmDeals`, `crmDealActivities`) are.
 
 > [!NOTE]
 > **Timestamps travel as UTC.** Every stamp in the archive is UTC. A PostgreSQL-made archive writes each

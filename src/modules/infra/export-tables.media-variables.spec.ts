@@ -20,6 +20,14 @@ import { IntegrationDeliveryFailure } from '../integration/entities/integration-
 import { StatusUpdate } from '../status-store/entities/status-update.entity';
 import { SendIdempotencyKey } from '../message/entities/send-idempotency-key.entity';
 import { AutomationRule } from '../automation/entities/automation-rule.entity';
+import { InboxConversation } from '../inbox/entities/inbox-conversation.entity';
+import { InboxNote } from '../inbox/entities/inbox-note.entity';
+import { CrmDeal } from '../crm/entities/crm-deal.entity';
+import { CrmDealActivity } from '../crm/entities/crm-deal-activity.entity';
+import { Campaign } from '../campaign/entities/campaign.entity';
+import { CampaignRecipient } from '../campaign/entities/campaign-recipient.entity';
+import { CampaignSegment } from '../campaign/entities/campaign-segment.entity';
+import { CrmStage } from '../crm/entities/crm-stage.entity';
 import * as templateRender from '../../common/utils/template-render';
 import { renderTemplate } from '../../common/utils/template-render';
 
@@ -40,6 +48,14 @@ const entities = [
   IntegrationDeliveryFailure,
   StatusUpdate,
   AutomationRule,
+  InboxConversation,
+  InboxNote,
+  CrmStage,
+  CrmDeal,
+  CrmDealActivity,
+  Campaign,
+  CampaignRecipient,
+  CampaignSegment,
   SendIdempotencyKey,
 ];
 

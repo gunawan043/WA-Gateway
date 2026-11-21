@@ -20,6 +20,13 @@ import type {
   IntegrationDeliveryFailureRow,
   StatusUpdateRow,
   AutomationRuleRow,
+  InboxConversationRow,
+  InboxNoteRow,
+  CrmDealRow,
+  CrmDealActivityRow,
+  CampaignRow,
+  CampaignRecipientRow,
+  CampaignSegmentRow,
 } from './migration-tables.types';
 
 // A per-table restore step for importData: which backup key to read, the exact INSERT text (kept in
@@ -96,6 +103,16 @@ function invalidJsonWarning(label: string, id: string, row: object, columns: rea
 // exception: no request can look up a name holding NUL, so keeping it would only strand the template.
 function nulFree(value: unknown): unknown {
   return NulFreeTransformer.to(value);
+}
+
+/**
+ * A JSON column's archived value. The export carries it as text (both dialects store `simple-json` as
+ * text), and the importer writes it back verbatim. A hand-edited archive that supplies an object is
+ * stringified rather than rejected, because the text column cannot bind an object directly.
+ */
+function jsonText(value: unknown): unknown {
+  if (typeof value === 'string') return nulFree(value);
+  return value == null ? null : JSON.stringify(value);
 }
 
 /** Apply the terminal index's keeper order to archives created before that index existed. */
@@ -581,6 +598,148 @@ export const TABLE_IMPORTERS: AnyTableImporter[] = [
       rule.updatedAt,
     ],
   }),
+  // Team inbox: conversations before notes, because a note's conversationId is a FK to a conversation
+  // row that the sessions DELETE just removed. Ids are preserved so notes stay attached.
+  defineTableImporter({
+    key: 'inboxConversations',
+    label: 'inbox conversation',
+    sql: `INSERT INTO inbox_conversations (id, "sessionId", "chatId", status, "assigneeKeyId", "assigneeName", "resolvedAt", "lastInboundAt", "createdAt", "updatedAt")
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+    id: (row: InboxConversationRow) => row.id,
+    map: (row: InboxConversationRow) => [
+      row.id,
+      row.sessionId,
+      row.chatId,
+      row.status,
+      nulFree(row.assigneeKeyId),
+      nulFree(row.assigneeName),
+      row.resolvedAt ?? null,
+      row.lastInboundAt ?? null,
+      row.createdAt,
+      row.updatedAt,
+    ],
+  }),
+  defineTableImporter({
+    key: 'inboxNotes',
+    label: 'inbox note',
+    sql: `INSERT INTO inbox_notes (id, "conversationId", "authorKeyId", "authorName", body, "createdAt")
+               VALUES ($1, $2, $3, $4, $5, $6)`,
+    id: (row: InboxNoteRow) => row.id,
+    map: (row: InboxNoteRow) => [
+      row.id,
+      row.conversationId,
+      row.authorKeyId,
+      row.authorName,
+      nulFree(row.body),
+      row.createdAt,
+    ],
+  }),
+  // Sales pipeline: deals before activities, because an activity's dealId is a FK to a deal row.
+  // Stage rows are not restored (they are seeded configuration with fixed ids), so a deal's stageId
+  // resolves against the local pipeline. Ids are preserved so activity history stays attached.
+  defineTableImporter({
+    key: 'crmDeals',
+    label: 'CRM deal',
+    sql: `INSERT INTO crm_deals (id, "stageId", title, "sessionId", "chatId", value, currency, status, "assigneeKeyId", "assigneeName", "expectedCloseAt", "closedAt", notes, "createdAt", "updatedAt")
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
+    id: (row: CrmDealRow) => row.id,
+    map: (row: CrmDealRow) => [
+      row.id,
+      row.stageId,
+      row.title,
+      nulFree(row.sessionId),
+      nulFree(row.chatId),
+      row.value ?? null,
+      row.currency,
+      row.status,
+      nulFree(row.assigneeKeyId),
+      nulFree(row.assigneeName),
+      row.expectedCloseAt ?? null,
+      row.closedAt ?? null,
+      nulFree(row.notes),
+      row.createdAt,
+      row.updatedAt,
+    ],
+  }),
+  defineTableImporter({
+    key: 'crmDealActivities',
+    label: 'CRM deal activity',
+    sql: `INSERT INTO crm_deal_activities (id, "dealId", kind, body, "fromStageId", "toStageId", "authorKeyId", "authorName", "createdAt")
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+    id: (row: CrmDealActivityRow) => row.id,
+    map: (row: CrmDealActivityRow) => [
+      row.id,
+      row.dealId,
+      row.kind,
+      nulFree(row.body),
+      nulFree(row.fromStageId),
+      nulFree(row.toStageId),
+      row.authorKeyId,
+      row.authorName,
+      row.createdAt,
+    ],
+  }),
+  // Broadcast campaigns: the campaign before its recipients (the FK). Segments have no FK and follow.
+  defineTableImporter({
+    key: 'campaigns',
+    label: 'campaign',
+    sql: `INSERT INTO campaigns (id, "sessionId", name, status, content, options, audience, progress, "scheduledAt", "startedAt", "completedAt", "createdByKeyId", "createdByName", "createdAt", "updatedAt")
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
+    id: (row: CampaignRow) => row.id,
+    map: (row: CampaignRow) => [
+      row.id,
+      row.sessionId,
+      nulFree(row.name),
+      row.status,
+      jsonText(row.content),
+      jsonText(row.options),
+      jsonText(row.audience),
+      jsonText(row.progress),
+      row.scheduledAt ?? null,
+      row.startedAt ?? null,
+      row.completedAt ?? null,
+      nulFree(row.createdByKeyId),
+      nulFree(row.createdByName),
+      row.createdAt,
+      row.updatedAt,
+    ],
+  }),
+  defineTableImporter({
+    key: 'campaignRecipients',
+    label: 'campaign recipient',
+    sql: `INSERT INTO campaign_recipients (id, "campaignId", "chatId", "chatName", status, "batchId", "messageId", "errorCode", "errorMessage", "sentAt", "createdAt", "updatedAt")
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+    id: (row: CampaignRecipientRow) => row.id,
+    map: (row: CampaignRecipientRow) => [
+      row.id,
+      row.campaignId,
+      row.chatId,
+      nulFree(row.chatName),
+      row.status,
+      nulFree(row.batchId),
+      nulFree(row.messageId),
+      nulFree(row.errorCode),
+      nulFree(row.errorMessage),
+      row.sentAt ?? null,
+      row.createdAt,
+      row.updatedAt,
+    ],
+  }),
+  defineTableImporter({
+    key: 'campaignSegments',
+    label: 'campaign segment',
+    sql: `INSERT INTO campaign_segments (id, "sessionId", name, "chatIds", "createdAt", "updatedAt")
+               VALUES ($1, $2, $3, $4, $5, $6)`,
+    id: (row: CampaignSegmentRow) => row.id,
+    map: (row: CampaignSegmentRow) => [
+      row.id,
+      row.sessionId,
+      nulFree(row.name),
+      jsonText(row.chatIds),
+      row.createdAt,
+      row.updatedAt,
+    ],
+  }),
 ];
 
 // The `as TableCounts` cast in importData means a dropped or mis-keyed descriptor is invisible to
@@ -603,6 +762,13 @@ const EXPECTED_TABLE_KEYS: ReadonlyArray<keyof MigrationTables> = [
   'integrationDeliveryFailures',
   'statusUpdates',
   'automationRules',
+  'inboxConversations',
+  'inboxNotes',
+  'crmDeals',
+  'crmDealActivities',
+  'campaigns',
+  'campaignRecipients',
+  'campaignSegments',
 ];
 const importerKeys = TABLE_IMPORTERS.map(importer => importer.key);
 for (const key of EXPECTED_TABLE_KEYS) {

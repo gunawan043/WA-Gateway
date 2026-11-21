@@ -79,6 +79,27 @@ export enum AuditAction {
   PLUGIN_CONFIG_UPDATED = 'plugin_config_updated',
   PLUGIN_SESSIONS_UPDATED = 'plugin_sessions_updated',
 
+  // Team inbox events. Assignment and status changes are the operational record of who owned a
+  // conversation; a note is internal, but deleting one destroys that record and is audited.
+  INBOX_CONVERSATION_ASSIGNED = 'inbox_conversation_assigned',
+  INBOX_CONVERSATION_STATUS_CHANGED = 'inbox_conversation_status_changed',
+  INBOX_NOTE_ADDED = 'inbox_note_added',
+  INBOX_NOTE_DELETED = 'inbox_note_deleted',
+
+  // Sales pipeline events. Creating a deal, moving it between stages (which decides open/won/lost)
+  // and deleting it with its whole history are the three state changes an operator may need to
+  // reconstruct later; field edits and notes stay in the deal's own activity log.
+  CRM_DEAL_CREATED = 'crm_deal_created',
+  CRM_DEAL_STAGE_CHANGED = 'crm_deal_stage_changed',
+  CRM_DEAL_DELETED = 'crm_deal_deleted',
+
+  // Broadcast events. Starting, cancelling and finishing a campaign are the boundaries an operator
+  // may need to reconstruct later; the per-recipient outcomes live on the campaign's own rows.
+  CAMPAIGN_STARTED = 'campaign_started',
+  CAMPAIGN_CANCELLED = 'campaign_cancelled',
+  CAMPAIGN_COMPLETED = 'campaign_completed',
+  CAMPAIGN_DELETED = 'campaign_deleted',
+
   // Infrastructure events (ADMIN-only operations on the infra module: credential-bearing config
   // mutation, server restart / Docker orchestration, and full-DB / storage export+import).
   INFRA_CONFIG_SAVED = 'infra_config_saved',

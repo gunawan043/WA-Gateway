@@ -1,4 +1,5 @@
 package com.rmyndharis.openwa.model;
 
 /** Result of validating the configured API key. */
-public record AuthValidateResponse(boolean valid, String role, String engineType, Boolean scoped) {}
+public record AuthValidateResponse(
+    boolean valid, String role, String engineType, Boolean scoped, String keyId, String keyName) {}

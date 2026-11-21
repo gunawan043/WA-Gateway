@@ -497,6 +497,7 @@ CREATE TABLE webhooks (
   "presence.update",
   "event.response",
   "poll.vote",
+  "inbox.updated",
   "group.join",
   "group.leave",
   "group.update",
@@ -965,7 +966,10 @@ src/database/migrations/           # data connection (pluggable)
 ├── 1791400000000-AddLidMappingReportSource.ts   # distinguishes mapping reports from cached display data
 ├── 1791600000000-RepairSqliteMessageFts.ts   # rebuilds the SQLite full-text index when it no longer matches messages
 ├── 1791700000000-AddChatStateDeletedAt.ts   # chat_states.deletedAt (when WhatsApp deleted the chat)
-└── 1791800000000-AddStatusMediaPathIndex.ts   # partial index on status_updates.mediaPath (orphan sweep)
+├── 1791800000000-AddStatusMediaPathIndex.ts   # partial index on status_updates.mediaPath (orphan sweep)
+├── 1791900000000-CreateInboxTables.ts   # inbox_conversations + inbox_notes (team inbox)
+├── 1792000000000-CreateCrmTables.ts   # crm_stages (seeded) + crm_deals + crm_deal_activities (sales pipeline)
+└── 1792100000000-CreateCampaignTables.ts   # campaigns + campaign_recipients + campaign_segments (broadcast)
 ```
 
 > [!NOTE]

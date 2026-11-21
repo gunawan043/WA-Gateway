@@ -37,6 +37,9 @@ const ALLOWLIST = new Map<string, string>([
   // Self-validation only: the route returns {valid, role} for the calling key and reads/writes no
   // resource, so a session-restricted key validating itself is harmless (it cannot broaden scope).
   ['auth-validate.controller.ts :: validate', 'self-validation of the calling key; no resource access'],
+  // The inbox's agent picker. Returns active key ids and display names only — no scope, usage or
+  // secret — and reads no session or chat data, so a session-scoped agent may reach it.
+  ['auth-agents.controller.ts :: findAll', 'directory of active key ids and names only; no session data'],
 ]);
 
 /**

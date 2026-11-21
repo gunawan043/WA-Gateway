@@ -57,7 +57,12 @@ describe('every request DTO that names a chat holds the JID pattern', () => {
       const lines = readFileSync(file, 'utf8').split('\n');
       lines.forEach((line, index) => {
         if (!declaration.test(line)) return;
-        const decorators = lines.slice(Math.max(0, index - 10), index).join('\n');
+        // Bound the window at the enclosing class: a request DTO's `@IsString()` on a field near the
+        // end of the previous class used to fall inside the fixed 10-line window and made a response
+        // DTO's `chatId` look validated. Only decorators of THIS class can describe this field.
+        let classStart = index - 1;
+        while (classStart >= 0 && !/^\s*(?:export\s+)?(?:abstract\s+)?class\s/.test(lines[classStart])) classStart--;
+        const decorators = lines.slice(Math.max(classStart + 1, index - 10), index).join('\n');
         if (!decorators.includes('@IsString()')) return; // a response field, nothing validates it
         seen += 1;
         // Four older DTOs spell the same regular expression out instead of importing the constant.

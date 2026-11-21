@@ -1352,6 +1352,8 @@ class AuthValidateResponse(_AuthValidateRequired, total=False):
     role: Literal["admin", "operator", "viewer"]
     engineType: str
     scoped: bool
+    keyId: str
+    keyName: str
 
 
 # ── Template ──────────────────────────────────────────────────────

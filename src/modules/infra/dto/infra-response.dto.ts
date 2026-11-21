@@ -492,6 +492,13 @@ export class MigrationTablesDto {
   @ApiProperty({ type: [Object] }) integrationDeliveryFailures!: object[];
   @ApiProperty({ type: [Object] }) statusUpdates!: object[];
   @ApiProperty({ type: [Object] }) automationRules!: object[];
+  @ApiProperty({ type: [Object] }) inboxConversations!: object[];
+  @ApiProperty({ type: [Object] }) inboxNotes!: object[];
+  @ApiProperty({ type: [Object] }) crmDeals!: object[];
+  @ApiProperty({ type: [Object] }) crmDealActivities!: object[];
+  @ApiProperty({ type: [Object] }) campaigns!: object[];
+  @ApiProperty({ type: [Object] }) campaignRecipients!: object[];
+  @ApiProperty({ type: [Object] }) campaignSegments!: object[];
 }
 
 /** Row count per table, with the same keys as {@link MigrationTablesDto}. */
@@ -512,6 +519,13 @@ export class TableCountsDto {
   @ApiProperty({ example: 0 }) integrationDeliveryFailures!: number;
   @ApiProperty({ example: 5 }) statusUpdates!: number;
   @ApiProperty({ example: 2 }) automationRules!: number;
+  @ApiProperty({ example: 0 }) inboxConversations!: number;
+  @ApiProperty({ example: 0 }) inboxNotes!: number;
+  @ApiProperty({ example: 0 }) crmDeals!: number;
+  @ApiProperty({ example: 0 }) crmDealActivities!: number;
+  @ApiProperty({ example: 0 }) campaigns!: number;
+  @ApiProperty({ example: 0 }) campaignRecipients!: number;
+  @ApiProperty({ example: 0 }) campaignSegments!: number;
 }
 
 export class OmittedInlineMediaDto {

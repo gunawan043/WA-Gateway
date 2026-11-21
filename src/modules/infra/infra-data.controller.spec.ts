@@ -40,6 +40,14 @@ import { IntegrationDeliveryFailure } from '../integration/entities/integration-
 import { StatusUpdate } from '../status-store/entities/status-update.entity';
 import { SendIdempotencyKey } from '../message/entities/send-idempotency-key.entity';
 import { AutomationRule } from '../automation/entities/automation-rule.entity';
+import { InboxConversation } from '../inbox/entities/inbox-conversation.entity';
+import { InboxNote } from '../inbox/entities/inbox-note.entity';
+import { CrmDeal } from '../crm/entities/crm-deal.entity';
+import { CrmDealActivity } from '../crm/entities/crm-deal-activity.entity';
+import { Campaign } from '../campaign/entities/campaign.entity';
+import { CampaignRecipient } from '../campaign/entities/campaign-recipient.entity';
+import { CampaignSegment } from '../campaign/entities/campaign-segment.entity';
+import { CrmStage } from '../crm/entities/crm-stage.entity';
 import { AuditAction } from '../audit/entities/audit-log.entity';
 import { ScopeBindingService } from '../integration/scope-binding.service';
 import { PluginInstanceService } from '../integration/plugin-instance.service';
@@ -81,6 +89,14 @@ describe('InfraDataController.importData round-trips export-data (no silent mess
         IntegrationDeliveryFailure,
         StatusUpdate,
         AutomationRule,
+        InboxConversation,
+        InboxNote,
+        CrmStage,
+        CrmDeal,
+        CrmDealActivity,
+        Campaign,
+        CampaignRecipient,
+        CampaignSegment,
         SendIdempotencyKey,
       ],
       synchronize: true,
@@ -1579,6 +1595,14 @@ describe('InfraDataController.import/export preserves every data-DB table', () =
         IntegrationDeliveryFailure,
         StatusUpdate,
         AutomationRule,
+        InboxConversation,
+        InboxNote,
+        CrmStage,
+        CrmDeal,
+        CrmDealActivity,
+        Campaign,
+        CampaignRecipient,
+        CampaignSegment,
       ],
       synchronize: true,
     });
@@ -2058,6 +2082,14 @@ describe('InfraDataController audit trail — import emits only on a committed r
         IntegrationDeliveryFailure,
         StatusUpdate,
         AutomationRule,
+        InboxConversation,
+        InboxNote,
+        CrmStage,
+        CrmDeal,
+        CrmDealActivity,
+        Campaign,
+        CampaignRecipient,
+        CampaignSegment,
       ],
       synchronize: true,
     });
@@ -2380,6 +2412,14 @@ describe('InfraDataController.importData status_updates + runtime reconciliation
         IntegrationDeliveryFailure,
         StatusUpdate,
         AutomationRule,
+        InboxConversation,
+        InboxNote,
+        CrmStage,
+        CrmDeal,
+        CrmDealActivity,
+        Campaign,
+        CampaignRecipient,
+        CampaignSegment,
       ],
       synchronize: true,
     });
@@ -3174,6 +3214,14 @@ describe('InfraDataController.importData re-syncs plugin instance bindings', () 
         IntegrationDeliveryFailure,
         StatusUpdate,
         AutomationRule,
+        InboxConversation,
+        InboxNote,
+        CrmStage,
+        CrmDeal,
+        CrmDealActivity,
+        Campaign,
+        CampaignRecipient,
+        CampaignSegment,
       ],
       synchronize: true,
     });

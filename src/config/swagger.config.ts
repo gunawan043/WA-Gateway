@@ -269,6 +269,9 @@ export function createSwaggerConfig(): Omit<OpenAPIObject, 'paths'> {
       .addTag('metrics', 'Prometheus metrics')
       .addTag('health', 'Health check endpoints')
       .addTag('automation', 'Automation rules (auto-reply)')
+      .addTag('inbox', 'Team inbox (per-chat assignment, status and notes)')
+      .addTag('crm', 'Sales pipeline (stages, deals and activity history)')
+      .addTag('campaigns', 'Broadcast campaigns (audience, chunks and per-recipient results)')
       .addTag('media', 'Media conversion')
       // ORDER MATTERS. Swagger UI resolves "Try it" against servers[0], substituting the variable
       // defaults — it does not consider the origin the page was served from. A templated server

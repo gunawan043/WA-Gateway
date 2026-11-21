@@ -43,6 +43,10 @@ const FOCUS_CUES: [string, string[]][] = [
   ],
   ['pages/ApiKeys.css', ['.api-keys-page .modal-body > textarea:focus']],
   [
+    'pages/Campaigns.css',
+    ['.campaigns-page .campaigns-search:focus-within', '.campaigns-page .campaign-chat-search:focus-within'],
+  ],
+  [
     'pages/Chats.css',
     [
       '.chats-page .session-switcher-btn:focus-visible',
@@ -70,6 +74,7 @@ const FOCUS_CUES: [string, string[]][] = [
       ".chats-page .status-compose-modal input[type='color']:focus",
     ],
   ],
+  ['pages/Inbox.css', ['.inbox-page .inbox-search:focus-within']],
   [
     'pages/Infrastructure.css',
     [
@@ -98,6 +103,7 @@ const FOCUS_CUES: [string, string[]][] = [
     ],
   ],
   ['pages/NumberChecker.css', ['.number-checker .nc-input:focus', '.number-checker .nc-textarea:focus']],
+  ['pages/Pipeline.css', ['.pipeline-page .pipeline-search:focus-within']],
   [
     'pages/Plugins.css',
     [

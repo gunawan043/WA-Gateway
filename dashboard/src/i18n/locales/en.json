@@ -68,7 +68,10 @@
     "messageTester": "Message Tester",
     "infrastructure": "Infrastructure",
     "plugins": "Plugins",
-    "logs": "Logs"
+    "logs": "Logs",
+    "inbox": "Inbox",
+    "pipeline": "Pipeline",
+    "campaigns": "Campaigns"
   },
   "chats": {
     "edited": "Edited",
@@ -1472,5 +1475,214 @@
       "current": "This session"
     },
     "loading": "Searching…"
+  },
+  "inbox": {
+    "title": "Team Inbox",
+    "subtitle": "Triage chats, assign agents, and keep internal notes.",
+    "session": "Session",
+    "noSessions": "No sessions yet",
+    "conversations": "Conversations",
+    "searchPlaceholder": "Search name, chat id or last message",
+    "noMessages": "No messages yet",
+    "unassigned": "Unassigned",
+    "status": {
+      "open": "Open",
+      "pending": "Pending",
+      "resolved": "Resolved",
+      "all": "All"
+    },
+    "assignee": {
+      "label": "Assignee",
+      "all": "All agents",
+      "me": "Assigned to me",
+      "unassigned": "Unassigned"
+    },
+    "empty": {
+      "title": "No conversations",
+      "body": "Adjust the filters or wait for an incoming message.",
+      "selectSession": "Pick a session to start."
+    },
+    "error": {
+      "load": "Could not load the inbox."
+    },
+    "detail": {
+      "selectPrompt": "Select a conversation on the left.",
+      "assignee": "Assignee",
+      "notes": "Internal notes",
+      "noNotes": "No notes yet.",
+      "notePlaceholder": "Write an internal note…",
+      "addNote": "Add note",
+      "deleteNote": "Delete note"
+    },
+    "assignToMe": "Me ({{name}})",
+    "updated": "Conversation updated",
+    "updateFailed": "Could not update the conversation",
+    "noteAdded": "Note added",
+    "noteDeleted": "Note deleted",
+    "confirmDeleteNote": "Delete this note?"
+  },
+  "pipeline": {
+    "title": "Sales Pipeline",
+    "subtitle": "Track deals across stages, assign an owner, and keep the history on the deal.",
+    "searchPlaceholder": "Search title, notes or owner",
+    "assignee": "Owner",
+    "allAgents": "All owners",
+    "assignedToMe": "Assigned to me",
+    "unassigned": "Unassigned",
+    "newDeal": "New deal",
+    "columnEmpty": "Drop a deal here",
+    "cancel": "Cancel",
+    "assignToMe": "Me ({{name}})",
+    "stats": {
+      "open": "open",
+      "won": "won",
+      "lost": "lost",
+      "openValue": "open value (mixed currencies)"
+    },
+    "error": {
+      "load": "Could not load the pipeline."
+    },
+    "create": {
+      "title": "New deal",
+      "submit": "Create deal",
+      "titlePlaceholder": "e.g. Annual contract"
+    },
+    "deal": {
+      "title": "Title",
+      "value": "Value",
+      "currency": "Currency",
+      "stage": "Stage",
+      "assignee": "Owner",
+      "expectedClose": "Expected close",
+      "notes": "Notes",
+      "save": "Save changes",
+      "delete": "Delete deal",
+      "confirmDelete": "Delete this deal and its whole history?",
+      "activities": "History",
+      "noActivities": "No activity yet.",
+      "notePlaceholder": "Add a note to this deal…",
+      "addNote": "Add note"
+    },
+    "activityKind": {
+      "created": "created",
+      "stage_change": "stage change",
+      "assignment": "assignment",
+      "note": "note",
+      "update": "update"
+    },
+    "toast": {
+      "moved": "Moved to {{stage}}",
+      "created": "Deal created",
+      "updated": "Deal updated",
+      "deleted": "Deal deleted",
+      "noteAdded": "Note added",
+      "saveFailed": "Could not save the deal"
+    }
+  },
+  "campaigns": {
+    "title": "Campaigns",
+    "subtitle": "Send one message to many chats, with a live per-recipient record",
+    "session": "Session",
+    "status": {
+      "draft": "Draft",
+      "scheduled": "Scheduled",
+      "running": "Running",
+      "completed": "Completed",
+      "cancelled": "Cancelled",
+      "failed": "Failed"
+    },
+    "allStatuses": "All",
+    "new": "New campaign",
+    "searchPlaceholder": "Search campaigns",
+    "empty": "No campaigns yet. Create one to reach a whole audience.",
+    "name": "Campaign",
+    "audience": "Audience",
+    "progress": "Progress",
+    "createdAt": "Created",
+    "none": "None",
+    "close": "Close",
+    "audienceKind": {
+      "manual": "Selected chats",
+      "segment": "Saved segment",
+      "all": "All session chats",
+      "label": "WhatsApp label"
+    },
+    "messageType": {
+      "text": "Text",
+      "image": "Image",
+      "video": "Video",
+      "audio": "Audio",
+      "document": "Document"
+    },
+    "recipientStatus": {
+      "pending": "Pending",
+      "sent": "Sent",
+      "failed": "Failed",
+      "skipped": "Skipped"
+    },
+    "error": {
+      "load": "Could not load campaigns."
+    },
+    "wizard": {
+      "title": "New campaign",
+      "step1": "Message",
+      "step2": "Audience",
+      "step3": "Schedule",
+      "next": "Next",
+      "back": "Back",
+      "create": "Create campaign"
+    },
+    "form": {
+      "name": "Campaign name",
+      "namePlaceholder": "e.g. Year-end promo",
+      "type": "Message type",
+      "message": "Message",
+      "messagePlaceholder": "Halo {{name}}, ...",
+      "mediaUrl": "Media URL",
+      "caption": "Caption",
+      "mimetype": "MIME type (optional)",
+      "filename": "File name (documents)",
+      "variablesHint": "Use {{name}} for the chat name; it is filled per recipient.",
+      "audienceKind": "Audience",
+      "searchChats": "Search chats",
+      "selected": "{{count}} selected",
+      "segment": "Saved segment",
+      "labelId": "Label ID",
+      "labelHint": "whatsapp-web.js only. Baileys exposes label writes but no label query and answers 501.",
+      "allHint": "Every chat in the session. Use the preview to confirm the count before sending.",
+      "preview": "Preview audience",
+      "previewCount": "{{count}} chats",
+      "previewTruncated": "The audience is larger than the 5000-chat cap; split it into segments.",
+      "delay": "Delay between messages (ms)",
+      "randomize": "Randomise the delay",
+      "stopOnError": "Stop on the first error",
+      "schedule": "Schedule (optional)",
+      "scheduleHint": "Leave the date empty to keep a draft. A scheduled campaign starts on its own.",
+      "saveSegment": "Save as segment",
+      "segmentName": "Segment name"
+    },
+    "detail": {
+      "title": "Campaign",
+      "start": "Start",
+      "cancel": "Cancel",
+      "delete": "Delete",
+      "confirmDelete": "Delete this campaign and its recipient records?",
+      "recipients": "Recipients",
+      "noRecipients": "No recipients yet. They are created when the campaign starts.",
+      "chat": "Chat",
+      "error": "Error",
+      "sent": "Sent",
+      "failed": "Failed",
+      "skipped": "Skipped",
+      "total": "Total"
+    },
+    "toast": {
+      "created": "Campaign created",
+      "started": "Campaign started",
+      "cancelled": "Campaign cancelled",
+      "deleted": "Campaign deleted",
+      "segmentSaved": "Segment saved",
+      "failed": "Campaign action failed"
+    }
   }
 }

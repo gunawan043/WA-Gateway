@@ -17,6 +17,9 @@ const Login = lazy(() => import('./pages/Login').then(m => ({ default: m.Login }
 const Dashboard = lazy(() => import('./pages/Dashboard').then(m => ({ default: m.Dashboard })));
 const Sessions = lazy(() => import('./pages/Sessions').then(m => ({ default: m.Sessions })));
 const Chats = lazy(() => import('./pages/Chats').then(m => ({ default: m.Chats })));
+const Inbox = lazy(() => import('./pages/Inbox').then(m => ({ default: m.Inbox })));
+const Pipeline = lazy(() => import('./pages/Pipeline').then(m => ({ default: m.Pipeline })));
+const Campaigns = lazy(() => import('./pages/Campaigns').then(m => ({ default: m.Campaigns })));
 const Webhooks = lazy(() => import('./pages/Webhooks').then(m => ({ default: m.Webhooks })));
 const Templates = lazy(() => import('./pages/Templates').then(m => ({ default: m.Templates })));
 const Logs = lazy(() => import('./pages/Logs').then(m => ({ default: m.Logs })));
@@ -44,9 +47,16 @@ function AppContent() {
   const [savedKey] = useState(() => sessionStorage.getItem('openwa_api_key'));
   const [isAuthenticated, setIsAuthenticated] = useState(!!savedKey);
   const [, setApiKey] = useState(savedKey || '');
-  const { setRole, role, setEngineType, setScoped, scoped } = useRole();
+  const { setRole, role, setEngineType, setScoped, scoped, setKeyIdentity } = useRole();
 
-  const handleLogin = (key: string, validatedRole?: string, engineType?: string, scoped = false) => {
+  const handleLogin = (
+    key: string,
+    validatedRole?: string,
+    engineType?: string,
+    scoped = false,
+    keyId?: string,
+    keyName?: string,
+  ) => {
     setApiKey(key);
     sessionStorage.setItem('openwa_api_key', key);
 
@@ -56,6 +66,7 @@ function AppContent() {
     setRole(isUserRole(validatedRole) ? validatedRole : 'viewer');
     setEngineType(engineType ?? null);
     setScoped(scoped);
+    setKeyIdentity?.(keyId ?? null, keyName ?? null);
 
     setIsAuthenticated(true);
   };
@@ -66,12 +77,13 @@ function AppContent() {
     setRole(null);
     setEngineType(null);
     setScoped(false);
+    setKeyIdentity?.(null, null);
     sessionStorage.removeItem('openwa_api_key');
     // Wipe the React Query cache too: it is keyed by resource, not actor, so without a full
     // clear a logout → login in the same tab with a different key/scope shows the previous
     // actor's sessions/messages/apiKeys/audit rows.
     clearActorState(queryClient);
-  }, [setRole, setEngineType, setScoped]);
+  }, [setRole, setEngineType, setScoped, setKeyIdentity]);
 
   // Re-validate and refresh the role on mount if already authenticated
   useEffect(() => {
@@ -82,7 +94,15 @@ function AppContent() {
       headers: { 'X-API-Key': savedKey },
     })
       .then(async res => {
-        const decision = resolveStartupValidation(res.status, await res.json().catch(() => null));
+        const body: {
+          valid?: boolean;
+          role?: string;
+          engineType?: string;
+          scoped?: unknown;
+          keyId?: unknown;
+          keyName?: unknown;
+        } | null = await res.json().catch(() => null);
+        const decision = resolveStartupValidation(res.status, body);
         // Nothing cancels this request on logout. If the user has since signed out, or back in with
         // another key, the answer is about a key no longer in use: applying it would hand the new
         // session the old key's role, or log it out over the old key's 401.
@@ -93,13 +113,16 @@ function AppContent() {
           setRole(decision.role);
           setScoped(decision.scoped);
           if (decision.engineType) setEngineType(decision.engineType);
+          if (typeof body?.keyId === 'string') {
+            setKeyIdentity?.(body.keyId, typeof body.keyName === 'string' ? body.keyName : null);
+          }
         }
       })
       .catch(() => {
         // Network failure (API unreachable): keep the cached role so a transient outage at
         // page load doesn't eject the user — an explicit 401/403 above still logs out.
       });
-  }, [savedKey, setRole, setEngineType, setScoped, handleLogout]);
+  }, [savedKey, setRole, setEngineType, setScoped, setKeyIdentity, handleLogout]);
 
   const loadingFallback = (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
@@ -126,6 +149,9 @@ function AppContent() {
                 <Route index element={<Dashboard />} />
                 <Route path="sessions" element={<Sessions />} />
                 <Route path="chats" element={<Chats />} />
+                <Route path="inbox" element={<Inbox />} />
+                <Route path="pipeline" element={<Pipeline />} />
+                <Route path="campaigns" element={<Campaigns />} />
                 <Route path="number-checker" element={<NumberChecker />} />
                 <Route path="webhooks" element={<Webhooks />} />
                 <Route path="templates" element={<Templates />} />

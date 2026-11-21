@@ -366,6 +366,24 @@ export const EXPORT_TABLES: AnyExportTable[] = [
   // rule with it — exporting and re-inserting it is not optional, or a restore silently destroys
   // every autoreply rule.
   defineExportTable({ key: 'automationRules', table: 'automation_rules', optional: true, sessionFk: true }),
+
+  // Team inbox. Conversations cascade from sessions, notes cascade from a conversation: both must be
+  // exported and re-inserted (conversations first) or a restore loses every assignment and note.
+  defineExportTable({ key: 'inboxConversations', table: 'inbox_conversations', optional: true, sessionFk: true }),
+  defineExportTable({ key: 'inboxNotes', table: 'inbox_notes', optional: true }),
+
+  // Sales pipeline. Deals carry only provenance columns for a session, so they do not cascade from
+  // `sessions`; activities cascade from a deal. Deals must be inserted before their activities.
+  // `crm_stages` is excluded below: its rows are seeded configuration with fixed ids.
+  defineExportTable({ key: 'crmDeals', table: 'crm_deals', optional: true }),
+  defineExportTable({ key: 'crmDealActivities', table: 'crm_deal_activities', optional: true }),
+
+  // Broadcast campaigns. `campaigns.sessionId` is provenance, not a FK, so nothing here cascades from
+  // `sessions`; recipients cascade from their campaign. Campaigns must be inserted before recipients.
+  // Segments carry no FK at all and are exported last for readability.
+  defineExportTable({ key: 'campaigns', table: 'campaigns', optional: true }),
+  defineExportTable({ key: 'campaignRecipients', table: 'campaign_recipients', optional: true }),
+  defineExportTable({ key: 'campaignSegments', table: 'campaign_segments', optional: true }),
 ];
 
 /**
@@ -378,4 +396,7 @@ export const EXPORT_TABLES: AnyExportTable[] = [
 export const EXPORT_TABLE_EXCLUSIONS: Readonly<Record<string, string>> = {
   // Claims expire within 24 hours; a restored key would only block or replay a send it never saw.
   send_idempotency_keys: 'short-lived Idempotency-Key claims (24 h TTL), meaningless after a restore',
+  // Seeded by the CRM migration with fixed ids on every deployment; deals store only a stageId, so a
+  // restore always finds the stages it references. Renames/reordering are local cosmetic config.
+  crm_stages: 'seeded pipeline configuration with fixed ids; deals reference them by stageId',
 };

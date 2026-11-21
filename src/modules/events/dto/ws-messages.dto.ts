@@ -28,6 +28,8 @@ export const SUBSCRIBABLE_EVENTS = [
   'presence.update',
   'event.response',
   'poll.vote',
+  'inbox.updated',
+  'campaign.updated',
   'call.accepted',
   'call.rejected',
   'call.missed',

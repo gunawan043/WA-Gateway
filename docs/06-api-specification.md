@@ -5437,12 +5437,28 @@ The key is read from the `X-API-Key` header, not the body; send an empty body. T
 **Response** `200`
 
 ```json
-{ "valid": true, "role": "operator", "engineType": "whatsapp-web.js", "scoped": false }
+{
+  "valid": true,
+  "role": "operator",
+  "engineType": "whatsapp-web.js",
+  "scoped": false,
+  "keyId": "6f1c…",
+  "keyName": "Agen A"
+}
 ```
 
 **Errors:** `401` missing/invalid/revoked/expired key (raised by the global guard before the handler); `403` a key refused by its `allowedIps` (blocked or undeterminable client IP), or one restricted with `allowedChats`
 
 > Implemented by `AuthValidateController` (`@Controller('auth')`), sharing the same `/api/auth` base.
+
+#### GET /api/auth/agents
+
+The directory the inbox and pipeline use for an assignee picker: active API keys only, as
+`[{ "id": "…", "name": "Agen A" }]`. It returns no scope, usage or secret, and reads no session or
+chat data, so a session-restricted key may reach it; a chat-restricted key may not (the route is not
+`@ChatScoped`).
+
+**Auth:** API key (VIEWER+) · **Response** `200`
 
 ### 6.4.10 System (Health, Metrics, Stats, Settings, Audit)
 
@@ -6061,7 +6077,7 @@ Export every row of the 16 migration tables from the Data DB as JSON. Read-only,
 >
 > This bounds the media, not the export — a large enough text-only history still exceeds the import limit, because every row costs a few hundred bytes of scaffolding whatever was said. For a backup that keeps everything, use `scripts/backup.sh`: it snapshots the database file itself (and `pg_dump`s Postgres), so inline media rides along regardless of this budget.
 
-The migration set (`MigrationTables`) is, in payload-key order: `sessions`, `webhooks`, `messages`, `messageBatches`, `templates`, `baileysStoredMessages`, `lidMappings`, `chatStates`, `pluginInstances`, `conversationMappings`, `ingressEvents`, `webhookDeliveryFailures`, `webhookOutboxEvents`, `integrationDeliveryFailures`, `statusUpdates`, `automationRules`.
+The migration set (`MigrationTables`) is, in payload-key order: `sessions`, `webhooks`, `messages`, `messageBatches`, `templates`, `baileysStoredMessages`, `lidMappings`, `chatStates`, `pluginInstances`, `conversationMappings`, `ingressEvents`, `webhookDeliveryFailures`, `webhookOutboxEvents`, `integrationDeliveryFailures`, `statusUpdates`, `automationRules`, `inboxConversations`, `inboxNotes`, `crmDeals`, `crmDealActivities`, `campaigns`, `campaignRecipients`, `campaignSegments`.
 
 **Response** `200`
 
@@ -6100,7 +6116,14 @@ The migration set (`MigrationTables`) is, in payload-key order: `sessions`, `web
     "webhookOutboxEvents": [],
     "integrationDeliveryFailures": [],
     "statusUpdates": [],
-    "automationRules": []
+    "automationRules": [],
+    "inboxConversations": [],
+    "inboxNotes": [],
+    "crmDeals": [],
+    "crmDealActivities": [],
+    "campaigns": [],
+    "campaignRecipients": [],
+    "campaignSegments": []
   },
   "counts": {
     "sessions": 1,
@@ -6118,7 +6141,14 @@ The migration set (`MigrationTables`) is, in payload-key order: `sessions`, `web
     "webhookOutboxEvents": 0,
     "integrationDeliveryFailures": 0,
     "statusUpdates": 0,
-    "automationRules": 0
+    "automationRules": 0,
+    "inboxConversations": 0,
+    "inboxNotes": 0,
+    "crmDeals": 0,
+    "crmDealActivities": 0,
+    "campaigns": 0,
+    "campaignRecipients": 0,
+    "campaignSegments": 0
   },
   "skippedTables": [],
   "omittedInlineMedia": { "messages": 0, "messageBatches": 0 }
@@ -6188,7 +6218,14 @@ Replace all Data DB rows with the supplied export. **Destructive and transaction
     "webhookOutboxEvents": [],
     "integrationDeliveryFailures": [],
     "statusUpdates": [],
-    "automationRules": []
+    "automationRules": [],
+    "inboxConversations": [],
+    "inboxNotes": [],
+    "crmDeals": [],
+    "crmDealActivities": [],
+    "campaigns": [],
+    "campaignRecipients": [],
+    "campaignSegments": []
   },
   "stopOrphans": true
 }
@@ -6215,7 +6252,14 @@ Replace all Data DB rows with the supplied export. **Destructive and transaction
     "webhookOutboxEvents": 0,
     "integrationDeliveryFailures": 0,
     "statusUpdates": 0,
-    "automationRules": 0
+    "automationRules": 0,
+    "inboxConversations": 0,
+    "inboxNotes": 0,
+    "crmDeals": 0,
+    "crmDealActivities": 0,
+    "campaigns": 0,
+    "campaignRecipients": 0,
+    "campaignSegments": 0
   },
   "warnings": [],
   "notices": [],
@@ -7356,6 +7400,212 @@ dispatches the stored row).
 
 **Errors:** `400` an encoded NUL (`%00`) in the path or query, or a JSON body that does not parse · `401` signature verification failed (missing, stale, or wrong secret) · `403` `GET` verification challenge failed on a route that declares `challenge` (`verifyToken` mismatch) · `404` unknown pluginId/instanceId, or no such claimed route · `413` body over the route's `maxBodyBytes` · `415` a body in a content type no parser reads (only `application/json` and `application/x-www-form-urlencoded` are read) · `429` rate limit: the per-instance bucket (`INGRESS_INSTANCE_LIMIT`, counted only for deliveries that pass signature verification) or the per-client-IP bucket (`INGRESS_IP_LIMIT`), both per `INGRESS_INSTANCE_TTL`; the global per-IP tiers skip this route, so these two are its bounds, and `Retry-After-instance` / `Retry-After-ingress-ip` names the one that shed the request, alongside a plain `Retry-After` carrying the same delay · `503` a route that declares a response contract, while its plugin is still being restored after startup or when its `session-alive` preflight finds the bound session without a running engine or with a failed one (a session that is starting, reconnecting, waiting for a QR scan, or disconnected but still loaded is answered with the route's ack and queued): the delivery is not persisted, so the provider's retry is treated as a new delivery, and `Retry-After` carries the delay
 
+### 6.4.18 Sales pipeline (CRM)
+
+A single-company pipeline. It is **deployment-global**, so every route is fenced with
+`@RequireUnscopedKey()` and none is chat-scoped: a key restricted to selected sessions, and a key
+restricted to selected chats, are both refused (`403`). Reads require `VIEWER`; deal writes and
+notes require `OPERATOR`; deleting a deal and editing a stage require `ADMIN`.
+
+Stages are seeded by the migration (`New`, `Contacted`, `Qualified`, `Proposal`, `Won`, `Lost`) with
+fixed ids and are configuration, not backup payload. There is no stage-create or stage-delete route.
+A deal's `status` (`open`/`won`/`lost`) is **derived from its stage's `kind`** on every move and is
+never set independently, so the board column, the status filter and `closedAt` cannot disagree.
+
+A deal may carry `sessionId` and `chatId`, but they are provenance: neither is a foreign key, so
+deleting a WhatsApp session leaves the deal and its history intact.
+
+#### GET /api/crm/board
+
+The pipeline in stage order: `{ columns: [{ stage, deals }], open, won, lost, openValue }`.
+`openValue` sums open deal values across currencies and is an indicator, not an accounting total.
+**Auth:** API key (VIEWER) · **Response** `200`.
+
+#### GET /api/crm/stages
+
+The stages in display order. **Auth:** API key (VIEWER) · **Response** `200`.
+
+#### PATCH /api/crm/stages/:id
+
+Partial update of `name`, `position` and/or `color`. `kind` is deliberately not editable: changing it
+would rewrite the status of every deal already in that stage without a stage-change entry in their
+history. **Auth:** API key (ADMIN) · `200`, `400` for an empty update, or `404`.
+
+#### GET /api/crm/deals
+
+Deals, newest activity first. Optional `status` (`open`/`won`/`lost`), `stageId`, `assignee`
+(`me`, `unassigned`, or an API key id), `q` (case-insensitive on title and notes), `limit` (1-200,
+default 50) and `offset`. **Auth:** API key (VIEWER) · **Response** `200`, an array of deals.
+
+#### POST /api/crm/deals
+
+Creates a deal. `title` is required; `stageId` defaults to the first stage. `value` is a whole
+number in `currency` units (default `IDR`) and may be omitted. `assigneeKeyId` must name an active
+API key. `sessionId`/`chatId` are recorded as provenance. A `created` entry is appended to the deal's
+history. **Auth:** API key (OPERATOR) · **Response** `201` with the deal and its activities · `400`
+for an unknown stage or an inactive assignee.
+
+#### GET /api/crm/deals/:id
+
+One deal with its activity history, oldest first. **Auth:** API key (VIEWER) · `200` or `404`.
+
+#### PATCH /api/crm/deals/:id
+
+Partial update. Moving `stageId` rewrites `status` and `closedAt` and appends a `stage_change` entry;
+changing `assigneeKeyId` appends an `assignment` entry; other edited fields append one `update`
+entry naming the changed fields. **Auth:** API key (OPERATOR) · `200`, `400` for an empty update, an
+unknown stage or an inactive assignee, or `404`.
+
+#### DELETE /api/crm/deals/:id
+
+Deletes the deal and cascades its history. **Auth:** API key (ADMIN) · **Response** `204` or `404`.
+
+#### POST /api/crm/deals/:id/activities
+
+Appends an internal note (`{ "body": "..." }`) to the deal's history as a `note` entry.
+**Auth:** API key (OPERATOR) · **Response** `201` with the activity, or `404`.
+
+### 6.4.19 Team inbox
+
+The inbox overlays assignment, status and internal notes on the engine's chat list. There is no chat
+table: a chat is `(sessionId, chatId)` and its name, unread count and last message come from the
+engine, so a chat that was never touched is implicitly `open` and unassigned and needs no backfill.
+The routes are chat-scoped: a key restricted with `allowedChats` sees only its own chats (list and
+summary are filtered before pagination; detail and writes are fenced to the named chat). A chat that
+is not in the session answers `404`.
+
+`status` is `open`, `pending` or `resolved`. A resolved conversation whose chat receives newer
+activity is reopened (`open`, `resolvedAt` cleared) by the next read, and `inbox.updated` is emitted.
+
+#### GET /api/sessions/:sessionId/inbox/conversations
+
+The session's chats with their inbox state, newest activity first. Optional `status`, `assignee`
+(`me`, `unassigned`, or an API key id), `q` (name, chat id or last message), `limit` (1-200, default 50) and `offset`. **Auth:** API key (VIEWER+) · **Response** `200`, an array of conversations.
+
+#### GET /api/sessions/:sessionId/inbox/summary
+
+Counts for the inbox header: `{ total, open, pending, resolved, unassigned, mine }`, computed over
+the same chat-scope-filtered set. **Auth:** API key (VIEWER+) · **Response** `200`.
+
+#### GET /api/sessions/:sessionId/inbox/conversations/:chatId
+
+One conversation with its internal notes, oldest first. **Auth:** API key (VIEWER+) · `200` or `404`.
+
+#### PATCH /api/sessions/:sessionId/inbox/conversations/:chatId
+
+Assign (`assigneeKeyId`, or `null` to release) and/or change `status`. `assigneeKeyId` must name an
+active API key. An empty update answers `400`. **Auth:** API key (OPERATOR) · `200` with the
+conversation and its notes · `400` or `404`.
+
+#### POST /api/sessions/:sessionId/inbox/conversations/:chatId/notes
+
+Add an internal note (`{ "body": "..." }`). The conversation row is created on first write.
+**Auth:** API key (OPERATOR) · **Response** `201` with the note · `404`.
+
+#### DELETE /api/sessions/:sessionId/inbox/conversations/:chatId/notes/:noteId
+
+Delete an internal note. **Auth:** API key (ADMIN) · **Response** `204` or `404`.
+
+### 6.4.20 Broadcast campaigns
+
+A campaign sends one message to a resolved audience, in chunks of at most 100 recipients. Every route
+sits under `:sessionId`, so the guard's session fence applies. **None of these routes is chat-scoped**:
+a campaign reaches many chats at once and its audience is not one chat the guard could inspect, so a
+key restricted with `allowedChats` is refused (`403`) by default-deny. Reads require `VIEWER`;
+creating, editing, starting and cancelling require `OPERATOR`; deleting a campaign or a segment
+requires `ADMIN`.
+
+`status` is `draft`, `scheduled`, `running`, `completed`, `cancelled` or `failed`. A campaign is
+editable only while `draft` or `scheduled`, and deletable only while `draft` or `cancelled`. Its
+`progress` is `{ total, sent, failed, skipped }`; per-chat outcomes live on the recipients.
+
+The audience is one of `manual` (`chatIds`), `segment` (`segmentId`), `all` (every chat in the
+session) or `label` (`labelId`). It is resolved when the campaign starts, not when it is created, so a
+draft may be saved before the session is connected. A `label` audience asks the engine for the chats
+carrying a WhatsApp label: **whatsapp-web.js only** — Baileys exposes label writes but no label query
+and answers `501`.
+
+Starting a campaign is resumable: a process restart leaves it `running`, and the next process
+continues from the recipients still `pending`. `campaign.updated` is emitted per chunk and on every
+status change.
+
+#### GET /api/sessions/:sessionId/campaigns
+
+Campaigns for the session, newest first. Optional `status`, `limit` (1-200, default 50) and `offset`.
+**Auth:** API key (VIEWER) · **Response** `200`, an array of campaigns.
+
+#### POST /api/sessions/:sessionId/campaigns
+
+Creates a campaign. `name` and `content` are required; `content` is
+`{ "type": "text" | "image" | "video" | "audio" | "document", "content": { ... } }`, where the inner
+object has the same shape as a bulk message item's content (`text`, `caption`, `image`, `video`,
+`audio`, `document`). `audience` defaults to `manual` with no chats and `options` defaults to a 3 s
+delay with randomisation. Supplying `scheduledAt` creates it as `scheduled`; otherwise it is a
+`draft`. **Auth:** API key (OPERATOR) · **Response** `201` with the campaign · `400` when the content
+or audience is incomplete.
+
+#### GET /api/sessions/:sessionId/campaigns/segments
+
+Saved recipient lists for the session, newest first. **Auth:** API key (VIEWER) · **Response** `200`.
+
+#### POST /api/sessions/:sessionId/campaigns/segments
+
+Saves a reusable list (`name` and `chatIds`). Duplicate ids are collapsed.
+**Auth:** API key (OPERATOR) · **Response** `201` with the segment · `400` when it has no chats.
+
+#### PATCH /api/sessions/:sessionId/campaigns/segments/:id
+
+Renames a segment and/or replaces its chats. An empty update answers `400`.
+**Auth:** API key (OPERATOR) · **Response** `200` or `404`.
+
+#### DELETE /api/sessions/:sessionId/campaigns/segments/:id
+
+Deletes a saved segment. A campaign that already references it keeps its stored audience; a start
+afterwards answers `404` for the missing segment. **Auth:** API key (ADMIN) · **Response** `204` or `404`.
+
+#### POST /api/sessions/:sessionId/campaigns/preview
+
+Resolves an audience without saving anything and returns
+`{ count, sample: [{ chatId, chatName }], truncated }`; `sampleSize` (1-100, default 20) bounds the
+sample. A `manual` audience is checked against the session's live chat list when that list is
+non-empty, so a mistyped JID is refused rather than sent to a different number.
+**Auth:** API key (OPERATOR) · **Response** `200`.
+**Errors:** `501` when the engine cannot list chats by label (Baileys); `400` for an incomplete
+audience or chats outside the session.
+
+#### GET /api/sessions/:sessionId/campaigns/:id
+
+One campaign with the first 50 recipients. **Auth:** API key (VIEWER) · `200` or `404`.
+
+#### PATCH /api/sessions/:sessionId/campaigns/:id
+
+Partial update of `name`, `content`, `audience`, `options` and/or `scheduledAt` (null clears the
+schedule and returns the campaign to `draft`). Only `draft` and `scheduled` campaigns are editable.
+**Auth:** API key (OPERATOR) · `200`, `400` for an empty or disallowed edit, or `404`.
+
+#### DELETE /api/sessions/:sessionId/campaigns/:id
+
+Deletes a `draft` or `cancelled` campaign and cascades its recipients. A completed run is kept as a
+record and answers `400`. **Auth:** API key (ADMIN) · **Response** `204`, `400` or `404`.
+
+#### POST /api/sessions/:sessionId/campaigns/:id/start
+
+Resolves the audience, fills the recipient rows and starts sending. Starting an already-running
+campaign is a no-op that returns it. **Auth:** API key (OPERATOR) · **Response** `200` with the
+campaign in `running` · `400` when the campaign already ran, the session is not active, or the
+audience is empty.
+
+#### POST /api/sessions/:sessionId/campaigns/:id/cancel
+
+Stops a `draft`, `scheduled` or `running` campaign: its active batch is cancelled and every recipient
+not yet attempted becomes `skipped`. Recipients already `sent` or `failed` keep their outcome.
+**Auth:** API key (OPERATOR) · **Response** `200` · `400` for a `completed` or `failed` campaign.
+
+#### GET /api/sessions/:sessionId/campaigns/:id/recipients
+
+One page of recipients, oldest first. Optional `status` (`pending`, `sent`, `failed`, `skipped`),
+`limit` (1-200, default 50) and `offset`. **Auth:** API key (VIEWER) · **Response** `200`.
+
 ## 6.5 Real-time API (WebSocket)
 
 Live events are delivered over a **Socket.IO** connection (not a raw WebSocket). The server mounts a single Socket.IO namespace, **`/events`**, on the same port as the REST API. There are no REST routes in this module.
@@ -7471,6 +7721,7 @@ session.restriction
 presence.update
 event.response
 poll.vote
+inbox.updated
 group.join
 group.leave
 group.update
@@ -7488,7 +7739,7 @@ A subscribe request whose `events` array contains no recognized name (after filt
 
 ### Wildcards and scoping
 
-- **Chat-restricted keys receive only events for `allowedChats`.** Message, presence, `event.response` and `poll.vote` events require `data.chatId`; group events require `data.groupId`. Persisted phone/LID aliases are matched at delivery time, including mappings learned after subscribing. An event without a resolvable chat is omitted. Account events, calls, statuses, QR codes, and `group.join_request` (it names people outside the allowed chats, as the membership-request routes do) are omitted even with `events: ["*"]`; a request containing only account events answers `FORBIDDEN_EVENTS`. These filters apply across Redis replicas. A changed chat authorization disconnects the socket on its next subscribe.
+- **Chat-restricted keys receive only events for `allowedChats`.** Message, presence, `event.response`, `poll.vote` and `inbox.updated` events require `data.chatId`; group events require `data.groupId`. Persisted phone/LID aliases are matched at delivery time, including mappings learned after subscribing. An event without a resolvable chat is omitted. Account events, calls, statuses, QR codes, and `group.join_request` (it names people outside the allowed chats, as the membership-request routes do) are omitted even with `events: ["*"]`; a request containing only account events answers `FORBIDDEN_EVENTS`. These filters apply across Redis replicas. A changed chat authorization disconnects the socket on its next subscribe.
 - **`sessionId: "*"`** subscribes to every session; **`events: ["*"]`** subscribes to every subscribable event except `message.receipt`, whose per-recipient volume makes it opt-in by name. They combine (e.g. `"*"` + `["*"]` = every wildcard-covered event of every session).
 - The API key is **re-validated on every `subscribe`** (not just at connect), so a key revoked or expired mid-connection is caught — the server replies `UNAUTHORIZED` and disconnects.
 - **Per-key session scope is enforced** against the fresh key: a key restricted via `allowedSessions` may NOT subscribe to `"*"` and may NOT subscribe to a session outside its allowlist — either is rejected with `FORBIDDEN_SESSION`. An unrestricted key (no `allowedSessions`) may subscribe to anything, including `"*"`.
@@ -7560,6 +7811,7 @@ These are the events OpenWA actually emits. A webhook is registered with an `eve
 | `presence.update`                                 | A subscribed chat's presence changed — someone came online, started typing, or stopped. Only actual CHANGES are dispatched: WhatsApp repeats itself freely, and every repeat would otherwise be a delivery                            | `{ sessionId, chatId, participants: [{ id, state, lastSeen? }], groupOnlineCount? }` — `state` is `available`/`unavailable`/`composing`/`recording`/`paused`; `lastSeen` is epoch **seconds** and absent when the contact hides it. Requires `POST .../presence/subscribe` first, and Baileys — whatsapp-web.js cannot observe presence                                                                                                                                                                                                                                                                                                                                                         |
 | `event.response`                                  | A guest answered a WhatsApp event invitation (going, not going, maybe). **Baileys only**; see the payload note below                                                                                                                  | `{ sessionId, eventMessageId, chatId, responderId, contact?, fromMe, response, extraGuestCount?, eventName?, responseMessageId, timestamp }`. `response` is `going`/`not_going`/`maybe`/`unknown`; `timestamp` is epoch **seconds** on the guest's clock. Order a guest's answers by `timestamp`, not by delivery                                                                                                                                                                                                                                                                                                                                                                               |
 | `poll.vote`                                       | A voter selected or cleared options on a poll; see the payload note below                                                                                                                                                             | `{ sessionId, pollMessageId, chatId, voterId, selectedOptions, pollName?, timestamp, timestampMs }`. `selectedOptions` holds the option texts now selected, `[]` when the vote was cleared; `timestamp` is epoch **seconds** and `timestampMs` the same instant in milliseconds, both on the voter's clock. Order a voter's changes by `timestampMs`, not by delivery                                                                                                                                                                                                                                                                                                                           |
+| `inbox.updated`                                   | A conversation's inbox state changed: an agent assigned or unassigned it, or its status moved between open, pending and resolved. Emitted by the team-inbox routes and by the reopen reconciliation on a read                         | `{ sessionId, chatId, status, assigneeKeyId, assigneeName }` — `status` is `open`/`pending`/`resolved`, and the assignee fields are `null` when unassigned. Chat-restricted keys receive it only for an allowed chat                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | `session.restriction`                             | WhatsApp places a restriction on the account, or lifts one. Deduped: an unchanged restriction is not re-announced, and a lift is only sent when one was in force                                                                      | `{ sessionId, active, kind, code, expiresAt }` — `active` is `false` for a lift and `kind`/`code` then describe the restriction that ended; `expiresAt` is an ISO timestamp or `null`. See `restriction` on the session response for the `kind` values                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | `session.status`                                  | The session status transitions                                                                                                                                                                                                        | `{ sessionId, status }` where `status` is one of `created` / `initializing` / `qr_ready` / `authenticating` / `ready` / `disconnected` / `action_required` / `failed`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | `group.join`                                      | Participant(s) are added to or join a group this session is in                                                                                                                                                                        | `{ groupId, actorId?, participantIds, timestamp }`. `actorId` is the admin/inviter when known. **Baileys**: a session added to or joining a group reports only its own id in `participantIds` (members added with it are not listed)                                                                                                                                                                                                                                                                                                                                                                                                                                                            |

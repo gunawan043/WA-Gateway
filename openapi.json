@@ -101,6 +101,17 @@
                 "plugin_disabled",
                 "plugin_config_updated",
                 "plugin_sessions_updated",
+                "inbox_conversation_assigned",
+                "inbox_conversation_status_changed",
+                "inbox_note_added",
+                "inbox_note_deleted",
+                "crm_deal_created",
+                "crm_deal_stage_changed",
+                "crm_deal_deleted",
+                "campaign_started",
+                "campaign_cancelled",
+                "campaign_completed",
+                "campaign_deleted",
                 "infra_config_saved",
                 "infra_restart_requested",
                 "infra_data_exported",
@@ -594,6 +605,51 @@
           }
         },
         "summary": "Validate an API key",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/agents": {
+      "get": {
+        "operationId": "AuthAgentsController_findAll",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Active keys, id and name only.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AgentDirectoryEntryDto"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API key is missing, unknown, revoked, or expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key's role, session or chat scope, or IP allow-list does not allow this operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List active agents (API key id and display name) for assignment pickers",
         "tags": [
           "auth"
         ]
@@ -15958,6 +16014,2134 @@
         ]
       }
     },
+    "/api/sessions/{sessionId}/inbox/conversations": {
+      "get": {
+        "operationId": "InboxController_list",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "required": true,
+            "in": "path",
+            "description": "Session ID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "open",
+                "pending",
+                "resolved"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "assignee",
+            "required": false,
+            "in": "query",
+            "description": "`me`, `unassigned`, or an API key id. Omit for every conversation.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Case-insensitive search on name, chat id or last message.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "1-200, default 50",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/InboxConversationDto"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API key is missing, unknown, revoked, or expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key's role, session or chat scope, or IP allow-list does not allow this operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List the session’s conversations with inbox state",
+        "tags": [
+          "inbox"
+        ]
+      }
+    },
+    "/api/sessions/{sessionId}/inbox/summary": {
+      "get": {
+        "operationId": "InboxController_summary",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "required": true,
+            "in": "path",
+            "description": "Session ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InboxSummaryDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API key is missing, unknown, revoked, or expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key's role, session or chat scope, or IP allow-list does not allow this operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Conversation counts for the inbox header",
+        "tags": [
+          "inbox"
+        ]
+      }
+    },
+    "/api/sessions/{sessionId}/inbox/conversations/{chatId}": {
+      "get": {
+        "operationId": "InboxController_get",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "required": true,
+            "in": "path",
+            "description": "Session ID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "chatId",
+            "required": true,
+            "in": "path",
+            "description": "Chat id (JID or bare phone)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InboxConversationDetailDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API key is missing, unknown, revoked, or expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key's role, session or chat scope, or IP allow-list does not allow this operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such chat in this session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "One conversation with its internal notes",
+        "tags": [
+          "inbox"
+        ]
+      },
+      "patch": {
+        "operationId": "InboxController_update",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "required": true,
+            "in": "path",
+            "description": "Session ID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "chatId",
+            "required": true,
+            "in": "path",
+            "description": "Chat id (JID or bare phone)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateInboxConversationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InboxConversationDetailDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Empty update, or assigneeKeyId is not an active API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API key is missing, unknown, revoked, or expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key's role, session or chat scope, or IP allow-list does not allow this operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such chat in this session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Assign a conversation or change its status",
+        "tags": [
+          "inbox"
+        ]
+      }
+    },
+    "/api/sessions/{sessionId}/inbox/conversations/{chatId}/notes": {
+      "post": {
+        "operationId": "InboxController_addNote",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "required": true,
+            "in": "path",
+            "description": "Session ID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "chatId",
+            "required": true,
+            "in": "path",
+            "description": "Chat id (JID or bare phone)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddInboxNoteDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InboxNoteDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The body is malformed, fails validation, or carries a field the DTO does not declare",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API key is missing, unknown, revoked, or expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key's role, session or chat scope, or IP allow-list does not allow this operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such chat in this session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Add an internal note",
+        "tags": [
+          "inbox"
+        ]
+      }
+    },
+    "/api/sessions/{sessionId}/inbox/conversations/{chatId}/notes/{noteId}": {
+      "delete": {
+        "operationId": "InboxController_deleteNote",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "required": true,
+            "in": "path",
+            "description": "Session ID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "chatId",
+            "required": true,
+            "in": "path",
+            "description": "Chat id (JID or bare phone)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "noteId",
+            "required": true,
+            "in": "path",
+            "description": "Note ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Note deleted."
+          },
+          "401": {
+            "description": "The API key is missing, unknown, revoked, or expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key's role, session or chat scope, or IP allow-list does not allow this operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such note on this conversation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Delete an internal note",
+        "tags": [
+          "inbox"
+        ]
+      }
+    },
+    "/api/crm/board": {
+      "get": {
+        "operationId": "CrmController_board",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CrmBoardDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API key is missing, unknown, revoked, or expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key's role, session or chat scope, or IP allow-list does not allow this operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "The pipeline as stage columns, with open/won/lost counts",
+        "tags": [
+          "crm"
+        ]
+      }
+    },
+    "/api/crm/stages": {
+      "get": {
+        "operationId": "CrmController_listStages",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CrmStageDto"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API key is missing, unknown, revoked, or expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key's role, session or chat scope, or IP allow-list does not allow this operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Pipeline stages in display order",
+        "tags": [
+          "crm"
+        ]
+      }
+    },
+    "/api/crm/stages/{id}": {
+      "patch": {
+        "operationId": "CrmController_updateStage",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Stage ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCrmStageDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CrmStageDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The body is malformed, fails validation, or carries a field the DTO does not declare",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API key is missing, unknown, revoked, or expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key's role, session or chat scope, or IP allow-list does not allow this operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such stage.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Rename, reorder or recolour a stage",
+        "tags": [
+          "crm"
+        ]
+      }
+    },
+    "/api/crm/deals": {
+      "get": {
+        "operationId": "CrmController_list",
+        "parameters": [
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "open",
+                "won",
+                "lost"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "stageId",
+            "required": false,
+            "in": "query",
+            "description": "Only deals in this stage.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "assignee",
+            "required": false,
+            "in": "query",
+            "description": "`me`, `unassigned`, or an API key id. Omit for every deal.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Case-insensitive search on title and notes.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "1-200, default 50",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CrmDealDto"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API key is missing, unknown, revoked, or expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key's role, session or chat scope, or IP allow-list does not allow this operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List deals, newest activity first",
+        "tags": [
+          "crm"
+        ]
+      },
+      "post": {
+        "operationId": "CrmController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCrmDealDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CrmDealDetailDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Unknown stage, or assigneeKeyId is not an active API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API key is missing, unknown, revoked, or expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key's role, session or chat scope, or IP allow-list does not allow this operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Create a deal",
+        "tags": [
+          "crm"
+        ]
+      }
+    },
+    "/api/crm/deals/{id}": {
+      "get": {
+        "operationId": "CrmController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Deal ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CrmDealDetailDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API key is missing, unknown, revoked, or expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key's role, session or chat scope, or IP allow-list does not allow this operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such deal.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "One deal with its activity history",
+        "tags": [
+          "crm"
+        ]
+      },
+      "patch": {
+        "operationId": "CrmController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Deal ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCrmDealDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CrmDealDetailDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Unknown stage, or assigneeKeyId is not an active API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API key is missing, unknown, revoked, or expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key's role, session or chat scope, or IP allow-list does not allow this operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such deal.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Update a deal, including moving it to another stage",
+        "tags": [
+          "crm"
+        ]
+      },
+      "delete": {
+        "operationId": "CrmController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Deal ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deal deleted."
+          },
+          "401": {
+            "description": "The API key is missing, unknown, revoked, or expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key's role, session or chat scope, or IP allow-list does not allow this operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such deal.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Delete a deal and its history",
+        "tags": [
+          "crm"
+        ]
+      }
+    },
+    "/api/crm/deals/{id}/activities": {
+      "post": {
+        "operationId": "CrmController_addActivity",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Deal ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddCrmActivityDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CrmActivityDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The body is malformed, fails validation, or carries a field the DTO does not declare",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API key is missing, unknown, revoked, or expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key's role, session or chat scope, or IP allow-list does not allow this operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such deal.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Append a note to a deal’s history",
+        "tags": [
+          "crm"
+        ]
+      }
+    },
+    "/api/sessions/{sessionId}/campaigns": {
+      "get": {
+        "operationId": "CampaignController_list",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "required": true,
+            "in": "path",
+            "description": "Session ID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "description": "Default 0",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "1-200, default 50",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "draft",
+                "scheduled",
+                "running",
+                "completed",
+                "cancelled",
+                "failed"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CampaignDto"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API key is missing, unknown, revoked, or expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key's role, session or chat scope, or IP allow-list does not allow this operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List campaigns for a session, newest first",
+        "tags": [
+          "campaigns"
+        ]
+      },
+      "post": {
+        "operationId": "CampaignController_create",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "required": true,
+            "in": "path",
+            "description": "Session ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCampaignDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CampaignDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The content or audience is incomplete.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API key is missing, unknown, revoked, or expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key's role, session or chat scope, or IP allow-list does not allow this operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Create a campaign as a draft (or scheduled, with scheduledAt)",
+        "tags": [
+          "campaigns"
+        ]
+      }
+    },
+    "/api/sessions/{sessionId}/campaigns/segments": {
+      "get": {
+        "operationId": "CampaignController_listSegments",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "required": true,
+            "in": "path",
+            "description": "Session ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CampaignSegmentDto"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API key is missing, unknown, revoked, or expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key's role, session or chat scope, or IP allow-list does not allow this operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Saved recipient lists for a session",
+        "tags": [
+          "campaigns"
+        ]
+      },
+      "post": {
+        "operationId": "CampaignController_createSegment",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "required": true,
+            "in": "path",
+            "description": "Session ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCampaignSegmentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CampaignSegmentDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The segment has no chats.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API key is missing, unknown, revoked, or expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key's role, session or chat scope, or IP allow-list does not allow this operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Save a reusable recipient list",
+        "tags": [
+          "campaigns"
+        ]
+      }
+    },
+    "/api/sessions/{sessionId}/campaigns/segments/{id}": {
+      "patch": {
+        "operationId": "CampaignController_updateSegment",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "required": true,
+            "in": "path",
+            "description": "Session ID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Segment ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCampaignSegmentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CampaignSegmentDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The body is malformed, fails validation, or carries a field the DTO does not declare",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API key is missing, unknown, revoked, or expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key's role, session or chat scope, or IP allow-list does not allow this operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such segment.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Rename a segment or replace its chats",
+        "tags": [
+          "campaigns"
+        ]
+      },
+      "delete": {
+        "operationId": "CampaignController_removeSegment",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "required": true,
+            "in": "path",
+            "description": "Session ID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Segment ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Segment deleted."
+          },
+          "401": {
+            "description": "The API key is missing, unknown, revoked, or expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key's role, session or chat scope, or IP allow-list does not allow this operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such segment.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Delete a saved segment",
+        "tags": [
+          "campaigns"
+        ]
+      }
+    },
+    "/api/sessions/{sessionId}/campaigns/preview": {
+      "post": {
+        "description": "Returns the number of distinct chats the audience resolves to and a sample. A `label` audience answers `501` on Baileys, which exposes label writes but no label query.",
+        "operationId": "CampaignController_preview",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "required": true,
+            "in": "path",
+            "description": "Session ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CampaignPreviewDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CampaignPreviewResultDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The audience is incomplete or names chats outside the session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API key is missing, unknown, revoked, or expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key's role, session or chat scope, or IP allow-list does not allow this operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "The engine cannot list chats by label.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Resolve an audience without saving anything",
+        "tags": [
+          "campaigns"
+        ]
+      }
+    },
+    "/api/sessions/{sessionId}/campaigns/{id}": {
+      "get": {
+        "operationId": "CampaignController_get",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "required": true,
+            "in": "path",
+            "description": "Session ID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Campaign ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CampaignDetailDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API key is missing, unknown, revoked, or expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key's role, session or chat scope, or IP allow-list does not allow this operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such campaign.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Campaign detail with the first page of recipients",
+        "tags": [
+          "campaigns"
+        ]
+      },
+      "patch": {
+        "operationId": "CampaignController_update",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "required": true,
+            "in": "path",
+            "description": "Session ID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Campaign ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCampaignDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CampaignDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The campaign already ran, or the edit is incomplete.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API key is missing, unknown, revoked, or expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key's role, session or chat scope, or IP allow-list does not allow this operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such campaign.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Edit a draft or scheduled campaign",
+        "tags": [
+          "campaigns"
+        ]
+      },
+      "delete": {
+        "operationId": "CampaignController_remove",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "required": true,
+            "in": "path",
+            "description": "Session ID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Campaign ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Campaign deleted."
+          },
+          "400": {
+            "description": "A running, scheduled or completed campaign cannot be deleted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API key is missing, unknown, revoked, or expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key's role, session or chat scope, or IP allow-list does not allow this operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such campaign.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Delete a draft or cancelled campaign",
+        "tags": [
+          "campaigns"
+        ]
+      }
+    },
+    "/api/sessions/{sessionId}/campaigns/{id}/start": {
+      "post": {
+        "operationId": "CampaignController_start",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "required": true,
+            "in": "path",
+            "description": "Session ID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Campaign ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The campaign is running.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CampaignDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The campaign already ran, the session is not active, or the audience is empty.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API key is missing, unknown, revoked, or expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key's role, session or chat scope, or IP allow-list does not allow this operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such campaign.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Start a draft or scheduled campaign now",
+        "tags": [
+          "campaigns"
+        ]
+      }
+    },
+    "/api/sessions/{sessionId}/campaigns/{id}/cancel": {
+      "post": {
+        "operationId": "CampaignController_cancel",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "required": true,
+            "in": "path",
+            "description": "Session ID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Campaign ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CampaignDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A completed or failed campaign cannot be cancelled.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API key is missing, unknown, revoked, or expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key's role, session or chat scope, or IP allow-list does not allow this operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such campaign.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Cancel a draft, scheduled or running campaign",
+        "tags": [
+          "campaigns"
+        ]
+      }
+    },
+    "/api/sessions/{sessionId}/campaigns/{id}/recipients": {
+      "get": {
+        "operationId": "CampaignController_listRecipients",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "required": true,
+            "in": "path",
+            "description": "Session ID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Campaign ID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "description": "Default 0",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "1-200, default 50",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "pending",
+                "sent",
+                "failed",
+                "skipped"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CampaignRecipientDto"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API key is missing, unknown, revoked, or expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key's role, session or chat scope, or IP allow-list does not allow this operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such campaign.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "One page of a campaign’s recipients",
+        "tags": [
+          "campaigns"
+        ]
+      }
+    },
     "/api/sessions/{sessionId}/catalog": {
       "get": {
         "operationId": "CatalogController_getCatalog",
@@ -18746,6 +20930,18 @@
       "description": "Automation rules (auto-reply)"
     },
     {
+      "name": "inbox",
+      "description": "Team inbox (per-chat assignment, status and notes)"
+    },
+    {
+      "name": "crm",
+      "description": "Sales pipeline (stages, deals and activity history)"
+    },
+    {
+      "name": "campaigns",
+      "description": "Broadcast campaigns (audience, chunks and per-recipient results)"
+    },
+    {
       "name": "media",
       "description": "Media conversion"
     }
@@ -19175,10 +21371,35 @@
             "type": "boolean",
             "description": "Whether the key is restricted to selected sessions; present only when valid.",
             "example": false
+          },
+          "keyId": {
+            "type": "string",
+            "description": "The calling key's own id; present only when valid. Used by the inbox for self-assignment."
+          },
+          "keyName": {
+            "type": "string",
+            "description": "The calling key's own name (the agent display name); present only when valid.",
+            "example": "Agen A"
           }
         },
         "required": [
           "valid"
+        ]
+      },
+      "AgentDirectoryEntryDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "example": "Agen A"
+          }
+        },
+        "required": [
+          "id",
+          "name"
         ]
       },
       "CreateSessionDto": {
@@ -23508,6 +25729,48 @@
             "items": {
               "type": "object"
             }
+          },
+          "inboxConversations": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "inboxNotes": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "crmDeals": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "crmDealActivities": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "campaigns": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "campaignRecipients": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "campaignSegments": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
           }
         },
         "required": [
@@ -23526,7 +25789,14 @@
           "webhookOutboxEvents",
           "integrationDeliveryFailures",
           "statusUpdates",
-          "automationRules"
+          "automationRules",
+          "inboxConversations",
+          "inboxNotes",
+          "crmDeals",
+          "crmDealActivities",
+          "campaigns",
+          "campaignRecipients",
+          "campaignSegments"
         ]
       },
       "TableCountsDto": {
@@ -23595,6 +25865,34 @@
           "automationRules": {
             "type": "number",
             "example": 2
+          },
+          "inboxConversations": {
+            "type": "number",
+            "example": 0
+          },
+          "inboxNotes": {
+            "type": "number",
+            "example": 0
+          },
+          "crmDeals": {
+            "type": "number",
+            "example": 0
+          },
+          "crmDealActivities": {
+            "type": "number",
+            "example": 0
+          },
+          "campaigns": {
+            "type": "number",
+            "example": 0
+          },
+          "campaignRecipients": {
+            "type": "number",
+            "example": 0
+          },
+          "campaignSegments": {
+            "type": "number",
+            "example": 0
           }
         },
         "required": [
@@ -23613,7 +25911,14 @@
           "webhookOutboxEvents",
           "integrationDeliveryFailures",
           "statusUpdates",
-          "automationRules"
+          "automationRules",
+          "inboxConversations",
+          "inboxNotes",
+          "crmDeals",
+          "crmDealActivities",
+          "campaigns",
+          "campaignRecipients",
+          "campaignSegments"
         ]
       },
       "OmittedInlineMediaDto": {
@@ -23690,7 +25995,7 @@
         "properties": {
           "tables": {
             "type": "object",
-            "description": "Every one of the 16 migration tables is emptied before the restore runs, so a key omitted here is restored EMPTY rather than left untouched. Post the whole GET /api/infra/export-data payload, not a hand-built subset.",
+            "description": "Every one of the 23 migration tables is emptied before the restore runs, so a key omitted here is restored EMPTY rather than left untouched. Post the whole GET /api/infra/export-data payload, not a hand-built subset.",
             "properties": {
               "sessions": {
                 "type": "array"
@@ -23738,6 +26043,27 @@
                 "type": "array"
               },
               "automationRules": {
+                "type": "array"
+              },
+              "inboxConversations": {
+                "type": "array"
+              },
+              "inboxNotes": {
+                "type": "array"
+              },
+              "crmDeals": {
+                "type": "array"
+              },
+              "crmDealActivities": {
+                "type": "array"
+              },
+              "campaigns": {
+                "type": "array"
+              },
+              "campaignRecipients": {
+                "type": "array"
+              },
+              "campaignSegments": {
                 "type": "array"
               }
             }
@@ -25713,6 +28039,1139 @@
           "mimetype",
           "bytes"
         ]
+      },
+      "InboxConversationDto": {
+        "type": "object",
+        "properties": {
+          "chatId": {
+            "type": "string",
+            "example": "628111@c.us"
+          },
+          "name": {
+            "type": "string",
+            "example": "Alice"
+          },
+          "isGroup": {
+            "type": "boolean",
+            "description": "Retained for back-compat; true for @g.us chats."
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "individual",
+              "group",
+              "channel",
+              "status",
+              "broadcast",
+              "unknown"
+            ]
+          },
+          "unreadCount": {
+            "type": "number"
+          },
+          "timestamp": {
+            "type": "number",
+            "description": "Unix seconds of the last activity."
+          },
+          "lastMessage": {
+            "type": "string"
+          },
+          "lastMessageType": {
+            "type": "string"
+          },
+          "archived": {
+            "type": "boolean"
+          },
+          "pinned": {
+            "type": "boolean"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "pending",
+              "resolved"
+            ]
+          },
+          "assigneeKeyId": {
+            "type": "string",
+            "nullable": true
+          },
+          "assigneeName": {
+            "type": "string",
+            "nullable": true
+          },
+          "resolvedAt": {
+            "type": "string",
+            "nullable": true,
+            "description": "ISO instant the conversation was resolved."
+          }
+        },
+        "required": [
+          "chatId",
+          "name",
+          "isGroup",
+          "kind",
+          "unreadCount",
+          "timestamp",
+          "archived",
+          "pinned",
+          "status"
+        ]
+      },
+      "InboxSummaryDto": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "number"
+          },
+          "open": {
+            "type": "number"
+          },
+          "pending": {
+            "type": "number"
+          },
+          "resolved": {
+            "type": "number"
+          },
+          "unassigned": {
+            "type": "number",
+            "description": "Conversations with no assignee."
+          },
+          "mine": {
+            "type": "number",
+            "description": "Conversations assigned to the calling key."
+          }
+        },
+        "required": [
+          "total",
+          "open",
+          "pending",
+          "resolved",
+          "unassigned",
+          "mine"
+        ]
+      },
+      "InboxNoteDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "authorKeyId": {
+            "type": "string"
+          },
+          "authorName": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "authorKeyId",
+          "authorName",
+          "body",
+          "createdAt"
+        ]
+      },
+      "InboxConversationDetailDto": {
+        "type": "object",
+        "properties": {
+          "chatId": {
+            "type": "string",
+            "example": "628111@c.us"
+          },
+          "name": {
+            "type": "string",
+            "example": "Alice"
+          },
+          "isGroup": {
+            "type": "boolean",
+            "description": "Retained for back-compat; true for @g.us chats."
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "individual",
+              "group",
+              "channel",
+              "status",
+              "broadcast",
+              "unknown"
+            ]
+          },
+          "unreadCount": {
+            "type": "number"
+          },
+          "timestamp": {
+            "type": "number",
+            "description": "Unix seconds of the last activity."
+          },
+          "lastMessage": {
+            "type": "string"
+          },
+          "lastMessageType": {
+            "type": "string"
+          },
+          "archived": {
+            "type": "boolean"
+          },
+          "pinned": {
+            "type": "boolean"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "pending",
+              "resolved"
+            ]
+          },
+          "assigneeKeyId": {
+            "type": "string",
+            "nullable": true
+          },
+          "assigneeName": {
+            "type": "string",
+            "nullable": true
+          },
+          "resolvedAt": {
+            "type": "string",
+            "nullable": true,
+            "description": "ISO instant the conversation was resolved."
+          },
+          "notes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InboxNoteDto"
+            }
+          }
+        },
+        "required": [
+          "chatId",
+          "name",
+          "isGroup",
+          "kind",
+          "unreadCount",
+          "timestamp",
+          "archived",
+          "pinned",
+          "status",
+          "notes"
+        ]
+      },
+      "UpdateInboxConversationDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "pending",
+              "resolved"
+            ],
+            "description": "New conversation status."
+          },
+          "assigneeKeyId": {
+            "type": "string",
+            "nullable": true,
+            "description": "API key id of the agent to assign. `null` releases the conversation."
+          }
+        }
+      },
+      "AddInboxNoteDto": {
+        "type": "object",
+        "properties": {
+          "body": {
+            "type": "string",
+            "description": "Note body (plain text, internal only).",
+            "maxLength": 5000
+          }
+        },
+        "required": [
+          "body"
+        ]
+      },
+      "CrmStageDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "open",
+              "won",
+              "lost"
+            ],
+            "description": "Whether deals here are open, won or lost."
+          },
+          "position": {
+            "type": "number"
+          },
+          "color": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "kind",
+          "position"
+        ]
+      },
+      "CrmDealDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "stageId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "sessionId": {
+            "type": "string",
+            "nullable": true
+          },
+          "chatId": {
+            "type": "string",
+            "nullable": true
+          },
+          "value": {
+            "type": "number",
+            "nullable": true
+          },
+          "currency": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "won",
+              "lost"
+            ]
+          },
+          "assigneeKeyId": {
+            "type": "string",
+            "nullable": true
+          },
+          "assigneeName": {
+            "type": "string",
+            "nullable": true
+          },
+          "expectedCloseAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "closedAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "stageId",
+          "title",
+          "currency",
+          "status",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "CrmBoardColumnDto": {
+        "type": "object",
+        "properties": {
+          "stage": {
+            "$ref": "#/components/schemas/CrmStageDto"
+          },
+          "deals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CrmDealDto"
+            }
+          }
+        },
+        "required": [
+          "stage",
+          "deals"
+        ]
+      },
+      "CrmBoardDto": {
+        "type": "object",
+        "properties": {
+          "columns": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CrmBoardColumnDto"
+            }
+          },
+          "open": {
+            "type": "number"
+          },
+          "won": {
+            "type": "number"
+          },
+          "lost": {
+            "type": "number"
+          },
+          "openValue": {
+            "type": "number",
+            "description": "Sum of open deal values, in mixed currencies (informational only)."
+          }
+        },
+        "required": [
+          "columns",
+          "open",
+          "won",
+          "lost",
+          "openValue"
+        ]
+      },
+      "UpdateCrmStageDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 60
+          },
+          "position": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "color": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 20
+          }
+        }
+      },
+      "CreateCrmDealDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "stageId": {
+            "type": "string",
+            "description": "Stage to place the deal in. Defaults to the first stage."
+          },
+          "sessionId": {
+            "type": "string",
+            "description": "Session the deal came from (provenance only)."
+          },
+          "chatId": {
+            "type": "string",
+            "description": "Chat the deal came from (provenance only)."
+          },
+          "value": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Whole units of `currency`; omit when unknown.",
+            "minimum": 0
+          },
+          "currency": {
+            "type": "string",
+            "description": "ISO 4217 code.",
+            "maxLength": 3,
+            "default": "IDR"
+          },
+          "assigneeKeyId": {
+            "type": "string",
+            "nullable": true,
+            "description": "API key id of the responsible agent."
+          },
+          "expectedCloseAt": {
+            "type": "string",
+            "nullable": true,
+            "description": "ISO date the deal is expected to close."
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 5000
+          }
+        },
+        "required": [
+          "title"
+        ]
+      },
+      "CrmActivityDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "created",
+              "stage_change",
+              "assignment",
+              "note",
+              "update"
+            ]
+          },
+          "body": {
+            "type": "string",
+            "nullable": true
+          },
+          "fromStageId": {
+            "type": "string",
+            "nullable": true
+          },
+          "toStageId": {
+            "type": "string",
+            "nullable": true
+          },
+          "authorKeyId": {
+            "type": "string"
+          },
+          "authorName": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "authorKeyId",
+          "authorName",
+          "createdAt"
+        ]
+      },
+      "CrmDealDetailDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "stageId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "sessionId": {
+            "type": "string",
+            "nullable": true
+          },
+          "chatId": {
+            "type": "string",
+            "nullable": true
+          },
+          "value": {
+            "type": "number",
+            "nullable": true
+          },
+          "currency": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "won",
+              "lost"
+            ]
+          },
+          "assigneeKeyId": {
+            "type": "string",
+            "nullable": true
+          },
+          "assigneeName": {
+            "type": "string",
+            "nullable": true
+          },
+          "expectedCloseAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "closedAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "activities": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CrmActivityDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "stageId",
+          "title",
+          "currency",
+          "status",
+          "createdAt",
+          "updatedAt",
+          "activities"
+        ]
+      },
+      "UpdateCrmDealDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "stageId": {
+            "type": "string",
+            "description": "Move the deal to another stage."
+          },
+          "value": {
+            "type": "integer",
+            "nullable": true,
+            "minimum": 0
+          },
+          "currency": {
+            "type": "string",
+            "maxLength": 3
+          },
+          "assigneeKeyId": {
+            "type": "string",
+            "nullable": true
+          },
+          "expectedCloseAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 5000
+          }
+        }
+      },
+      "AddCrmActivityDto": {
+        "type": "object",
+        "properties": {
+          "body": {
+            "type": "string",
+            "description": "Note to append to the deal history.",
+            "maxLength": 5000
+          }
+        },
+        "required": [
+          "body"
+        ]
+      },
+      "CampaignContentDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "text",
+              "image",
+              "video",
+              "audio",
+              "document"
+            ]
+          },
+          "content": {
+            "description": "Same shape as one bulk message item’s content.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/BulkMessageContentDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "type",
+          "content"
+        ]
+      },
+      "CampaignOptionsDto": {
+        "type": "object",
+        "properties": {
+          "delayBetweenMessages": {
+            "type": "number",
+            "default": 3000,
+            "minimum": 1000,
+            "maximum": 60000
+          },
+          "randomizeDelay": {
+            "type": "boolean",
+            "default": true
+          },
+          "stopOnError": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
+      "CampaignAudienceDto": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "manual",
+              "segment",
+              "all",
+              "label"
+            ]
+          },
+          "chatIds": {
+            "description": "Required for `manual`; ignored otherwise.",
+            "maxItems": 5000,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "segmentId": {
+            "type": "string",
+            "description": "Required for `segment`; ignored otherwise."
+          },
+          "labelId": {
+            "type": "string",
+            "description": "Required for `label`; ignored otherwise."
+          }
+        },
+        "required": [
+          "kind"
+        ]
+      },
+      "CampaignProgressDto": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "number"
+          },
+          "sent": {
+            "type": "number"
+          },
+          "failed": {
+            "type": "number"
+          },
+          "skipped": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "total",
+          "sent",
+          "failed",
+          "skipped"
+        ]
+      },
+      "CampaignDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "sessionId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "scheduled",
+              "running",
+              "completed",
+              "cancelled",
+              "failed"
+            ]
+          },
+          "content": {
+            "$ref": "#/components/schemas/CampaignContentDto"
+          },
+          "options": {
+            "$ref": "#/components/schemas/CampaignOptionsDto"
+          },
+          "audience": {
+            "$ref": "#/components/schemas/CampaignAudienceDto"
+          },
+          "progress": {
+            "$ref": "#/components/schemas/CampaignProgressDto"
+          },
+          "scheduledAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "startedAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "completedAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdByKeyId": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdByName": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "sessionId",
+          "name",
+          "status",
+          "content",
+          "options",
+          "audience",
+          "progress",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "CreateCampaignDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "content": {
+            "$ref": "#/components/schemas/CampaignContentDto"
+          },
+          "audience": {
+            "description": "Defaults to `manual` with no chats.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CampaignAudienceDto"
+              }
+            ]
+          },
+          "options": {
+            "$ref": "#/components/schemas/CampaignOptionsDto"
+          },
+          "scheduledAt": {
+            "type": "string",
+            "nullable": true,
+            "description": "When to start. Omit to keep the campaign a draft; `start` sends immediately."
+          }
+        },
+        "required": [
+          "name",
+          "content"
+        ]
+      },
+      "CampaignSegmentDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "chatIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "chatIds",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "CreateCampaignSegmentDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "chatIds": {
+            "maxItems": 5000,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "name",
+          "chatIds"
+        ]
+      },
+      "UpdateCampaignSegmentDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "chatIds": {
+            "maxItems": 5000,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "CampaignPreviewDto": {
+        "type": "object",
+        "properties": {
+          "audience": {
+            "$ref": "#/components/schemas/CampaignAudienceDto"
+          },
+          "sampleSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "default": 20,
+            "description": "How many resolved chats to return as a sample."
+          }
+        },
+        "required": [
+          "audience"
+        ]
+      },
+      "CampaignSampleDto": {
+        "type": "object",
+        "properties": {
+          "chatId": {
+            "type": "string"
+          },
+          "chatName": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "chatId"
+        ]
+      },
+      "CampaignPreviewResultDto": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "number",
+            "description": "How many distinct chats the audience resolves to."
+          },
+          "sample": {
+            "description": "A sample of the resolved chats, without statuses.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CampaignSampleDto"
+            }
+          },
+          "truncated": {
+            "type": "boolean",
+            "description": "True when the audience exceeded the cap and was truncated."
+          }
+        },
+        "required": [
+          "count",
+          "sample",
+          "truncated"
+        ]
+      },
+      "CampaignRecipientDto": {
+        "type": "object",
+        "properties": {
+          "chatId": {
+            "type": "string"
+          },
+          "chatName": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "sent",
+              "failed",
+              "skipped"
+            ]
+          },
+          "messageId": {
+            "type": "string",
+            "nullable": true
+          },
+          "errorCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "errorMessage": {
+            "type": "string",
+            "nullable": true
+          },
+          "sentAt": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "chatId",
+          "status"
+        ]
+      },
+      "CampaignDetailDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "sessionId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "scheduled",
+              "running",
+              "completed",
+              "cancelled",
+              "failed"
+            ]
+          },
+          "content": {
+            "$ref": "#/components/schemas/CampaignContentDto"
+          },
+          "options": {
+            "$ref": "#/components/schemas/CampaignOptionsDto"
+          },
+          "audience": {
+            "$ref": "#/components/schemas/CampaignAudienceDto"
+          },
+          "progress": {
+            "$ref": "#/components/schemas/CampaignProgressDto"
+          },
+          "scheduledAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "startedAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "completedAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdByKeyId": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdByName": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "recipients": {
+            "description": "The first page of recipients.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CampaignRecipientDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "sessionId",
+          "name",
+          "status",
+          "content",
+          "options",
+          "audience",
+          "progress",
+          "createdAt",
+          "updatedAt",
+          "recipients"
+        ]
+      },
+      "UpdateCampaignDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "content": {
+            "$ref": "#/components/schemas/CampaignContentDto"
+          },
+          "audience": {
+            "$ref": "#/components/schemas/CampaignAudienceDto"
+          },
+          "options": {
+            "$ref": "#/components/schemas/CampaignOptionsDto"
+          },
+          "scheduledAt": {
+            "type": "string",
+            "nullable": true,
+            "description": "Schedule (or clear, with null) the start time of a draft."
+          }
+        }
       },
       "CatalogDto": {
         "type": "object",

@@ -32,6 +32,8 @@ type AuthValidateResponse struct {
 	Role       string `json:"role,omitempty"`
 	EngineType string `json:"engineType,omitempty"`
 	Scoped     bool   `json:"scoped,omitempty"`
+	KeyID      string `json:"keyId,omitempty"`
+	KeyName    string `json:"keyName,omitempty"`
 }
 
 // ── Template ───────────────────────────────────────────

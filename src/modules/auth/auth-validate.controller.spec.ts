@@ -7,7 +7,7 @@ describe('AuthValidateController', () => {
   const controller = new AuthValidateController(engineFactory);
 
   const makeKey = (over: Partial<ApiKey> = {}): ApiKey =>
-    ({ id: 'k1', role: ApiKeyRole.OPERATOR, isActive: true, allowedIps: null, ...over }) as ApiKey;
+    ({ id: 'k1', name: 'Agen A', role: ApiKeyRole.OPERATOR, isActive: true, allowedIps: null, ...over }) as ApiKey;
 
   it('reports the guard-validated key as valid, echoing its role and the running engine', () => {
     expect(controller.validate(makeKey({ role: ApiKeyRole.ADMIN }))).toEqual({
@@ -15,6 +15,8 @@ describe('AuthValidateController', () => {
       role: ApiKeyRole.ADMIN,
       engineType: 'baileys',
       scoped: false,
+      keyId: 'k1',
+      keyName: 'Agen A',
     });
   });
 
@@ -37,7 +39,14 @@ describe('AuthValidateController', () => {
     // The handler must NOT re-validate without an IP, which previously fail-closed and wrongly
     // reported valid:false for any key carrying an allowedIps restriction.
     const key = makeKey({ allowedIps: ['10.0.0.0/24'] });
-    expect(controller.validate(key)).toEqual({ valid: true, role: key.role, engineType: 'baileys', scoped: false });
+    expect(controller.validate(key)).toEqual({
+      valid: true,
+      role: key.role,
+      engineType: 'baileys',
+      scoped: false,
+      keyId: key.id,
+      keyName: key.name,
+    });
   });
 
   it('returns valid:false when no key is attached (defense-in-depth)', () => {

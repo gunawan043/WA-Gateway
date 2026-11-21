@@ -2,6 +2,14 @@ import { DataSource, Repository } from 'typeorm';
 import { AuditService } from '../audit/audit.service';
 import { PluginLoaderService } from '../../core/plugins/plugin-loader.service';
 import { AutomationRule } from '../automation/entities/automation-rule.entity';
+import { CrmDealActivity } from '../crm/entities/crm-deal-activity.entity';
+import { Campaign } from '../campaign/entities/campaign.entity';
+import { CampaignRecipient } from '../campaign/entities/campaign-recipient.entity';
+import { CampaignSegment } from '../campaign/entities/campaign-segment.entity';
+import { CrmDeal } from '../crm/entities/crm-deal.entity';
+import { CrmStage } from '../crm/entities/crm-stage.entity';
+import { InboxConversation } from '../inbox/entities/inbox-conversation.entity';
+import { InboxNote } from '../inbox/entities/inbox-note.entity';
 import { InfraDataController } from '../infra/infra-data.controller';
 import { InfraDataService } from '../infra/infra-data.service';
 import { BaileysStoredMessage } from '../../engine/adapters/baileys-stored-message.entity';
@@ -48,6 +56,14 @@ describe('Post-import scope-binding resync retracts secrets of retired or rolled
     IntegrationDeliveryFailure,
     StatusUpdate,
     AutomationRule,
+    InboxConversation,
+    InboxNote,
+    CrmStage,
+    CrmDeal,
+    CrmDealActivity,
+    Campaign,
+    CampaignRecipient,
+    CampaignSegment,
   ];
 
   function buildStatefulLoader(

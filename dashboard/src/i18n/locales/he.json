@@ -72,7 +72,10 @@
     "messageTester": "בדיקת הודעות",
     "infrastructure": "תשתית",
     "plugins": "תוספים",
-    "logs": "לוגים"
+    "logs": "לוגים",
+    "inbox": "תיבת דואר נכנס",
+    "pipeline": "צינור מכירות",
+    "campaigns": "קמפיינים"
   },
   "chats": {
     "edited": "נערך",
@@ -540,7 +543,7 @@
     "actions": {
       "view": "צפייה",
       "proxy": "Proxy",
-      "start": "הפעלה",
+      "start": "Session",
       "stop": "עצירה",
       "reconnect": "התחברות מחדש",
       "unlink": "ביטול קישור",
@@ -1332,7 +1335,7 @@
       "auth": "אימות",
       "extension": "הרחבה"
     },
-    "enable": "הפעלה",
+    "enable": "Session",
     "disable": "השבתה",
     "healthCheck": "בדיקת תקינות",
     "configure": "הגדרה",
@@ -1452,7 +1455,7 @@
         "delete": "מחיקה",
         "copy": "העתקה",
         "save": "שמירה",
-        "enable": "הפעלה",
+        "enable": "Session",
         "disable": "השבתה"
       },
       "errors": {
@@ -1491,5 +1494,214 @@
       "current": "Session זה"
     },
     "loading": "מחפש…"
+  },
+  "inbox": {
+    "title": "תיבת דואר נכנס לצוות",
+    "subtitle": "מיין צ'אטים, הקצה סוכנים ושמור הערות פנימיות.",
+    "session": "Session",
+    "noSessions": "אין עדיין Sessions",
+    "conversations": "שיחות",
+    "searchPlaceholder": "חפש לפי שם, מזהה צ'אט או הודעה אחרונה",
+    "noMessages": "אין הודעות עדיין",
+    "unassigned": "לא מוקצה",
+    "status": {
+      "open": "פתוח",
+      "pending": "ממתין",
+      "resolved": "נפתר",
+      "all": "הכול"
+    },
+    "assignee": {
+      "label": "אחראי",
+      "all": "כל הסוכנים",
+      "me": "מוקצה לי",
+      "unassigned": "לא מוקצה"
+    },
+    "empty": {
+      "title": "אין שיחות",
+      "body": "שנה את המסננים או המתן להודעה נכנסת.",
+      "selectSession": "בחר Session כדי להתחיל."
+    },
+    "error": {
+      "load": "לא ניתן לטעון את תיבת הדואר הנכנס."
+    },
+    "detail": {
+      "selectPrompt": "בחר שיחה משמאל.",
+      "assignee": "אחראי",
+      "notes": "הערות פנימיות",
+      "noNotes": "אין הערות עדיין.",
+      "notePlaceholder": "כתוב הערה פנימית…",
+      "addNote": "הוסף הערה",
+      "deleteNote": "מחיקת הערה"
+    },
+    "assignToMe": "אני ({{name}})",
+    "updated": "השיחה עודכנה",
+    "updateFailed": "לא ניתן לעדכן את השיחה",
+    "noteAdded": "ההערה נוספה",
+    "noteDeleted": "ההערה נמחקה",
+    "confirmDeleteNote": "למחוק את ההערה הזו?"
+  },
+  "pipeline": {
+    "title": "צינור מכירות",
+    "subtitle": "עקוב אחר עסקאות בין שלבים, הקצה בעלים ושמור את ההיסטוריה על העסקה.",
+    "searchPlaceholder": "חפש לפי כותרת, הערות או בעלים",
+    "assignee": "בעלים",
+    "allAgents": "כל הבעלים",
+    "assignedToMe": "מוקצה לי",
+    "unassigned": "לא מוקצה",
+    "newDeal": "עסקה חדשה",
+    "columnEmpty": "שחרר עסקה כאן",
+    "cancel": "ביטול",
+    "assignToMe": "אני ({{name}})",
+    "stats": {
+      "open": "פתוח",
+      "won": "נזכה",
+      "lost": "הופסד",
+      "openValue": "ערך פתוח (מטבעות מעורבים)"
+    },
+    "error": {
+      "load": "לא ניתן לטעון את צינור המכירות."
+    },
+    "create": {
+      "title": "עסקה חדשה",
+      "submit": "יצירת עסקה",
+      "titlePlaceholder": "למשל חוזה שנתי"
+    },
+    "deal": {
+      "title": "כותרת",
+      "value": "ערך",
+      "currency": "מטבע",
+      "stage": "שלב",
+      "assignee": "בעלים",
+      "expectedClose": "סגירה צפויה",
+      "notes": "הערות",
+      "save": "שמור שינויים",
+      "delete": "מחיקת עסקה",
+      "confirmDelete": "למחוק את העסקה ואת כל ההיסטוריה שלה?",
+      "activities": "היסטוריה",
+      "noActivities": "אין פעילות עדיין.",
+      "notePlaceholder": "הוסף הערה לעסקה הזו…",
+      "addNote": "הוסף הערה"
+    },
+    "activityKind": {
+      "created": "נוצר",
+      "stage_change": "שינוי שלב",
+      "assignment": "הקצאה",
+      "note": "הערה",
+      "update": "עדכון"
+    },
+    "toast": {
+      "moved": "הועבר ל{{stage}}",
+      "created": "העסקה נוצרה",
+      "updated": "העסקה עודכנה",
+      "deleted": "העסקה נמחקה",
+      "noteAdded": "ההערה נוספה",
+      "saveFailed": "לא ניתן לשמור את העסקה"
+    }
+  },
+  "campaigns": {
+    "title": "קמפיינים",
+    "subtitle": "שלח הודעה אחת לצ'אטים רבים, עם רשומה חיה לכל נמען",
+    "session": "Session",
+    "status": {
+      "draft": "טיוטה",
+      "scheduled": "מתוזמן",
+      "running": "פעיל",
+      "completed": "הושלם",
+      "cancelled": "מבוטל",
+      "failed": "נכשל"
+    },
+    "allStatuses": "הכול",
+    "new": "קמפיין חדש",
+    "searchPlaceholder": "חיפוש קמפיינים",
+    "empty": "אין קמפיינים עדיין. צור אחד כדי להגיע לקהל שלם.",
+    "name": "קמפיין",
+    "audience": "קהל",
+    "progress": "התקדמות",
+    "createdAt": "נוצר",
+    "none": "ללא",
+    "close": "סגירה",
+    "audienceKind": {
+      "manual": "צ'אטים נבחרים",
+      "segment": "סגמנט שמור",
+      "all": "כל הצ'אטים ב-Session",
+      "label": "תווית WhatsApp"
+    },
+    "messageType": {
+      "text": "טקסט",
+      "image": "תמונה",
+      "video": "וידאו",
+      "audio": "שמע",
+      "document": "מסמך"
+    },
+    "recipientStatus": {
+      "pending": "ממתין",
+      "sent": "נשלח",
+      "failed": "נכשל",
+      "skipped": "דולג"
+    },
+    "error": {
+      "load": "לא ניתן לטעון קמפיינים."
+    },
+    "wizard": {
+      "title": "קמפיין חדש",
+      "step1": "הודעה",
+      "step2": "קהל",
+      "step3": "תזמון",
+      "next": "הבא",
+      "back": "חזרה",
+      "create": "יצירת קמפיין"
+    },
+    "form": {
+      "name": "שם הקמפיין",
+      "namePlaceholder": "למשל מבצע סוף שנה",
+      "type": "סוג הודעה",
+      "message": "הודעה",
+      "messagePlaceholder": "שלום {{name}}, ...",
+      "mediaUrl": "כתובת מדיה",
+      "caption": "כיתוב",
+      "mimetype": "סוג MIME (אופציונלי)",
+      "filename": "שם קובץ (מסמכים)",
+      "variablesHint": "השתמש ב-{{name}} לשם הצ'אט; הוא מולא לכל נמען.",
+      "audienceKind": "קהל",
+      "searchChats": "חיפוש צ'אטים",
+      "selected": "{{count}} נבחרו",
+      "segment": "סגמנט שמור",
+      "labelId": "מזהה תווית",
+      "labelHint": "רק whatsapp-web.js. ‏Baileys חושף כתיבת תוויות אך לא קריאתן ומחזיר 501.",
+      "allHint": "כל צ'אט ב-Session. השתמש בתצוגה המקדימה כדי לאשר את הכמות לפני השליחה.",
+      "preview": "תצוגה מקדימה של הקהל",
+      "previewCount": "{{count}} צ'אטים",
+      "previewTruncated": "הקהל גדול ממגבלת 5,000 הצ'אטים; פצל אותו לסגמנטים.",
+      "delay": "השהיה בין הודעות (מ״ש)",
+      "randomize": "אקראי את ההשהיה",
+      "stopOnError": "עצור בשגיאה הראשונה",
+      "schedule": "תזמון (אופציונלי)",
+      "scheduleHint": "השאר את התאריך ריק כדי לשמור כטיוטה. קמפיין מתוזמן מתחיל מעצמו.",
+      "saveSegment": "שמור כסגמנט",
+      "segmentName": "שם הסגמנט"
+    },
+    "detail": {
+      "title": "קמפיין",
+      "start": "התחל",
+      "cancel": "ביטול",
+      "delete": "מחיקה",
+      "confirmDelete": "למחוק את הקמפיין ואת רשומות הנמענים שלו?",
+      "recipients": "נמענים",
+      "noRecipients": "אין נמענים עדיין. הם נוצרים כשהקמפיין מתחיל.",
+      "chat": "צ'אט",
+      "error": "שגיאה",
+      "sent": "נשלח",
+      "failed": "נכשל",
+      "skipped": "דולג",
+      "total": "סה״כ"
+    },
+    "toast": {
+      "created": "הקמפיין נוצר",
+      "started": "הקמפיין החל",
+      "cancelled": "הקמפיין בוטל",
+      "deleted": "הקמפיין נמחק",
+      "segmentSaved": "הסגמנט נשמר",
+      "failed": "פעולת הקמפיין נכשלה"
+    }
   }
 }

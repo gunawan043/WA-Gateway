@@ -24,6 +24,9 @@ import {
   PanelRightOpen,
   Languages,
   UserCheck,
+  Inbox as InboxIcon,
+  KanbanSquare,
+  Megaphone,
 } from 'lucide-react';
 import { useTheme } from '../hooks/useTheme';
 import { useRole, type UserRole } from '../hooks/useRole';
@@ -42,6 +45,13 @@ const allNavItems = [
   { to: '/', icon: LayoutDashboard, key: 'dashboard' as const, adminOnly: false },
   { to: '/sessions', icon: Smartphone, key: 'sessions' as const, adminOnly: false },
   { to: '/chats', icon: MessageSquare, key: 'chats' as const, adminOnly: false },
+  { to: '/inbox', icon: InboxIcon, key: 'inbox' as const, adminOnly: false },
+  // The pipeline is deployment-global and fenced with @RequireUnscopedKey, so a session-restricted
+  // key is refused by the API and the item is hidden.
+  { to: '/pipeline', icon: KanbanSquare, key: 'pipeline' as const, adminOnly: false, unscopedOnly: true },
+  // Session-scoped, so a session-restricted key is fine; the API refuses a chat-restricted key
+  // outright (a broadcast spans many chats), and the page shows that refusal as an error.
+  { to: '/campaigns', icon: Megaphone, key: 'campaigns' as const, adminOnly: false },
   { to: '/number-checker', icon: UserCheck, key: 'numberChecker' as const, adminOnly: false },
   { to: '/webhooks', icon: Webhook, key: 'webhooks' as const, adminOnly: false },
   { to: '/templates', icon: ClipboardList, key: 'templates' as const, adminOnly: false },

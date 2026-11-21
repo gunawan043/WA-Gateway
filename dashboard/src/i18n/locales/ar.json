@@ -76,7 +76,10 @@
     "messageTester": "اختبار الرسائل",
     "infrastructure": "البنية التحتية",
     "plugins": "الإضافات",
-    "logs": "السجلات"
+    "logs": "السجلات",
+    "inbox": "صندوق الوارد",
+    "pipeline": "خط المبيعات",
+    "campaigns": "الحملات"
   },
   "chats": {
     "edited": "تم التعديل",
@@ -1509,5 +1512,214 @@
       "current": "هذه الجلسة"
     },
     "loading": "جارٍ البحث…"
+  },
+  "inbox": {
+    "title": "صندوق وارد الفريق",
+    "subtitle": "رتّب المحادثات، وعيّن الوكلاء، واحتفظ بملاحظات داخلية.",
+    "session": "الجلسة",
+    "noSessions": "لا توجد جلسات بعد",
+    "conversations": "المحادثات",
+    "searchPlaceholder": "ابحث بالاسم أو معرّف المحادثة أو آخر رسالة",
+    "noMessages": "لا توجد رسائل بعد",
+    "unassigned": "غير مسند",
+    "status": {
+      "open": "مفتوحة",
+      "pending": "قيد الانتظار",
+      "resolved": "محلولة",
+      "all": "الكل"
+    },
+    "assignee": {
+      "label": "المسؤول",
+      "all": "كل الوكلاء",
+      "me": "مُسند إليّ",
+      "unassigned": "غير مسند"
+    },
+    "empty": {
+      "title": "لا توجد محادثات",
+      "body": "عدّل عوامل التصفية أو انتظر رسالة واردة.",
+      "selectSession": "اختر جلسة للبدء."
+    },
+    "error": {
+      "load": "تعذّر تحميل صندوق الوارد."
+    },
+    "detail": {
+      "selectPrompt": "اختر محادثة من اليسار.",
+      "assignee": "المسؤول",
+      "notes": "ملاحظات داخلية",
+      "noNotes": "لا توجد ملاحظات بعد.",
+      "notePlaceholder": "اكتب ملاحظة داخلية…",
+      "addNote": "إضافة ملاحظة",
+      "deleteNote": "حذف الملاحظة"
+    },
+    "assignToMe": "أنا ({{name}})",
+    "updated": "تم تحديث المحادثة",
+    "updateFailed": "تعذّر تحديث المحادثة",
+    "noteAdded": "أُضيفت الملاحظة",
+    "noteDeleted": "حُذفت الملاحظة",
+    "confirmDeleteNote": "هل تريد حذف هذه الملاحظة؟"
+  },
+  "pipeline": {
+    "title": "خط المبيعات",
+    "subtitle": "تابع الصفقات عبر المراحل، وعيّن مالكًا، واحتفظ بالسجل على الصفقة.",
+    "searchPlaceholder": "ابحث بالعنوان أو الملاحظات أو المالك",
+    "assignee": "المالك",
+    "allAgents": "كل المالكين",
+    "assignedToMe": "مُسند إليّ",
+    "unassigned": "غير مسند",
+    "newDeal": "صفقة جديدة",
+    "columnEmpty": "أفلت صفقة هنا",
+    "cancel": "إلغاء",
+    "assignToMe": "أنا ({{name}})",
+    "stats": {
+      "open": "مفتوحة",
+      "won": "فازت",
+      "lost": "خسرت",
+      "openValue": "قيمة مفتوحة (عملات مختلطة)"
+    },
+    "error": {
+      "load": "تعذّر تحميل خط المبيعات."
+    },
+    "create": {
+      "title": "صفقة جديدة",
+      "submit": "إنشاء صفقة",
+      "titlePlaceholder": "مثال: عقد سنوي"
+    },
+    "deal": {
+      "title": "العنوان",
+      "value": "القيمة",
+      "currency": "العملة",
+      "stage": "المرحلة",
+      "assignee": "المالك",
+      "expectedClose": "الإغلاق المتوقع",
+      "notes": "ملاحظات",
+      "save": "حفظ التغييرات",
+      "delete": "حذف الصفقة",
+      "confirmDelete": "هل تريد حذف هذه الصفقة وسجلها بالكامل؟",
+      "activities": "السجل",
+      "noActivities": "لا يوجد نشاط بعد.",
+      "notePlaceholder": "أضف ملاحظة إلى هذه الصفقة…",
+      "addNote": "إضافة ملاحظة"
+    },
+    "activityKind": {
+      "created": "إنشاء",
+      "stage_change": "تغيير المرحلة",
+      "assignment": "إسناد",
+      "note": "ملاحظة",
+      "update": "تحديث"
+    },
+    "toast": {
+      "moved": "نُقلت إلى {{stage}}",
+      "created": "أُنشئت الصفقة",
+      "updated": "تم تحديث الصفقة",
+      "deleted": "حُذفت الصفقة",
+      "noteAdded": "أُضيفت الملاحظة",
+      "saveFailed": "تعذّر حفظ الصفقة"
+    }
+  },
+  "campaigns": {
+    "title": "الحملات",
+    "subtitle": "أرسل رسالة واحدة إلى محادثات كثيرة، مع سجل مباشر لكل مستلم",
+    "session": "الجلسة",
+    "status": {
+      "draft": "مسودة",
+      "scheduled": "مجدولة",
+      "running": "قيد التشغيل",
+      "completed": "مكتملة",
+      "cancelled": "ملغاة",
+      "failed": "فشلت"
+    },
+    "allStatuses": "الكل",
+    "new": "حملة جديدة",
+    "searchPlaceholder": "بحث في الحملات",
+    "empty": "لا توجد حملات بعد. أنشئ حملة للوصول إلى جمهور كامل.",
+    "name": "حملة",
+    "audience": "الجمهور",
+    "progress": "التقدم",
+    "createdAt": "أُنشئت",
+    "none": "لا شيء",
+    "close": "إغلاق",
+    "audienceKind": {
+      "manual": "محادثات مختارة",
+      "segment": "شريحة محفوظة",
+      "all": "كل محادثات الجلسة",
+      "label": "تصنيف WhatsApp"
+    },
+    "messageType": {
+      "text": "نص",
+      "image": "صورة",
+      "video": "فيديو",
+      "audio": "صوت",
+      "document": "مستند"
+    },
+    "recipientStatus": {
+      "pending": "قيد الانتظار",
+      "sent": "أُرسلت",
+      "failed": "فشلت",
+      "skipped": "تم تخطيها"
+    },
+    "error": {
+      "load": "تعذّر تحميل الحملات."
+    },
+    "wizard": {
+      "title": "حملة جديدة",
+      "step1": "رسالة",
+      "step2": "الجمهور",
+      "step3": "الجدولة",
+      "next": "التالي",
+      "back": "رجوع",
+      "create": "إنشاء حملة"
+    },
+    "form": {
+      "name": "اسم الحملة",
+      "namePlaceholder": "مثال: عرض نهاية العام",
+      "type": "نوع الرسالة",
+      "message": "رسالة",
+      "messagePlaceholder": "مرحبًا {{name}}، ...",
+      "mediaUrl": "رابط الوسائط",
+      "caption": "التعليق",
+      "mimetype": "نوع MIME (اختياري)",
+      "filename": "اسم الملف (للمستندات)",
+      "variablesHint": "استخدم {{name}} لاسم المحادثة؛ يُملأ لكل مستلم.",
+      "audienceKind": "الجمهور",
+      "searchChats": "بحث في المحادثات",
+      "selected": "تم اختيار {{count}}",
+      "segment": "شريحة محفوظة",
+      "labelId": "معرّف التصنيف",
+      "labelHint": "يعمل مع whatsapp-web.js فقط. يتيح Baileys كتابة التصنيفات دون قراءتها ويجيب بـ 501.",
+      "allHint": "كل محادثة في الجلسة. استخدم المعاينة لتأكيد العدد قبل الإرسال.",
+      "preview": "معاينة الجمهور",
+      "previewCount": "{{count}} محادثة",
+      "previewTruncated": "يتجاوز الجمهور حد 5000 محادثة؛ قسّمه إلى شرائح.",
+      "delay": "التأخير بين الرسائل (مللي ثانية)",
+      "randomize": "عشوائية التأخير",
+      "stopOnError": "التوقف عند أول خطأ",
+      "schedule": "الجدولة (اختياري)",
+      "scheduleHint": "اترك التاريخ فارغًا للاحتفاظ بمسودة. تبدأ الحملة المجدولة من تلقاء نفسها.",
+      "saveSegment": "حفظ كشريحة",
+      "segmentName": "اسم الشريحة"
+    },
+    "detail": {
+      "title": "حملة",
+      "start": "بدء",
+      "cancel": "إلغاء",
+      "delete": "حذف",
+      "confirmDelete": "هل تريد حذف هذه الحملة وسجلات مستلميها؟",
+      "recipients": "المستلمون",
+      "noRecipients": "لا يوجد مستلمون بعد. يُنشؤون عند بدء الحملة.",
+      "chat": "محادثة",
+      "error": "خطأ",
+      "sent": "أُرسلت",
+      "failed": "فشلت",
+      "skipped": "تم تخطيها",
+      "total": "الإجمالي"
+    },
+    "toast": {
+      "created": "أُنشئت الحملة",
+      "started": "بدأت الحملة",
+      "cancelled": "أُلغيت الحملة",
+      "deleted": "حُذفت الحملة",
+      "segmentSaved": "حُفظت الشريحة",
+      "failed": "فشل إجراء الحملة"
+    }
   }
 }

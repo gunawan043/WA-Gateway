@@ -68,7 +68,10 @@
     "messageTester": "Penguji Pesan",
     "infrastructure": "Infrastruktur",
     "plugins": "Plugin",
-    "logs": "Log"
+    "logs": "Log",
+    "inbox": "Inbox",
+    "pipeline": "Pipeline",
+    "campaigns": "Kampanye"
   },
   "chats": {
     "edited": "Diedit",
@@ -1472,5 +1475,214 @@
       "current": "Sesi ini"
     },
     "loading": "Mencari…"
+  },
+  "inbox": {
+    "title": "Inbox Tim",
+    "subtitle": "Kelola chat, tugaskan ke agen, dan simpan catatan internal.",
+    "session": "Sesi",
+    "noSessions": "Belum ada sesi",
+    "conversations": "Daftar percakapan",
+    "searchPlaceholder": "Cari nama, chat id, atau pesan terakhir",
+    "noMessages": "Belum ada pesan",
+    "unassigned": "Belum ditugaskan",
+    "status": {
+      "open": "Terbuka",
+      "pending": "Menunggu",
+      "resolved": "Selesai",
+      "all": "Semua"
+    },
+    "assignee": {
+      "label": "Agen",
+      "all": "Semua agen",
+      "me": "Ditugaskan ke saya",
+      "unassigned": "Belum ditugaskan"
+    },
+    "empty": {
+      "title": "Tidak ada percakapan",
+      "body": "Ubah filter atau tunggu pesan masuk.",
+      "selectSession": "Pilih sesi untuk mulai."
+    },
+    "error": {
+      "load": "Gagal memuat inbox."
+    },
+    "detail": {
+      "selectPrompt": "Pilih percakapan di sebelah kiri.",
+      "assignee": "Agen",
+      "notes": "Catatan internal",
+      "noNotes": "Belum ada catatan.",
+      "notePlaceholder": "Tulis catatan internal…",
+      "addNote": "Tambah catatan",
+      "deleteNote": "Hapus catatan"
+    },
+    "assignToMe": "Saya ({{name}})",
+    "updated": "Percakapan diperbarui",
+    "updateFailed": "Gagal memperbarui percakapan",
+    "noteAdded": "Catatan ditambahkan",
+    "noteDeleted": "Catatan dihapus",
+    "confirmDeleteNote": "Hapus catatan ini?"
+  },
+  "pipeline": {
+    "title": "Pipeline Penjualan",
+    "subtitle": "Lacak deal di setiap tahap, tetapkan penanggung jawab, dan simpan riwayatnya.",
+    "searchPlaceholder": "Cari judul, catatan, atau penanggung jawab",
+    "assignee": "Penanggung jawab",
+    "allAgents": "Semua penanggung jawab",
+    "assignedToMe": "Ditugaskan ke saya",
+    "unassigned": "Belum ditugaskan",
+    "newDeal": "Deal baru",
+    "columnEmpty": "Letakkan deal di sini",
+    "cancel": "Batal",
+    "assignToMe": "Saya ({{name}})",
+    "stats": {
+      "open": "terbuka",
+      "won": "menang",
+      "lost": "kalah",
+      "openValue": "nilai terbuka (mata uang campuran)"
+    },
+    "error": {
+      "load": "Gagal memuat pipeline."
+    },
+    "create": {
+      "title": "Deal baru",
+      "submit": "Buat deal",
+      "titlePlaceholder": "mis. Kontrak tahunan"
+    },
+    "deal": {
+      "title": "Judul",
+      "value": "Nilai",
+      "currency": "Mata uang",
+      "stage": "Tahap",
+      "assignee": "Penanggung jawab",
+      "expectedClose": "Perkiraan tutup",
+      "notes": "Catatan",
+      "save": "Simpan perubahan",
+      "delete": "Hapus deal",
+      "confirmDelete": "Hapus deal ini beserta seluruh riwayatnya?",
+      "activities": "Riwayat",
+      "noActivities": "Belum ada aktivitas.",
+      "notePlaceholder": "Tambahkan catatan untuk deal ini…",
+      "addNote": "Tambah catatan"
+    },
+    "activityKind": {
+      "created": "dibuat",
+      "stage_change": "pindah tahap",
+      "assignment": "penugasan",
+      "note": "catatan",
+      "update": "perubahan"
+    },
+    "toast": {
+      "moved": "Dipindahkan ke {{stage}}",
+      "created": "Deal dibuat",
+      "updated": "Deal diperbarui",
+      "deleted": "Deal dihapus",
+      "noteAdded": "Catatan ditambahkan",
+      "saveFailed": "Gagal menyimpan deal"
+    }
+  },
+  "campaigns": {
+    "title": "Kampanye",
+    "subtitle": "Kirim satu pesan ke banyak obrolan, dengan catatan per penerima",
+    "session": "Sesi",
+    "status": {
+      "draft": "Draf",
+      "scheduled": "Terjadwal",
+      "running": "Berjalan",
+      "completed": "Selesai",
+      "cancelled": "Dibatalkan",
+      "failed": "Gagal"
+    },
+    "allStatuses": "Semua",
+    "new": "Kampanye baru",
+    "searchPlaceholder": "Cari kampanye",
+    "empty": "Belum ada kampanye. Buat satu untuk menjangkau seluruh audiens.",
+    "name": "Kampanye",
+    "audience": "Audiens",
+    "progress": "Progres",
+    "createdAt": "Dibuat",
+    "none": "Tidak ada",
+    "close": "Tutup",
+    "audienceKind": {
+      "manual": "Obrolan terpilih",
+      "segment": "Segmen tersimpan",
+      "all": "Semua obrolan sesi",
+      "label": "Label WhatsApp"
+    },
+    "messageType": {
+      "text": "Teks",
+      "image": "Gambar",
+      "video": "Video",
+      "audio": "Audio",
+      "document": "Dokumen"
+    },
+    "recipientStatus": {
+      "pending": "Menunggu",
+      "sent": "Terkirim",
+      "failed": "Gagal",
+      "skipped": "Dilewati"
+    },
+    "error": {
+      "load": "Gagal memuat kampanye."
+    },
+    "wizard": {
+      "title": "Kampanye baru",
+      "step1": "Pesan",
+      "step2": "Audiens",
+      "step3": "Jadwal",
+      "next": "Lanjut",
+      "back": "Kembali",
+      "create": "Buat kampanye"
+    },
+    "form": {
+      "name": "Nama kampanye",
+      "namePlaceholder": "mis. Promo akhir tahun",
+      "type": "Jenis pesan",
+      "message": "Pesan",
+      "messagePlaceholder": "Halo {{name}}, ...",
+      "mediaUrl": "URL media",
+      "caption": "Keterangan",
+      "mimetype": "Tipe MIME (opsional)",
+      "filename": "Nama berkas (dokumen)",
+      "variablesHint": "Gunakan {{name}} untuk nama obrolan; diisi per penerima.",
+      "audienceKind": "Audiens",
+      "searchChats": "Cari obrolan",
+      "selected": "{{count}} dipilih",
+      "segment": "Segmen tersimpan",
+      "labelId": "ID label",
+      "labelHint": "Hanya whatsapp-web.js. Baileys mendukung penulisan label tetapi tidak bisa membacanya dan menjawab 501.",
+      "allHint": "Seluruh obrolan dalam sesi. Gunakan pratinjau untuk memastikan jumlahnya sebelum mengirim.",
+      "preview": "Pratinjau audiens",
+      "previewCount": "{{count}} obrolan",
+      "previewTruncated": "Audiens melebihi batas 5000 obrolan; pecah menjadi beberapa segmen.",
+      "delay": "Jeda antar pesan (ms)",
+      "randomize": "Acak jeda",
+      "stopOnError": "Berhenti pada kesalahan pertama",
+      "schedule": "Jadwal (opsional)",
+      "scheduleHint": "Biarkan tanggal kosong untuk menyimpan draf. Kampanye terjadwal mulai sendiri.",
+      "saveSegment": "Simpan sebagai segmen",
+      "segmentName": "Nama segmen"
+    },
+    "detail": {
+      "title": "Kampanye",
+      "start": "Mulai",
+      "cancel": "Batalkan",
+      "delete": "Hapus",
+      "confirmDelete": "Hapus kampanye ini beserta catatan penerimanya?",
+      "recipients": "Penerima",
+      "noRecipients": "Belum ada penerima. Penerima dibuat saat kampanye dimulai.",
+      "chat": "Obrolan",
+      "error": "Kesalahan",
+      "sent": "Terkirim",
+      "failed": "Gagal",
+      "skipped": "Dilewati",
+      "total": "Total"
+    },
+    "toast": {
+      "created": "Kampanye dibuat",
+      "started": "Kampanye dimulai",
+      "cancelled": "Kampanye dibatalkan",
+      "deleted": "Kampanye dihapus",
+      "segmentSaved": "Segmen disimpan",
+      "failed": "Aksi kampanye gagal"
+    }
   }
 }

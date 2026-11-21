@@ -85,6 +85,7 @@ const CHAT_EVENTS = new Set([
   'presence.update',
   'event.response',
   'poll.vote',
+  'inbox.updated',
 ]);
 
 /**
@@ -1173,6 +1174,23 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
    */
   emitGroupUpdate(sessionId: string, data: Record<string, unknown>) {
     this.emitToRooms(sessionId, 'group.update', data);
+  }
+
+  /**
+   * Emit an inbox conversation change (assignment, status, or a reopen) so other agents' dashboards
+   * update without polling. Payload: `{ chatId, status, assigneeKeyId, assigneeName }`.
+   */
+  emitInboxUpdated(sessionId: string, data: Record<string, unknown>) {
+    this.emitToRooms(sessionId, 'inbox.updated', data);
+  }
+
+  /**
+   * A campaign changed status or progress. Delivered per session, not per chat: a campaign spans many
+   * chats, and it is deliberately NOT in CHAT_EVENTS, so a chat-restricted key cannot subscribe to it
+   * (the campaign routes refuse such a key outright).
+   */
+  emitCampaignUpdated(sessionId: string, data: Record<string, unknown>) {
+    this.emitToRooms(sessionId, 'campaign.updated', data);
   }
 
   /**

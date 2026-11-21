@@ -262,6 +262,119 @@ export interface AutomationRuleRow {
   updatedAt: string | Date;
 }
 
+/**
+ * Team-inbox rows. `inbox_conversations` carries an ON DELETE CASCADE FK to sessions, so the import's
+ * `DELETE FROM sessions` wipes it; `inbox_notes` cascades from a conversation. Both must therefore be
+ * exported and re-inserted, conversations first, or a restore silently loses every assignment and note.
+ */
+export interface InboxConversationRow {
+  id: string;
+  sessionId: string;
+  chatId: string;
+  status: string;
+  assigneeKeyId: string | null;
+  assigneeName: string | null;
+  resolvedAt: string | Date | null;
+  lastInboundAt: string | Date | null;
+  createdAt: string | Date;
+  updatedAt: string | Date;
+}
+
+export interface InboxNoteRow {
+  id: string;
+  conversationId: string;
+  authorKeyId: string;
+  authorName: string;
+  body: string;
+  createdAt: string | Date;
+}
+
+/**
+ * Sales-pipeline rows. `crm_stages` is deliberately NOT part of this payload: the migration seeds it
+ * with fixed ids on every deployment, so it is configuration rather than backup data, and a restored
+ * deal always finds the stage it references. Deals and their append-only activity log are exported,
+ * deals first (an activity's `dealId` is a FK to a deal row).
+ */
+export interface CrmDealRow {
+  id: string;
+  stageId: string;
+  title: string;
+  sessionId: string | null;
+  chatId: string | null;
+  value: number | null;
+  currency: string;
+  status: string;
+  assigneeKeyId: string | null;
+  assigneeName: string | null;
+  expectedCloseAt: string | Date | null;
+  closedAt: string | Date | null;
+  notes: string | null;
+  createdAt: string | Date;
+  updatedAt: string | Date;
+}
+
+export interface CrmDealActivityRow {
+  id: string;
+  dealId: string;
+  kind: string;
+  body: string | null;
+  fromStageId: string | null;
+  toStageId: string | null;
+  authorKeyId: string;
+  authorName: string;
+  createdAt: string | Date;
+}
+
+/**
+ * Broadcast rows. The JSON columns arrive as TEXT from the export's raw `SELECT *` (both dialects
+ * store `simple-json` as text), so the importer inserts them verbatim; a hand-edited archive that
+ * supplies an object is stringified rather than rejected.
+ *
+ * Recipients are exported after their campaign (the FK), and segments have no FK to anything, so
+ * their position in the registry is only about readability.
+ */
+export interface CampaignRow {
+  id: string;
+  sessionId: string;
+  name: string;
+  status: string;
+  content: string;
+  options: string;
+  audience: string;
+  progress: string;
+  scheduledAt: string | Date | null;
+  startedAt: string | Date | null;
+  completedAt: string | Date | null;
+  createdByKeyId: string | null;
+  createdByName: string | null;
+  createdAt: string | Date;
+  updatedAt: string | Date;
+}
+
+export interface CampaignRecipientRow {
+  id: string;
+  campaignId: string;
+  chatId: string;
+  chatName: string | null;
+  status: string;
+  batchId: string | null;
+  messageId: string | null;
+  errorCode: string | null;
+  errorMessage: string | null;
+  sentAt: string | Date | null;
+  createdAt: string | Date;
+  updatedAt: string | Date;
+}
+
+export interface CampaignSegmentRow {
+  id: string;
+  sessionId: string;
+  name: string;
+  chatIds: string;
+  createdAt: string | Date;
+  updatedAt: string | Date;
+}
+
 export interface MigrationTables {
   sessions: SessionRow[];
   webhooks: WebhookRow[];
@@ -279,6 +392,13 @@ export interface MigrationTables {
   integrationDeliveryFailures: IntegrationDeliveryFailureRow[];
   statusUpdates: StatusUpdateRow[];
   automationRules: AutomationRuleRow[];
+  inboxConversations: InboxConversationRow[];
+  inboxNotes: InboxNoteRow[];
+  crmDeals: CrmDealRow[];
+  crmDealActivities: CrmDealActivityRow[];
+  campaigns: CampaignRow[];
+  campaignRecipients: CampaignRecipientRow[];
+  campaignSegments: CampaignSegmentRow[];
 }
 
 export type TableCounts = { [K in keyof MigrationTables]: number };

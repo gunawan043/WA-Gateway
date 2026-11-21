@@ -53,6 +53,25 @@ export function RoleProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // Identity of the calling key, beside the role for the same reason: it belongs to this tab's key.
+  const [keyId, setKeyIdState] = useState<string | null>(() => sessionStorage.getItem('openwa_key_id'));
+  const [keyName, setKeyNameState] = useState<string | null>(() => sessionStorage.getItem('openwa_key_name'));
+
+  const setKeyIdentity = useCallback((newKeyId: string | null, newKeyName: string | null) => {
+    setKeyIdState(newKeyId);
+    setKeyNameState(newKeyName);
+    if (newKeyId) {
+      sessionStorage.setItem('openwa_key_id', newKeyId);
+    } else {
+      sessionStorage.removeItem('openwa_key_id');
+    }
+    if (newKeyName) {
+      sessionStorage.setItem('openwa_key_name', newKeyName);
+    } else {
+      sessionStorage.removeItem('openwa_key_name');
+    }
+  }, []);
+
   const value: RoleContextType = {
     role,
     setRole,
@@ -64,6 +83,9 @@ export function RoleProvider({ children }: { children: ReactNode }) {
     setEngineType,
     scoped,
     setScoped,
+    keyId,
+    keyName,
+    setKeyIdentity,
   };
 
   return <RoleContext.Provider value={value}>{children}</RoleContext.Provider>;

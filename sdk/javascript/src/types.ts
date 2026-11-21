@@ -1370,6 +1370,10 @@ export interface AuthValidateResponse {
   role?: 'admin' | 'operator' | 'viewer';
   engineType?: string;
   scoped?: boolean;
+  /** The calling key's own id; present only when the key is valid. */
+  keyId?: string;
+  /** The calling key's own display name; present only when the key is valid. */
+  keyName?: string;
 }
 
 // ── Template ──────────────────────────────────────────────────────

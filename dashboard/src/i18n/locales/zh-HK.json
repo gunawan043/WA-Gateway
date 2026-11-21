@@ -68,7 +68,10 @@
     "messageTester": "訊息測試器",
     "infrastructure": "基礎架構",
     "plugins": "外掛",
-    "logs": "記錄"
+    "logs": "記錄",
+    "inbox": "收件匣",
+    "pipeline": "銷售管道",
+    "campaigns": "活動"
   },
   "chats": {
     "edited": "已編輯",
@@ -1472,5 +1475,214 @@
       "current": "目前工作階段"
     },
     "loading": "搜尋中…"
+  },
+  "inbox": {
+    "title": "團隊收件匣",
+    "subtitle": "整理聊天、指派客服並保留內部備註。",
+    "session": "工作階段",
+    "noSessions": "暫無工作階段",
+    "conversations": "對話",
+    "searchPlaceholder": "搜尋名稱、聊天 ID 或最後一則訊息",
+    "noMessages": "暫無訊息",
+    "unassigned": "未指派",
+    "status": {
+      "open": "進行中",
+      "pending": "待處理",
+      "resolved": "已解決",
+      "all": "全部"
+    },
+    "assignee": {
+      "label": "負責人",
+      "all": "所有客服",
+      "me": "指派給我",
+      "unassigned": "未指派"
+    },
+    "empty": {
+      "title": "暫無對話",
+      "body": "調整篩選條件或等待收到訊息。",
+      "selectSession": "選擇一個工作階段開始。"
+    },
+    "error": {
+      "load": "無法載入收件匣。"
+    },
+    "detail": {
+      "selectPrompt": "在左側選擇一個對話。",
+      "assignee": "負責人",
+      "notes": "內部備註",
+      "noNotes": "暫無備註。",
+      "notePlaceholder": "撰寫內部備註…",
+      "addNote": "新增備註",
+      "deleteNote": "刪除備註"
+    },
+    "assignToMe": "我（{{name}}）",
+    "updated": "對話已更新",
+    "updateFailed": "無法更新對話",
+    "noteAdded": "備註已新增",
+    "noteDeleted": "備註已刪除",
+    "confirmDeleteNote": "刪除此備註？"
+  },
+  "pipeline": {
+    "title": "銷售管道",
+    "subtitle": "跨階段追蹤交易、指派負責人，並在交易上保留歷史記錄。",
+    "searchPlaceholder": "搜尋標題、備註或負責人",
+    "assignee": "負責人",
+    "allAgents": "所有負責人",
+    "assignedToMe": "指派給我",
+    "unassigned": "未指派",
+    "newDeal": "新增交易",
+    "columnEmpty": "將交易拖到此處",
+    "cancel": "取消",
+    "assignToMe": "我（{{name}}）",
+    "stats": {
+      "open": "進行中",
+      "won": "贏單",
+      "lost": "輸單",
+      "openValue": "進行中金額（混合貨幣）"
+    },
+    "error": {
+      "load": "無法載入銷售管道。"
+    },
+    "create": {
+      "title": "新增交易",
+      "submit": "建立交易",
+      "titlePlaceholder": "例如：年度合約"
+    },
+    "deal": {
+      "title": "標題",
+      "value": "金額",
+      "currency": "貨幣",
+      "stage": "階段",
+      "assignee": "負責人",
+      "expectedClose": "預計成交日期",
+      "notes": "備註",
+      "save": "儲存變更",
+      "delete": "刪除交易",
+      "confirmDelete": "刪除此交易及其全部歷史記錄？",
+      "activities": "歷史記錄",
+      "noActivities": "暫無活動記錄。",
+      "notePlaceholder": "為此交易新增備註…",
+      "addNote": "新增備註"
+    },
+    "activityKind": {
+      "created": "建立",
+      "stage_change": "階段變更",
+      "assignment": "指派",
+      "note": "備註",
+      "update": "更新"
+    },
+    "toast": {
+      "moved": "已移至 {{stage}}",
+      "created": "交易已建立",
+      "updated": "交易已更新",
+      "deleted": "交易已刪除",
+      "noteAdded": "備註已新增",
+      "saveFailed": "無法儲存交易"
+    }
+  },
+  "campaigns": {
+    "title": "活動",
+    "subtitle": "向多個聊天傳送一則訊息，並即時記錄每位收件人",
+    "session": "工作階段",
+    "status": {
+      "draft": "草稿",
+      "scheduled": "已排程",
+      "running": "執行中",
+      "completed": "已完成",
+      "cancelled": "已取消",
+      "failed": "失敗"
+    },
+    "allStatuses": "全部",
+    "new": "新增活動",
+    "searchPlaceholder": "搜尋活動",
+    "empty": "暫無活動。建立一個即可觸及全部受眾。",
+    "name": "活動",
+    "audience": "受眾",
+    "progress": "進度",
+    "createdAt": "已建立",
+    "none": "無",
+    "close": "關閉",
+    "audienceKind": {
+      "manual": "已選聊天",
+      "segment": "已儲存的分群",
+      "all": "工作階段中的所有聊天",
+      "label": "WhatsApp 標籤"
+    },
+    "messageType": {
+      "text": "文字",
+      "image": "圖片",
+      "video": "影片",
+      "audio": "音訊",
+      "document": "文件"
+    },
+    "recipientStatus": {
+      "pending": "待處理",
+      "sent": "已傳送",
+      "failed": "失敗",
+      "skipped": "已略過"
+    },
+    "error": {
+      "load": "無法載入活動。"
+    },
+    "wizard": {
+      "title": "新增活動",
+      "step1": "訊息",
+      "step2": "受眾",
+      "step3": "排程",
+      "next": "下一步",
+      "back": "返回",
+      "create": "建立活動"
+    },
+    "form": {
+      "name": "活動名稱",
+      "namePlaceholder": "例如：年終促銷",
+      "type": "訊息類型",
+      "message": "訊息",
+      "messagePlaceholder": "你好 {{name}}，...",
+      "mediaUrl": "媒體 URL",
+      "caption": "說明文字",
+      "mimetype": "MIME 類型（選填）",
+      "filename": "檔案名稱（文件）",
+      "variablesHint": "聊天名稱使用 {{name}}；會按每位收件人填入。",
+      "audienceKind": "受眾",
+      "searchChats": "搜尋聊天",
+      "selected": "已選 {{count}} 個",
+      "segment": "已儲存的分群",
+      "labelId": "標籤 ID",
+      "labelHint": "僅支援 whatsapp-web.js。Baileys 可寫入標籤但不支援查詢標籤，並傳回 501。",
+      "allHint": "工作階段中的所有聊天。傳送前請用預覽確認數量。",
+      "preview": "預覽受眾",
+      "previewCount": "{{count}} 個聊天",
+      "previewTruncated": "受眾超過 5000 個聊天的上限；請拆分為多個分群。",
+      "delay": "訊息間隔（毫秒）",
+      "randomize": "隨機化間隔",
+      "stopOnError": "遇到第一個錯誤時停止",
+      "schedule": "排程（選填）",
+      "scheduleHint": "留空日期以儲存為草稿。已排程的活動會自動開始。",
+      "saveSegment": "儲存為分群",
+      "segmentName": "分群名稱"
+    },
+    "detail": {
+      "title": "活動",
+      "start": "開始",
+      "cancel": "取消",
+      "delete": "刪除",
+      "confirmDelete": "刪除此活動及其收件人記錄？",
+      "recipients": "收件人",
+      "noRecipients": "暫無收件人。活動開始時會建立。",
+      "chat": "聊天",
+      "error": "錯誤",
+      "sent": "已傳送",
+      "failed": "失敗",
+      "skipped": "已略過",
+      "total": "總計"
+    },
+    "toast": {
+      "created": "活動已建立",
+      "started": "活動已開始",
+      "cancelled": "活動已取消",
+      "deleted": "活動已刪除",
+      "segmentSaved": "分群已儲存",
+      "failed": "活動操作失敗"
+    }
   }
 }

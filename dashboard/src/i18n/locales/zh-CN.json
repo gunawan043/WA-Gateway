@@ -68,7 +68,10 @@
     "messageTester": "消息测试器",
     "infrastructure": "基础设施",
     "plugins": "插件",
-    "logs": "日志"
+    "logs": "日志",
+    "inbox": "收件箱",
+    "pipeline": "销售管道",
+    "campaigns": "活动"
   },
   "chats": {
     "edited": "已编辑",
@@ -1472,5 +1475,214 @@
       "current": "当前会话"
     },
     "loading": "搜索中…"
+  },
+  "inbox": {
+    "title": "团队收件箱",
+    "subtitle": "整理聊天、分配客服并保留内部备注。",
+    "session": "会话",
+    "noSessions": "暂无会话",
+    "conversations": "对话",
+    "searchPlaceholder": "搜索名称、聊天 ID 或最后一条消息",
+    "noMessages": "暂无消息",
+    "unassigned": "未分配",
+    "status": {
+      "open": "进行中",
+      "pending": "待处理",
+      "resolved": "已解决",
+      "all": "全部"
+    },
+    "assignee": {
+      "label": "负责人",
+      "all": "所有客服",
+      "me": "分配给我",
+      "unassigned": "未分配"
+    },
+    "empty": {
+      "title": "暂无对话",
+      "body": "调整筛选条件或等待收到消息。",
+      "selectSession": "选择一个会话开始。"
+    },
+    "error": {
+      "load": "无法加载收件箱。"
+    },
+    "detail": {
+      "selectPrompt": "在左侧选择一个对话。",
+      "assignee": "负责人",
+      "notes": "内部备注",
+      "noNotes": "暂无备注。",
+      "notePlaceholder": "编写内部备注…",
+      "addNote": "添加备注",
+      "deleteNote": "删除备注"
+    },
+    "assignToMe": "我（{{name}}）",
+    "updated": "对话已更新",
+    "updateFailed": "无法更新对话",
+    "noteAdded": "备注已添加",
+    "noteDeleted": "备注已删除",
+    "confirmDeleteNote": "删除此备注？"
+  },
+  "pipeline": {
+    "title": "销售管道",
+    "subtitle": "跨阶段跟踪交易、指定负责人，并在交易上保留历史记录。",
+    "searchPlaceholder": "搜索标题、备注或负责人",
+    "assignee": "负责人",
+    "allAgents": "所有负责人",
+    "assignedToMe": "分配给我",
+    "unassigned": "未分配",
+    "newDeal": "新建交易",
+    "columnEmpty": "将交易拖到此处",
+    "cancel": "取消",
+    "assignToMe": "我（{{name}}）",
+    "stats": {
+      "open": "进行中",
+      "won": "赢单",
+      "lost": "输单",
+      "openValue": "进行中金额（混合货币）"
+    },
+    "error": {
+      "load": "无法加载销售管道。"
+    },
+    "create": {
+      "title": "新建交易",
+      "submit": "创建交易",
+      "titlePlaceholder": "例如：年度合同"
+    },
+    "deal": {
+      "title": "标题",
+      "value": "金额",
+      "currency": "货币",
+      "stage": "阶段",
+      "assignee": "负责人",
+      "expectedClose": "预计成交日期",
+      "notes": "备注",
+      "save": "保存更改",
+      "delete": "删除交易",
+      "confirmDelete": "删除此交易及其全部历史记录？",
+      "activities": "历史记录",
+      "noActivities": "暂无活动记录。",
+      "notePlaceholder": "为此交易添加备注…",
+      "addNote": "添加备注"
+    },
+    "activityKind": {
+      "created": "创建",
+      "stage_change": "阶段变更",
+      "assignment": "分配",
+      "note": "备注",
+      "update": "更新"
+    },
+    "toast": {
+      "moved": "已移至 {{stage}}",
+      "created": "交易已创建",
+      "updated": "交易已更新",
+      "deleted": "交易已删除",
+      "noteAdded": "备注已添加",
+      "saveFailed": "无法保存交易"
+    }
+  },
+  "campaigns": {
+    "title": "活动",
+    "subtitle": "向多个聊天发送一条消息，并实时记录每位收件人",
+    "session": "会话",
+    "status": {
+      "draft": "草稿",
+      "scheduled": "已排期",
+      "running": "运行中",
+      "completed": "已完成",
+      "cancelled": "已取消",
+      "failed": "失败"
+    },
+    "allStatuses": "全部",
+    "new": "新建活动",
+    "searchPlaceholder": "搜索活动",
+    "empty": "暂无活动。创建一个即可触达全部受众。",
+    "name": "活动",
+    "audience": "受众",
+    "progress": "进度",
+    "createdAt": "已创建",
+    "none": "无",
+    "close": "关闭",
+    "audienceKind": {
+      "manual": "已选聊天",
+      "segment": "已保存的分群",
+      "all": "会话中的所有聊天",
+      "label": "WhatsApp 标签"
+    },
+    "messageType": {
+      "text": "文本",
+      "image": "图片",
+      "video": "视频",
+      "audio": "音频",
+      "document": "文档"
+    },
+    "recipientStatus": {
+      "pending": "待处理",
+      "sent": "已发送",
+      "failed": "失败",
+      "skipped": "已跳过"
+    },
+    "error": {
+      "load": "无法加载活动。"
+    },
+    "wizard": {
+      "title": "新建活动",
+      "step1": "消息",
+      "step2": "受众",
+      "step3": "排期",
+      "next": "下一步",
+      "back": "返回",
+      "create": "创建活动"
+    },
+    "form": {
+      "name": "活动名称",
+      "namePlaceholder": "例如：年终促销",
+      "type": "消息类型",
+      "message": "消息",
+      "messagePlaceholder": "你好 {{name}}，...",
+      "mediaUrl": "媒体 URL",
+      "caption": "说明文字",
+      "mimetype": "MIME 类型（可选）",
+      "filename": "文件名（文档）",
+      "variablesHint": "聊天名称使用 {{name}}；会按每位收件人填充。",
+      "audienceKind": "受众",
+      "searchChats": "搜索聊天",
+      "selected": "已选 {{count}} 个",
+      "segment": "已保存的分群",
+      "labelId": "标签 ID",
+      "labelHint": "仅支持 whatsapp-web.js。Baileys 可写入标签但不支持查询标签，并返回 501。",
+      "allHint": "会话中的所有聊天。发送前请用预览确认数量。",
+      "preview": "预览受众",
+      "previewCount": "{{count}} 个聊天",
+      "previewTruncated": "受众超过 5000 个聊天的上限；请拆分为多个分群。",
+      "delay": "消息间隔（毫秒）",
+      "randomize": "随机化间隔",
+      "stopOnError": "遇到第一个错误时停止",
+      "schedule": "排期（可选）",
+      "scheduleHint": "留空日期以保存为草稿。已排期的活动会自动开始。",
+      "saveSegment": "保存为分群",
+      "segmentName": "分群名称"
+    },
+    "detail": {
+      "title": "活动",
+      "start": "开始",
+      "cancel": "取消",
+      "delete": "删除",
+      "confirmDelete": "删除此活动及其收件人记录？",
+      "recipients": "收件人",
+      "noRecipients": "暂无收件人。活动开始时会创建。",
+      "chat": "聊天",
+      "error": "错误",
+      "sent": "已发送",
+      "failed": "失败",
+      "skipped": "已跳过",
+      "total": "总计"
+    },
+    "toast": {
+      "created": "活动已创建",
+      "started": "活动已开始",
+      "cancelled": "活动已取消",
+      "deleted": "活动已删除",
+      "segmentSaved": "分群已保存",
+      "failed": "活动操作失败"
+    }
   }
 }

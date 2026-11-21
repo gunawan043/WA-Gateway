@@ -902,6 +902,21 @@ export class InfraDataService {
         await clearTable('integration_delivery_failures');
         // status_updates has no FK to sessions; clear it explicitly so the replace is complete.
         await clearTable('status_updates');
+        // inbox_notes references inbox_conversations, not sessions, so the sessions DELETE below does
+        // not reach it. Clear it first: the archive re-inserts it with its original ids and a restore
+        // onto the same instance would otherwise collide on the primary key.
+        await clearTable('inbox_notes');
+        // Sales pipeline: neither table carries a FK to sessions. Clear activities before deals (the
+        // FK cascades, but explicit clearing keeps the order correct where it is not enforced) so a
+        // restore onto the instance that produced the archive does not collide on primary keys.
+        await clearTable('crm_deal_activities');
+        await clearTable('crm_deals');
+        // Broadcast campaigns: recipients cascade from their campaign, but clearing them explicitly
+        // keeps the order correct where the cascade is not enforced. Segments have no FK at all and
+        // would otherwise collide on their primary keys when a restore targets the source instance.
+        await clearTable('campaign_recipients');
+        await clearTable('campaigns');
+        await clearTable('campaign_segments');
         // Session ownership is CLUSTER RUNTIME STATE, not backup payload: which process currently holds
         // a session's engine, and until when. The replace below deletes it along with everything else,
         // and the sessions importer does not restore it (deliberately — see below), so without this the

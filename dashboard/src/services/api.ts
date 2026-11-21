@@ -1702,3 +1702,398 @@ export const statsApi = {
   getOverview: () => request<OverviewStats>('/stats/overview'),
   getMessages: (period: StatsPeriod) => request<MessageStats>(`/stats/messages?period=${period}`),
 };
+
+// =============================================================================
+// Team Inbox API (mirrors src/modules/inbox)
+// =============================================================================
+
+export type InboxStatus = 'open' | 'pending' | 'resolved';
+export type InboxAssigneeFilter = 'all' | 'me' | 'unassigned' | string;
+
+export interface InboxConversation {
+  chatId: string;
+  name: string;
+  isGroup: boolean;
+  kind: ChatKind;
+  unreadCount: number;
+  timestamp: number;
+  lastMessage?: string;
+  lastMessageType?: MessageType;
+  archived: boolean;
+  pinned: boolean;
+  status: InboxStatus;
+  assigneeKeyId: string | null;
+  assigneeName: string | null;
+  resolvedAt: string | null;
+}
+
+export interface InboxNote {
+  id: string;
+  authorKeyId: string;
+  authorName: string;
+  body: string;
+  createdAt: string;
+}
+
+export interface InboxConversationDetail extends InboxConversation {
+  notes: InboxNote[];
+}
+
+export interface InboxSummary {
+  total: number;
+  open: number;
+  pending: number;
+  resolved: number;
+  unassigned: number;
+  mine: number;
+}
+
+export interface InboxListParams {
+  status?: InboxStatus;
+  assignee?: InboxAssigneeFilter;
+  q?: string;
+  limit?: number;
+  offset?: number;
+}
+
+/** One assignable agent: an active API key's id and display name (GET /auth/agents). */
+export interface AgentDirectoryEntry {
+  id: string;
+  name: string;
+}
+
+export const inboxApi = {
+  agents: () => request<AgentDirectoryEntry[]>('/auth/agents'),
+  list: (sessionId: string, params: InboxListParams = {}) => {
+    const query = new URLSearchParams();
+    if (params.status) query.set('status', params.status);
+    if (params.assignee && params.assignee !== 'all') query.set('assignee', params.assignee);
+    if (params.q) query.set('q', params.q);
+    if (params.limit !== undefined) query.set('limit', String(params.limit));
+    if (params.offset !== undefined) query.set('offset', String(params.offset));
+    const suffix = query.toString();
+    return request<InboxConversation[]>(`/sessions/${sessionId}/inbox/conversations${suffix ? `?${suffix}` : ''}`);
+  },
+  summary: (sessionId: string) => request<InboxSummary>(`/sessions/${sessionId}/inbox/summary`),
+  get: (sessionId: string, chatId: string) =>
+    request<InboxConversationDetail>(`/sessions/${sessionId}/inbox/conversations/${encodeURIComponent(chatId)}`),
+  update: (sessionId: string, chatId: string, data: { status?: InboxStatus; assigneeKeyId?: string | null }) =>
+    request<InboxConversationDetail>(`/sessions/${sessionId}/inbox/conversations/${encodeURIComponent(chatId)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+  addNote: (sessionId: string, chatId: string, body: string) =>
+    request<InboxNote>(`/sessions/${sessionId}/inbox/conversations/${encodeURIComponent(chatId)}/notes`, {
+      method: 'POST',
+      body: JSON.stringify({ body }),
+    }),
+  deleteNote: (sessionId: string, chatId: string, noteId: string) =>
+    request<void>(
+      `/sessions/${sessionId}/inbox/conversations/${encodeURIComponent(chatId)}/notes/${encodeURIComponent(noteId)}`,
+      { method: 'DELETE' },
+    ),
+};
+
+// =============================================================================
+// CRM pipeline API (mirrors src/modules/crm)
+// =============================================================================
+
+export type CrmDealStatus = 'open' | 'won' | 'lost';
+export type CrmStageKind = 'open' | 'won' | 'lost';
+export type CrmAssigneeFilter = 'all' | 'me' | 'unassigned' | string;
+
+export interface CrmStage {
+  id: string;
+  name: string;
+  kind: CrmStageKind;
+  position: number;
+  color: string | null;
+}
+
+export interface CrmDeal {
+  id: string;
+  stageId: string;
+  title: string;
+  sessionId: string | null;
+  chatId: string | null;
+  value: number | null;
+  currency: string;
+  status: CrmDealStatus;
+  assigneeKeyId: string | null;
+  assigneeName: string | null;
+  expectedCloseAt: string | null;
+  closedAt: string | null;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type CrmActivityKind = 'created' | 'stage_change' | 'assignment' | 'note' | 'update';
+
+export interface CrmActivity {
+  id: string;
+  kind: CrmActivityKind;
+  body: string | null;
+  fromStageId: string | null;
+  toStageId: string | null;
+  authorKeyId: string;
+  authorName: string;
+  createdAt: string;
+}
+
+export interface CrmDealDetail extends CrmDeal {
+  activities: CrmActivity[];
+}
+
+export interface CrmBoardColumn {
+  stage: CrmStage;
+  deals: CrmDeal[];
+}
+
+export interface CrmBoard {
+  columns: CrmBoardColumn[];
+  open: number;
+  won: number;
+  lost: number;
+  openValue: number;
+}
+
+export interface CrmDealListParams {
+  status?: CrmDealStatus;
+  stageId?: string;
+  assignee?: CrmAssigneeFilter;
+  q?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export interface CreateCrmDealInput {
+  title: string;
+  stageId?: string;
+  sessionId?: string;
+  chatId?: string;
+  value?: number | null;
+  currency?: string;
+  assigneeKeyId?: string | null;
+  expectedCloseAt?: string | null;
+  notes?: string | null;
+}
+
+export interface UpdateCrmDealInput {
+  title?: string;
+  stageId?: string;
+  value?: number | null;
+  currency?: string;
+  assigneeKeyId?: string | null;
+  expectedCloseAt?: string | null;
+  notes?: string | null;
+}
+
+export const crmApi = {
+  board: () => request<CrmBoard>('/crm/board'),
+  stages: () => request<CrmStage[]>('/crm/stages'),
+  updateStage: (id: string, data: { name?: string; position?: number; color?: string | null }) =>
+    request<CrmStage>(`/crm/stages/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  list: (params: CrmDealListParams = {}) => {
+    const query = new URLSearchParams();
+    if (params.status) query.set('status', params.status);
+    if (params.stageId) query.set('stageId', params.stageId);
+    if (params.assignee && params.assignee !== 'all') query.set('assignee', params.assignee);
+    if (params.q) query.set('q', params.q);
+    if (params.limit !== undefined) query.set('limit', String(params.limit));
+    if (params.offset !== undefined) query.set('offset', String(params.offset));
+    const suffix = query.toString();
+    return request<CrmDeal[]>(`/crm/deals${suffix ? `?${suffix}` : ''}`);
+  },
+  create: (data: CreateCrmDealInput) =>
+    request<CrmDealDetail>('/crm/deals', { method: 'POST', body: JSON.stringify(data) }),
+  get: (id: string) => request<CrmDealDetail>(`/crm/deals/${encodeURIComponent(id)}`),
+  update: (id: string, data: UpdateCrmDealInput) =>
+    request<CrmDealDetail>(`/crm/deals/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  remove: (id: string) => request<void>(`/crm/deals/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  addActivity: (id: string, body: string) =>
+    request<CrmActivity>(`/crm/deals/${encodeURIComponent(id)}/activities`, {
+      method: 'POST',
+      body: JSON.stringify({ body }),
+    }),
+};
+
+// =============================================================================
+// Campaigns
+// =============================================================================
+
+export type CampaignStatus = 'draft' | 'scheduled' | 'running' | 'completed' | 'cancelled' | 'failed';
+export type CampaignAudienceKind = 'manual' | 'segment' | 'all' | 'label';
+export type CampaignMessageType = 'text' | 'image' | 'video' | 'audio' | 'document';
+export type CampaignRecipientStatus = 'pending' | 'sent' | 'failed' | 'skipped';
+
+/** One media reference, matching a bulk message item's content. */
+export interface CampaignMedia {
+  url?: string;
+  base64?: string;
+  mimetype?: string;
+  filename?: string;
+  ptt?: boolean;
+}
+
+export interface CampaignContentBody {
+  text?: string;
+  caption?: string;
+  image?: CampaignMedia;
+  video?: CampaignMedia;
+  audio?: CampaignMedia;
+  document?: CampaignMedia;
+}
+
+export interface CampaignContent {
+  type: CampaignMessageType;
+  content: CampaignContentBody;
+}
+
+export interface CampaignOptions {
+  delayBetweenMessages: number;
+  randomizeDelay: boolean;
+  stopOnError: boolean;
+}
+
+export interface CampaignAudience {
+  kind: CampaignAudienceKind;
+  chatIds?: string[];
+  segmentId?: string;
+  labelId?: string;
+}
+
+export interface CampaignProgress {
+  total: number;
+  sent: number;
+  failed: number;
+  skipped: number;
+}
+
+export interface Campaign {
+  id: string;
+  sessionId: string;
+  name: string;
+  status: CampaignStatus;
+  content: CampaignContent;
+  options: CampaignOptions;
+  audience: CampaignAudience;
+  progress: CampaignProgress;
+  scheduledAt: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+  createdByKeyId: string | null;
+  createdByName: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CampaignRecipient {
+  chatId: string;
+  chatName: string | null;
+  status: CampaignRecipientStatus;
+  messageId: string | null;
+  errorCode: string | null;
+  errorMessage: string | null;
+  sentAt: string | null;
+}
+
+export interface CampaignDetail extends Campaign {
+  recipients: CampaignRecipient[];
+}
+
+export interface CampaignSegment {
+  id: string;
+  name: string;
+  chatIds: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CampaignSample {
+  chatId: string;
+  chatName: string | null;
+}
+
+export interface CampaignPreviewResult {
+  count: number;
+  sample: CampaignSample[];
+  truncated: boolean;
+}
+
+export interface CampaignListParams {
+  status?: CampaignStatus;
+  limit?: number;
+  offset?: number;
+}
+
+export interface CreateCampaignInput {
+  name: string;
+  content: CampaignContent;
+  audience?: CampaignAudience;
+  options?: Partial<CampaignOptions>;
+  scheduledAt?: string | null;
+}
+
+export interface UpdateCampaignInput {
+  name?: string;
+  content?: CampaignContent;
+  audience?: CampaignAudience;
+  options?: Partial<CampaignOptions>;
+  scheduledAt?: string | null;
+}
+
+const campaignBase = (sessionId: string) => `/sessions/${encodeURIComponent(sessionId)}/campaigns`;
+
+export const campaignApi = {
+  list: (sessionId: string, params: CampaignListParams = {}) => {
+    const query = new URLSearchParams();
+    if (params.status) query.set('status', params.status);
+    if (params.limit !== undefined) query.set('limit', String(params.limit));
+    if (params.offset !== undefined) query.set('offset', String(params.offset));
+    const suffix = query.toString();
+    return request<Campaign[]>(`${campaignBase(sessionId)}${suffix ? `?${suffix}` : ''}`);
+  },
+  create: (sessionId: string, data: CreateCampaignInput) =>
+    request<Campaign>(campaignBase(sessionId), { method: 'POST', body: JSON.stringify(data) }),
+  get: (sessionId: string, id: string) =>
+    request<CampaignDetail>(`${campaignBase(sessionId)}/${encodeURIComponent(id)}`),
+  update: (sessionId: string, id: string, data: UpdateCampaignInput) =>
+    request<Campaign>(`${campaignBase(sessionId)}/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+  remove: (sessionId: string, id: string) =>
+    request<void>(`${campaignBase(sessionId)}/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  start: (sessionId: string, id: string) =>
+    request<Campaign>(`${campaignBase(sessionId)}/${encodeURIComponent(id)}/start`, { method: 'POST' }),
+  cancel: (sessionId: string, id: string) =>
+    request<Campaign>(`${campaignBase(sessionId)}/${encodeURIComponent(id)}/cancel`, { method: 'POST' }),
+  recipients: (
+    sessionId: string,
+    id: string,
+    params: { status?: CampaignRecipientStatus; limit?: number; offset?: number } = {},
+  ) => {
+    const query = new URLSearchParams();
+    if (params.status) query.set('status', params.status);
+    if (params.limit !== undefined) query.set('limit', String(params.limit));
+    if (params.offset !== undefined) query.set('offset', String(params.offset));
+    const suffix = query.toString();
+    return request<CampaignRecipient[]>(
+      `${campaignBase(sessionId)}/${encodeURIComponent(id)}/recipients${suffix ? `?${suffix}` : ''}`,
+    );
+  },
+  preview: (sessionId: string, audience: CampaignAudience, sampleSize = 20) =>
+    request<CampaignPreviewResult>(`${campaignBase(sessionId)}/preview`, {
+      method: 'POST',
+      body: JSON.stringify({ audience, sampleSize }),
+    }),
+  segments: (sessionId: string) => request<CampaignSegment[]>(`${campaignBase(sessionId)}/segments`),
+  createSegment: (sessionId: string, data: { name: string; chatIds: string[] }) =>
+    request<CampaignSegment>(`${campaignBase(sessionId)}/segments`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  removeSegment: (sessionId: string, id: string) =>
+    request<void>(`${campaignBase(sessionId)}/segments/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+};

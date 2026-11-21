@@ -49,8 +49,8 @@ All five SDKs expose the same fluent resource surface:
 > ⚠️ Check the per-route **Auth** lines in the [API specification](../docs/06-api-specification.md) for the required API-key role in every SDK. The JavaScript, Python and PHP method tables in the [SDK design](../docs/18-sdk-design.md) also mark role requirements.
 >
 > Deliberately **not** exposed, matching `docs/18-sdk-design.md` exactly:
-> `auth/api-keys` (key validation itself is the `auth` row above), `audit`,
-> `settings`, `stats`, `automation`, `infra`,
+> `auth/api-keys`, `auth/agents` (key validation itself is the `auth` row above), `audit`,
+> `settings`, `stats`, `automation`, `infra`, `inbox`, `crm`, `campaigns`,
 > `plugins`, the `integration` management routes, `metrics`, `mcp`, `ingress`
 > and `docker`. These two lists have to agree — they did not, in both
 > directions, and a list that disagrees with its own design doc reads as an

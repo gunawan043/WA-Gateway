@@ -26,6 +26,8 @@ export class AuthValidateController {
     role?: string;
     engineType?: string;
     scoped?: boolean;
+    keyId?: string;
+    keyName?: string;
   } {
     // This route is behind the global API-key guard, so only a validated key reaches this handler
     // (a missing/invalid key 401s first). The guard has already verified the key — including its
@@ -45,6 +47,10 @@ export class AuthValidateController {
       role: apiKey.role,
       engineType: this.engineFactory.getCurrentEngine(),
       scoped: (apiKey.allowedSessions?.length ?? 0) > 0,
+      // The inbox shows "assigned to me" and self-assignment from these; they describe the caller's
+      // own key, so exposing them to the caller reveals nothing it did not already present.
+      keyId: apiKey.id,
+      keyName: apiKey.name,
     };
   }
 }

@@ -170,6 +170,17 @@ export class ValidateApiKeyResponseDto {
     example: false,
   })
   scoped?: boolean;
+
+  @ApiPropertyOptional({
+    description: "The calling key's own id; present only when valid. Used by the inbox for self-assignment.",
+  })
+  keyId?: string;
+
+  @ApiPropertyOptional({
+    description: "The calling key's own name (the agent display name); present only when valid.",
+    example: 'Agen A',
+  })
+  keyName?: string;
 }
 
 export class UpdateApiKeyDto {

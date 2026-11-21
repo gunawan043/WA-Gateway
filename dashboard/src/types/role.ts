@@ -14,4 +14,12 @@ export interface RoleContextType {
   /** Whether the key is restricted to selected sessions, so the cross-session routes refuse it. */
   scoped: boolean;
   setScoped: (scoped: boolean) => void;
+  /**
+   * The calling key's own id and name, from /auth/validate. The inbox uses them for "assigned to me"
+   * and self-assignment. Optional so test fixtures written before this field existed still type-check;
+   * RoleProvider always supplies them.
+   */
+  keyId?: string | null;
+  keyName?: string | null;
+  setKeyIdentity?: (keyId: string | null, keyName: string | null) => void;
 }
