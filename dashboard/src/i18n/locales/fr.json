@@ -1822,7 +1822,20 @@
     "deleteFailed": "Impossible de supprimer l'utilisateur",
     "resetFailed": "Impossible de réinitialiser le mot de passe",
     "changeFailed": "Impossible de modifier le mot de passe",
-    "deactivateHint": "Un compte désactivé ne peut pas se connecter, et ses sessions ouvertes prennent fin maintenant."
+    "deactivateHint": "Un compte désactivé ne peut pas se connecter, et ses sessions ouvertes prennent fin maintenant.",
+    "session": "Session",
+    "noSessions": "Aucune session disponible",
+    "divisionFilter": "Division",
+    "allDivisions": "Toutes les divisions",
+    "divisions": "Divisions",
+    "noDivision": "Aucune division",
+    "manageDivisions": "Gérer les divisions",
+    "divisionsHint": "L'appartenance est propre à chaque session. Le CS répond dans cette session aux conversations dirigées vers cette division.",
+    "divisionsSaved": "Divisions mises à jour",
+    "divisionsFailed": "Impossible de mettre à jour les divisions",
+    "divisionsLoadError": "Impossible de charger les divisions",
+    "noDivisions": "Cette session n'a pas encore de division. Créez-en une sur la page Divisions.",
+    "filteredEmpty": "Aucun utilisateur ne correspond à ce filtre."
   },
   "divisions": {
     "title": "Divisions",

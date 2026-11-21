@@ -1822,7 +1822,20 @@
     "deleteFailed": "Impossibile eliminare l'utente",
     "resetFailed": "Impossibile reimpostare la password",
     "changeFailed": "Impossibile cambiare la password",
-    "deactivateHint": "Un account disattivato non può accedere e le sue sessioni aperte terminano subito."
+    "deactivateHint": "Un account disattivato non può accedere e le sue sessioni aperte terminano subito.",
+    "session": "Sessione",
+    "noSessions": "Nessuna sessione disponibile",
+    "divisionFilter": "Divisione",
+    "allDivisions": "Tutte le divisioni",
+    "divisions": "Divisioni",
+    "noDivision": "Nessuna divisione",
+    "manageDivisions": "Gestisci divisioni",
+    "divisionsHint": "L'appartenenza è per sessione. Il CS risponde in questa sessione alle chat indirizzate a questa divisione.",
+    "divisionsSaved": "Divisioni aggiornate",
+    "divisionsFailed": "Impossibile aggiornare le divisioni",
+    "divisionsLoadError": "Impossibile caricare le divisioni",
+    "noDivisions": "Questa sessione non ha ancora divisioni. Creane una nella pagina Divisioni.",
+    "filteredEmpty": "Nessun utente corrisponde a questo filtro."
   },
   "divisions": {
     "title": "Divisioni",

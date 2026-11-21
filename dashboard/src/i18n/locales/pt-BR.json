@@ -1822,7 +1822,20 @@
     "deleteFailed": "Não foi possível excluir o usuário",
     "resetFailed": "Não foi possível redefinir a senha",
     "changeFailed": "Não foi possível alterar a senha",
-    "deactivateHint": "Uma conta desativada não pode entrar, e as sessões abertas terminam agora."
+    "deactivateHint": "Uma conta desativada não pode entrar, e as sessões abertas terminam agora.",
+    "session": "Sessão",
+    "noSessions": "Nenhuma sessão disponível",
+    "divisionFilter": "Divisão",
+    "allDivisions": "Todas as divisões",
+    "divisions": "Divisões",
+    "noDivision": "Sem divisão",
+    "manageDivisions": "Gerenciar divisões",
+    "divisionsHint": "A participação é por sessão. O CS responde nesta sessão às conversas encaminhadas para esta divisão.",
+    "divisionsSaved": "Divisões atualizadas",
+    "divisionsFailed": "Não foi possível atualizar as divisões",
+    "divisionsLoadError": "Não foi possível carregar as divisões",
+    "noDivisions": "Esta sessão ainda não tem divisões. Crie uma na página Divisões.",
+    "filteredEmpty": "Nenhum usuário corresponde a este filtro."
   },
   "divisions": {
     "title": "Divisões",

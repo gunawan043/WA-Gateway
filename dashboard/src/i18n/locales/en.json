@@ -1813,7 +1813,20 @@
     "deleteFailed": "Could not delete the user",
     "resetFailed": "Could not reset the password",
     "changeFailed": "Could not change the password",
-    "deactivateHint": "A disabled account cannot sign in, and its open sessions end now."
+    "deactivateHint": "A disabled account cannot sign in, and its open sessions end now.",
+    "session": "Session",
+    "noSessions": "No session available",
+    "divisionFilter": "Division",
+    "allDivisions": "All divisions",
+    "divisions": "Divisions",
+    "noDivision": "No division",
+    "manageDivisions": "Manage divisions",
+    "divisionsHint": "Membership is per session. The CS answers this division's routed chats in this session.",
+    "divisionsSaved": "Divisions updated",
+    "divisionsFailed": "Could not update the divisions",
+    "divisionsLoadError": "Could not load divisions",
+    "noDivisions": "This session has no divisions yet. Create one on the Divisions page.",
+    "filteredEmpty": "No user matches this filter."
   },
   "divisions": {
     "title": "Divisions",

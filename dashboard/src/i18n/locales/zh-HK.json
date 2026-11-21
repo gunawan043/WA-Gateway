@@ -1813,7 +1813,20 @@
     "deleteFailed": "無法刪除用戶",
     "resetFailed": "無法重設密碼",
     "changeFailed": "無法更改密碼",
-    "deactivateHint": "已停用的帳戶無法登入，其已開啟的工作階段會立即結束。"
+    "deactivateHint": "已停用的帳戶無法登入，其已開啟的工作階段會立即結束。",
+    "session": "工作階段",
+    "noSessions": "沒有可用的工作階段",
+    "divisionFilter": "部門",
+    "allDivisions": "所有部門",
+    "divisions": "部門",
+    "noDivision": "未分配部門",
+    "manageDivisions": "管理部門",
+    "divisionsHint": "成員關係按工作階段區分。客服會在此工作階段回覆路由到該部門的對話。",
+    "divisionsSaved": "部門已更新",
+    "divisionsFailed": "無法更新部門",
+    "divisionsLoadError": "無法載入部門",
+    "noDivisions": "此工作階段還沒有部門。請在部門頁面建立一個。",
+    "filteredEmpty": "沒有用戶符合此篩選條件。"
   },
   "divisions": {
     "title": "部門",

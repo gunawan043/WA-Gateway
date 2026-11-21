@@ -1832,7 +1832,20 @@
     "deleteFailed": "לא ניתן למחוק את המשתמש",
     "resetFailed": "לא ניתן לאפס את הסיסמה",
     "changeFailed": "לא ניתן לשנות את הסיסמה",
-    "deactivateHint": "חשבון מושבת לא יכול להיכנס, וה-Sessions הפתוחים שלו מסתיימים כעת."
+    "deactivateHint": "חשבון מושבת לא יכול להיכנס, וה-Sessions הפתוחים שלו מסתיימים כעת.",
+    "session": "Session",
+    "noSessions": "אין Session זמין",
+    "divisionFilter": "חטיבה",
+    "allDivisions": "כל החטיבות",
+    "divisions": "חטיבות",
+    "noDivision": "ללא חטיבה",
+    "manageDivisions": "ניהול חטיבות",
+    "divisionsHint": "השיוך הוא לכל Session בנפרד. איש השירות עונה ב-Session הזה על השיחות שהופנו לחטיבה הזו.",
+    "divisionsSaved": "החטיבות עודכנו",
+    "divisionsFailed": "עדכון החטיבות נכשל",
+    "divisionsLoadError": "טעינת החטיבות נכשלה",
+    "noDivisions": "ב-Session הזה אין עדיין חטיבות. אפשר ליצור אחת בעמוד החטיבות.",
+    "filteredEmpty": "אין משתמש שמתאים לסינון הזה."
   },
   "divisions": {
     "title": "חטיבות",

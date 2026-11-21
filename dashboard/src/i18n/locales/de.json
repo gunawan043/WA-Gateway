@@ -1813,7 +1813,20 @@
     "deleteFailed": "Der Benutzer konnte nicht gelöscht werden",
     "resetFailed": "Das Passwort konnte nicht zurückgesetzt werden",
     "changeFailed": "Das Passwort konnte nicht geändert werden",
-    "deactivateHint": "Ein deaktiviertes Konto kann sich nicht anmelden, und seine offenen Sitzungen enden jetzt."
+    "deactivateHint": "Ein deaktiviertes Konto kann sich nicht anmelden, und seine offenen Sitzungen enden jetzt.",
+    "session": "Sitzung",
+    "noSessions": "Keine Sitzung verfügbar",
+    "divisionFilter": "Abteilung",
+    "allDivisions": "Alle Abteilungen",
+    "divisions": "Abteilungen",
+    "noDivision": "Keine Abteilung",
+    "manageDivisions": "Abteilungen verwalten",
+    "divisionsHint": "Die Mitgliedschaft gilt pro Sitzung. Der CS beantwortet in dieser Sitzung die dieser Abteilung zugewiesenen Chats.",
+    "divisionsSaved": "Abteilungen aktualisiert",
+    "divisionsFailed": "Abteilungen konnten nicht aktualisiert werden",
+    "divisionsLoadError": "Abteilungen konnten nicht geladen werden",
+    "noDivisions": "Diese Sitzung hat noch keine Abteilung. Lege eine auf der Seite Abteilungen an.",
+    "filteredEmpty": "Kein Benutzer passt zu diesem Filter."
   },
   "divisions": {
     "title": "Abteilungen",

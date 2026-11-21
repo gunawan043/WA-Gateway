@@ -1813,7 +1813,20 @@
     "deleteFailed": "Gagal menghapus pengguna",
     "resetFailed": "Gagal mereset kata sandi",
     "changeFailed": "Gagal mengubah kata sandi",
-    "deactivateHint": "Akun yang dinonaktifkan tidak bisa masuk, dan sesi yang terbuka berakhir sekarang."
+    "deactivateHint": "Akun yang dinonaktifkan tidak bisa masuk, dan sesi yang terbuka berakhir sekarang.",
+    "session": "Sesi",
+    "noSessions": "Belum ada sesi",
+    "divisionFilter": "Divisi",
+    "allDivisions": "Semua divisi",
+    "divisions": "Divisi",
+    "noDivision": "Tanpa divisi",
+    "manageDivisions": "Atur divisi",
+    "divisionsHint": "Keanggotaan berlaku per sesi. CS menjawab chat yang dirutekan ke divisi ini pada sesi tersebut.",
+    "divisionsSaved": "Divisi diperbarui",
+    "divisionsFailed": "Gagal memperbarui divisi",
+    "divisionsLoadError": "Gagal memuat divisi",
+    "noDivisions": "Sesi ini belum punya divisi. Buat dulu di halaman Divisi.",
+    "filteredEmpty": "Tidak ada pengguna yang cocok dengan filter ini."
   },
   "divisions": {
     "title": "Divisi",

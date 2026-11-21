@@ -1822,7 +1822,20 @@
     "deleteFailed": "No se pudo eliminar el usuario",
     "resetFailed": "No se pudo restablecer la contraseña",
     "changeFailed": "No se pudo cambiar la contraseña",
-    "deactivateHint": "Una cuenta desactivada no puede iniciar sesión y sus sesiones abiertas terminan ahora."
+    "deactivateHint": "Una cuenta desactivada no puede iniciar sesión y sus sesiones abiertas terminan ahora.",
+    "session": "Sesión",
+    "noSessions": "No hay ninguna sesión disponible",
+    "divisionFilter": "División",
+    "allDivisions": "Todas las divisiones",
+    "divisions": "Divisiones",
+    "noDivision": "Sin división",
+    "manageDivisions": "Gestionar divisiones",
+    "divisionsHint": "La pertenencia es por sesión. El CS responde en esta sesión a los chats dirigidos a esta división.",
+    "divisionsSaved": "Divisiones actualizadas",
+    "divisionsFailed": "No se pudieron actualizar las divisiones",
+    "divisionsLoadError": "No se pudieron cargar las divisiones",
+    "noDivisions": "Esta sesión aún no tiene divisiones. Crea una en la página Divisiones.",
+    "filteredEmpty": "Ningún usuario coincide con este filtro."
   },
   "divisions": {
     "title": "Divisiones",

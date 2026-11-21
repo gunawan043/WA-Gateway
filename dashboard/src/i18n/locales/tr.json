@@ -1813,7 +1813,20 @@
     "deleteFailed": "Kullanıcı silinemedi",
     "resetFailed": "Şifre sıfırlanamadı",
     "changeFailed": "Şifre değiştirilemedi",
-    "deactivateHint": "Devre dışı bir hesap oturum açamaz ve açık oturumları hemen sona erer."
+    "deactivateHint": "Devre dışı bir hesap oturum açamaz ve açık oturumları hemen sona erer.",
+    "session": "Oturum",
+    "noSessions": "Kullanılabilir oturum yok",
+    "divisionFilter": "Bölüm",
+    "allDivisions": "Tüm bölümler",
+    "divisions": "Bölümler",
+    "noDivision": "Bölüm yok",
+    "manageDivisions": "Bölümleri yönet",
+    "divisionsHint": "Üyelik oturum başına geçerlidir. CS, bu oturumda bu bölüme yönlendirilen sohbetleri yanıtlar.",
+    "divisionsSaved": "Bölümler güncellendi",
+    "divisionsFailed": "Bölümler güncellenemedi",
+    "divisionsLoadError": "Bölümler yüklenemedi",
+    "noDivisions": "Bu oturumda henüz bölüm yok. Bölümler sayfasından bir tane oluştur.",
+    "filteredEmpty": "Bu filtreyle eşleşen kullanıcı yok."
   },
   "divisions": {
     "title": "Bölümler",

@@ -39,7 +39,44 @@ let updateStatus = 200;
 let deleteStatus = 204;
 let resetStatus = 204;
 let passwordStatus = 204;
+let divisionPatchStatus = 200;
 const calls: { method: string; path: string; body: Record<string, unknown> | undefined }[] = [];
+
+const session = { id: 's1', name: 'Nomor Pusat', status: 'ready' };
+// Ada is in SMP Putra next to a machine key; Grace is in the inactive SMA Putri.
+const divisionList = [
+  {
+    id: 'd1',
+    sessionId: 's1',
+    name: 'SMP Putra',
+    keywords: [],
+    menuLabel: null,
+    welcomeText: null,
+    sortOrder: 0,
+    slaMinutes: 0,
+    isActive: true,
+    agents: [
+      { apiKeyId: 'k1', name: 'Ada' },
+      { apiKeyId: 'machine-1', name: 'Bot' },
+    ],
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+  },
+  {
+    id: 'd2',
+    sessionId: 's1',
+    name: 'SMA Putri',
+    keywords: [],
+    menuLabel: null,
+    welcomeText: null,
+    sortOrder: 1,
+    slaMinutes: 0,
+    isActive: false,
+    agents: [{ apiKeyId: 'k2', name: 'Grace' }],
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+  },
+];
 
 function installFetchStub(): void {
   globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
@@ -79,6 +116,18 @@ function installFetchStub(): void {
         return Promise.resolve(jsonResponse({ message: 'Current password is incorrect' }, 401));
       return Promise.resolve(new Response(null, { status: 204 }));
     }
+    if (path === '/api/sessions' && method === 'GET') {
+      return Promise.resolve(jsonResponse([session]));
+    }
+    if (/^\/api\/sessions\/[^/]+\/divisions$/.test(path) && method === 'GET') {
+      return Promise.resolve(jsonResponse(divisionList));
+    }
+    if (/^\/api\/sessions\/[^/]+\/divisions\/[^/]+$/.test(path) && method === 'PATCH') {
+      if (divisionPatchStatus !== 200) {
+        return Promise.resolve(jsonResponse({ message: 'Division update refused' }, divisionPatchStatus));
+      }
+      return Promise.resolve(jsonResponse(divisionList[0]));
+    }
     return Promise.resolve(jsonResponse({ message: `unstubbed ${method} ${path}` }, 404));
   }) as typeof fetch;
 }
@@ -86,20 +135,37 @@ function installFetchStub(): void {
 let rtl: typeof import('@testing-library/react');
 let Users: (typeof import('./Users.tsx'))['Users'];
 let ToastProvider: (typeof import('../components/Toast.tsx'))['ToastProvider'];
+let QueryClient: (typeof import('@tanstack/react-query'))['QueryClient'];
+let QueryClientProvider: (typeof import('@tanstack/react-query'))['QueryClientProvider'];
+let queryClient: InstanceType<(typeof import('@tanstack/react-query'))['QueryClient']> | undefined;
 
 before(async () => {
   const { installJsdomGlobals } = await import('../test-helpers/jsdom.ts');
   await installJsdomGlobals();
   installFetchStub();
+  // Saving divisions creates a Mutation, and react-query keeps a five-minute gcTime timer for it that
+  // `queryClient.clear()` does not cancel. Unref every react-query timer so the runner can exit.
+  const { timeoutManager } = await import('@tanstack/react-query');
+  const unref = (id: ReturnType<typeof setTimeout>): ReturnType<typeof setTimeout> => id.unref();
+  timeoutManager.setTimeoutProvider({
+    setTimeout: (callback, delay) => unref(setTimeout(callback, delay)),
+    clearTimeout: id => clearTimeout(id),
+    setInterval: (callback, delay) => unref(setInterval(callback, delay)),
+    clearInterval: id => clearInterval(id),
+  });
   const { i18nReady } = await import('../i18n/index.ts');
   await i18nReady;
   rtl = await import('@testing-library/react');
+  ({ QueryClient, QueryClientProvider } = await import('@tanstack/react-query'));
   ({ ToastProvider } = await import('../components/Toast.tsx'));
   ({ Users } = await import('./Users.tsx'));
 });
 
-afterEach(() => {
+afterEach(async () => {
+  await rtl.waitFor(() => assert.equal(queryClient?.isFetching() ?? 0, 0));
   rtl.cleanup();
+  queryClient?.clear();
+  queryClient = undefined;
   userList = [ada, grace];
   listStatus = 200;
   createStatus = 201;
@@ -107,12 +173,20 @@ afterEach(() => {
   deleteStatus = 204;
   resetStatus = 204;
   passwordStatus = 204;
+  divisionPatchStatus = 200;
   calls.length = 0;
   window.sessionStorage.clear();
 });
 
 async function renderUsers(): Promise<void> {
-  rtl.render(createElement(ToastProvider, null, createElement(Users)));
+  queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 1_000 } } });
+  rtl.render(
+    createElement(
+      QueryClientProvider,
+      { client: queryClient },
+      createElement(ToastProvider, null, createElement(Users)),
+    ),
+  );
   await rtl.waitFor(() => assert.ok(document.querySelector('.users-table, .users-empty')));
 }
 
@@ -331,4 +405,74 @@ test('a wrong current password is reported as such, not as a server failure', as
   assert.equal(document.querySelector('.user-dialog-error')?.textContent, 'Current password is incorrect');
   // The credential is still good: a typo in one field must not end the session.
   assert.equal(window.sessionStorage.getItem('openwa_api_key'), 'owa_s1_token');
+});
+
+// ── Division membership ───────────────────────────────────────────────
+// Membership lives on division_agents per session, keyed by the user's linked apiKeyId, so the
+// table joins the account list to the selected session's divisions.
+
+test('each account shows the divisions it belongs to in the selected session', async () => {
+  await renderUsers();
+  await rtl.waitFor(() =>
+    assert.match(document.querySelectorAll('.users-table tbody tr')[0]?.textContent ?? '', /SMP Putra/),
+  );
+
+  const rows = document.querySelectorAll('.users-table tbody tr');
+  assert.match(rows[0].textContent ?? '', /SMP Putra/);
+  assert.doesNotMatch(rows[0].textContent ?? '', /SMA Putri/);
+  assert.match(rows[1].textContent ?? '', /SMA Putri/);
+  assert.equal((document.querySelector('#users-session') as HTMLSelectElement).value, 's1');
+});
+
+test('the division filter narrows the table, and no match says so', async () => {
+  await renderUsers();
+  const filter = document.querySelector('#users-division-filter') as HTMLSelectElement;
+  await rtl.waitFor(() => assert.equal(filter.disabled, false));
+
+  rtl.fireEvent.change(filter, { target: { value: 'd2' } });
+  assert.equal(document.querySelectorAll('.users-table tbody tr').length, 1);
+  assert.match(document.querySelector('.users-table tbody tr')?.textContent ?? '', /Grace/);
+
+  rtl.fireEvent.change(filter, { target: { value: 'unassigned' } });
+  assert.ok(document.querySelector('.users-filter-empty'));
+  assert.doesNotMatch(document.querySelector('.users-table tbody')?.textContent ?? '', /Ada|Grace/);
+});
+
+test('the manage dialog saves only the divisions that changed and keeps the other members', async () => {
+  await renderUsers();
+  const manage = rtl.screen.getAllByRole('button', { name: 'Manage divisions' })[0] as HTMLButtonElement;
+  await rtl.waitFor(() => assert.equal(manage.disabled, false));
+  rtl.fireEvent.click(manage);
+
+  const dialog = rtl.screen.getByRole('dialog');
+  assert.match(dialog.textContent ?? '', /ada@example\.com/);
+  // Ada is already in SMP Putra; ticking SMA Putri is the only change.
+  assert.equal((rtl.within(dialog).getByRole('checkbox', { name: /SMP Putra/ }) as HTMLInputElement).checked, true);
+  rtl.fireEvent.click(rtl.within(dialog).getByRole('checkbox', { name: /SMA Putri/ }));
+  rtl.fireEvent.click(rtl.within(dialog).getByRole('button', { name: 'Save' }));
+
+  await rtl.waitFor(() => assert.ok(lastCall('PATCH', /^\/api\/sessions\/s1\/divisions\/d2$/)));
+  // Grace's key is carried over: the endpoint replaces the whole set.
+  assert.deepEqual(lastCall('PATCH', /^\/api\/sessions\/s1\/divisions\/d2$/)?.body, {
+    agentKeyIds: ['k2', 'k1'],
+  });
+  // SMP Putra already had Ada, so it is not written at all.
+  assert.equal(lastCall('PATCH', /^\/api\/sessions\/s1\/divisions\/d1$/), undefined);
+  assert.equal(calls.filter(call => call.method === 'PATCH' && /divisions/.test(call.path)).length, 1);
+});
+
+test('a refused division write keeps the dialog open with the reason', async () => {
+  divisionPatchStatus = 403;
+  await renderUsers();
+  const manage = rtl.screen.getAllByRole('button', { name: 'Manage divisions' })[0] as HTMLButtonElement;
+  await rtl.waitFor(() => assert.equal(manage.disabled, false));
+  rtl.fireEvent.click(manage);
+
+  const dialog = rtl.screen.getByRole('dialog');
+  rtl.fireEvent.click(rtl.within(dialog).getByRole('checkbox', { name: /SMA Putri/ }));
+  rtl.fireEvent.click(rtl.within(dialog).getByRole('button', { name: 'Save' }));
+
+  await rtl.waitFor(() => assert.ok(document.querySelector('.user-dialog-error')));
+  assert.match(document.querySelector('.user-dialog-error')?.textContent ?? '', /Division update refused/);
+  assert.ok(rtl.screen.getByRole('dialog'));
 });

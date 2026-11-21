@@ -1,7 +1,18 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { AlertCircle, AlertTriangle, KeyRound, Loader2, Pencil, Plus, Trash2, Users as UsersIcon } from 'lucide-react';
-import { authApi, usersApi, type AuthUser } from '../services/api';
+import {
+  AlertCircle,
+  AlertTriangle,
+  KeyRound,
+  Loader2,
+  Network,
+  Pencil,
+  Plus,
+  Trash2,
+  Users as UsersIcon,
+} from 'lucide-react';
+import { authApi, usersApi, type AuthUser, type Division } from '../services/api';
+import { useDivisionsQuery, useSessionsQuery, useUpdateDivisionMutation } from '../hooks/queries';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { useToast } from '../hooks/useToast';
 import { PageHeader } from '../components/PageHeader';
@@ -21,6 +32,7 @@ type Dialog =
   | { type: 'edit'; user: AuthUser }
   | { type: 'reset'; user: AuthUser }
   | { type: 'delete'; user: AuthUser }
+  | { type: 'divisions'; user: AuthUser }
   | { type: 'password' }
   | null;
 
@@ -80,6 +92,49 @@ export function Users() {
   const [me] = useState(() => readStoredAccount());
   const firstFieldRef = useRef<HTMLInputElement>(null);
 
+  // Division membership is per session: one account can sit in different divisions in another
+  // session, so the page asks which session it is showing before it reads any membership.
+  const { data: sessions = [] } = useSessionsQuery();
+  const [sessionId, setSessionId] = useState('');
+  const [divisionFilter, setDivisionFilter] = useState('all');
+  const divisionsQuery = useDivisionsQuery(sessionId);
+  const divisions = useMemo(() => divisionsQuery.data ?? [], [divisionsQuery.data]);
+  const updateDivision = useUpdateDivisionMutation(sessionId);
+  const [divisionDraft, setDivisionDraft] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (sessionId || sessions.length === 0) return;
+    const ready = sessions.find(session => session.status === 'ready') ?? sessions[0];
+    setSessionId(ready.id);
+  }, [sessionId, sessions]);
+
+  // A division deleted, or a session switched, while its filter is selected must not leave the
+  // table mysteriously empty.
+  useEffect(() => {
+    if (divisionFilter === 'all' || divisionFilter === 'unassigned') return;
+    if (!divisionsQuery.isLoading && !divisions.some(division => division.id === divisionFilter)) {
+      setDivisionFilter('all');
+    }
+  }, [divisionFilter, divisions, divisionsQuery.isLoading]);
+
+  const memberships = useMemo(() => {
+    const byKey = new Map<string, Division[]>();
+    for (const division of divisions) {
+      for (const agent of division.agents) {
+        const list = byKey.get(agent.apiKeyId);
+        if (list) list.push(division);
+        else byKey.set(agent.apiKeyId, [division]);
+      }
+    }
+    return byKey;
+  }, [divisions]);
+
+  const visibleRows = useMemo(() => {
+    if (divisionFilter === 'all') return rows;
+    if (divisionFilter === 'unassigned') return rows.filter(user => !memberships.get(user.apiKeyId)?.length);
+    return rows.filter(user => memberships.get(user.apiKeyId)?.some(division => division.id === divisionFilter));
+  }, [rows, divisionFilter, memberships]);
+
   const load = useCallback(async () => {
     try {
       setRows(await usersApi.list());
@@ -116,7 +171,11 @@ export function Users() {
   const describeFailure = (err: unknown, fallback: string): string => {
     const status = (err as { status?: number }).status;
     const message = err instanceof Error ? err.message : '';
-    if (status === 409) return t(dialog?.type === 'create' ? 'users.emailTaken' : 'users.lastAdmin');
+    // A 409 on this page is a taken address when creating and the last admin otherwise; a division
+    // write has its own conflict answers and keeps the server's wording.
+    if (status === 409 && dialog?.type !== 'divisions') {
+      return t(dialog?.type === 'create' ? 'users.emailTaken' : 'users.lastAdmin');
+    }
     return message ? `${t(fallback)}: ${message}` : t(fallback);
   };
 
@@ -155,6 +214,40 @@ export function Users() {
       await load();
     } catch (err) {
       setError(describeFailure(err, 'users.saveFailed'));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const openDivisions = (user: AuthUser) => {
+    setDivisionDraft(divisions.filter(d => d.agents.some(a => a.apiKeyId === user.apiKeyId)).map(d => d.id));
+    setError('');
+    setDialog({ type: 'divisions', user });
+  };
+
+  const handleSaveDivisions = async () => {
+    if (dialog?.type !== 'divisions') return;
+    setSaving(true);
+    setError('');
+    try {
+      // Re-read before writing: the endpoint replaces the whole member set, so a stale list would
+      // drop a CS another admin added since this page loaded.
+      const fresh = (await divisionsQuery.refetch()).data ?? divisions;
+      const keyId = dialog.user.apiKeyId;
+      const changed = fresh.filter(division => {
+        const member = division.agents.some(agent => agent.apiKeyId === keyId);
+        return member !== divisionDraft.includes(division.id);
+      });
+      for (const division of changed) {
+        // The set is sent whole; every other member, a machine key included, is carried over.
+        const next = division.agents.map(agent => agent.apiKeyId).filter(id => id !== keyId);
+        if (divisionDraft.includes(division.id)) next.push(keyId);
+        await updateDivision.mutateAsync({ divisionId: division.id, data: { agentKeyIds: next } });
+      }
+      toast.success(t('users.divisionsSaved'));
+      setDialog(null);
+    } catch (err) {
+      setError(describeFailure(err, 'users.divisionsFailed'));
     } finally {
       setSaving(false);
     }
@@ -276,6 +369,50 @@ export function Users() {
         }
       />
 
+      <div className="users-toolbar">
+        <label className="users-toolbar-field" htmlFor="users-session">
+          {t('users.session')}
+          <select
+            id="users-session"
+            value={sessionId}
+            onChange={event => {
+              setSessionId(event.target.value);
+              setDivisionFilter('all');
+            }}
+            disabled={sessions.length === 0}
+          >
+            {sessions.length === 0 && <option value="">{t('users.noSessions')}</option>}
+            {sessions.map(session => (
+              <option key={session.id} value={session.id}>
+                {session.name || session.id}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="users-toolbar-field" htmlFor="users-division-filter">
+          {t('users.divisionFilter')}
+          <select
+            id="users-division-filter"
+            value={divisionFilter}
+            onChange={event => setDivisionFilter(event.target.value)}
+            disabled={!sessionId || divisions.length === 0}
+          >
+            <option value="all">{t('users.allDivisions')}</option>
+            <option value="unassigned">{t('users.noDivision')}</option>
+            {divisions.map(division => (
+              <option key={division.id} value={division.id}>
+                {division.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        {divisionsQuery.error && (
+          <span className="users-toolbar-error" role="alert">
+            {t('users.divisionsLoadError')}
+          </span>
+        )}
+      </div>
+
       {loading ? (
         <div className="users-empty" role="status">
           <Loader2 className="animate-spin" size={32} />
@@ -299,6 +436,7 @@ export function Users() {
               <tr>
                 <th scope="col">{t('common.name')}</th>
                 <th scope="col">{t('common.role')}</th>
+                <th scope="col">{t('users.divisions')}</th>
                 <th scope="col">{t('common.status')}</th>
                 <th scope="col">{t('users.lastLogin')}</th>
                 <th scope="col" className="users-actions-header">
@@ -307,54 +445,86 @@ export function Users() {
               </tr>
             </thead>
             <tbody>
-              {rows.map(user => (
-                <tr key={user.id}>
-                  <td>
-                    <span className="user-name">
-                      {user.name}
-                      {me?.id === user.id && <span className="user-you-badge">{t('users.you')}</span>}
-                    </span>
-                    <span className="user-email">{user.email}</span>
-                  </td>
-                  <td>
-                    <code className="user-role">{t(`apiKeys.roles.${user.role}`)}</code>
-                  </td>
-                  <td>
-                    <span className={user.isActive ? 'status-badge active' : 'status-badge inactive'}>
-                      {t(user.isActive ? 'common.active' : 'common.inactive')}
-                    </span>
-                  </td>
-                  <td className="user-last-login">{formatDate(user.lastLoginAt)}</td>
-                  <td>
-                    <span className="actions-cell">
-                      <button
-                        className="icon-btn"
-                        title={t('users.editTitle')}
-                        aria-label={t('users.editTitle')}
-                        onClick={() => open({ type: 'edit', user })}
-                      >
-                        <Pencil size={16} />
-                      </button>
-                      <button
-                        className="icon-btn"
-                        title={t('users.resetTitle')}
-                        aria-label={t('users.resetTitle')}
-                        onClick={() => open({ type: 'reset', user })}
-                      >
-                        <KeyRound size={16} />
-                      </button>
-                      <button
-                        className="icon-btn danger"
-                        title={t('common.delete')}
-                        aria-label={t('users.deleteTitle')}
-                        onClick={() => open({ type: 'delete', user })}
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </span>
+              {visibleRows.map(user => {
+                const memberOf = memberships.get(user.apiKeyId) ?? [];
+                return (
+                  <tr key={user.id}>
+                    <td>
+                      <span className="user-name">
+                        {user.name}
+                        {me?.id === user.id && <span className="user-you-badge">{t('users.you')}</span>}
+                      </span>
+                      <span className="user-email">{user.email}</span>
+                    </td>
+                    <td>
+                      <code className="user-role">{t(`apiKeys.roles.${user.role}`)}</code>
+                    </td>
+                    <td>
+                      <span className="user-divisions">
+                        {memberOf.length === 0 ? (
+                          <span className="user-division-none">{t('users.noDivision')}</span>
+                        ) : (
+                          memberOf.map(division => (
+                            <span key={division.id} className="user-division-chip">
+                              {division.name}
+                            </span>
+                          ))
+                        )}
+                      </span>
+                    </td>
+                    <td>
+                      <span className={user.isActive ? 'status-badge active' : 'status-badge inactive'}>
+                        {t(user.isActive ? 'common.active' : 'common.inactive')}
+                      </span>
+                    </td>
+                    <td className="user-last-login">{formatDate(user.lastLoginAt)}</td>
+                    <td>
+                      <span className="actions-cell">
+                        <button
+                          className="icon-btn"
+                          title={t('users.manageDivisions')}
+                          aria-label={t('users.manageDivisions')}
+                          onClick={() => openDivisions(user)}
+                          disabled={!sessionId || divisions.length === 0}
+                        >
+                          <Network size={16} />
+                        </button>
+                        <button
+                          className="icon-btn"
+                          title={t('users.editTitle')}
+                          aria-label={t('users.editTitle')}
+                          onClick={() => open({ type: 'edit', user })}
+                        >
+                          <Pencil size={16} />
+                        </button>
+                        <button
+                          className="icon-btn"
+                          title={t('users.resetTitle')}
+                          aria-label={t('users.resetTitle')}
+                          onClick={() => open({ type: 'reset', user })}
+                        >
+                          <KeyRound size={16} />
+                        </button>
+                        <button
+                          className="icon-btn danger"
+                          title={t('common.delete')}
+                          aria-label={t('users.deleteTitle')}
+                          onClick={() => open({ type: 'delete', user })}
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+              {visibleRows.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="users-filter-empty">
+                    {t('users.filteredEmpty')}
                   </td>
                 </tr>
-              ))}
+              )}
             </tbody>
           </table>
         </div>
@@ -478,6 +648,58 @@ export function Users() {
             {t('common.active')}
           </label>
           {!draft.isActive && <span className="user-field-hint">{t('users.deactivateHint')}</span>}
+          {errorNote}
+        </Modal>
+      )}
+
+      {dialog?.type === 'divisions' && (
+        <Modal
+          open
+          onClose={close}
+          title={t('users.manageDivisions')}
+          closeLabel={t('common.close')}
+          footer={
+            <>
+              <button className="btn-secondary" onClick={close} disabled={saving}>
+                {t('common.cancel')}
+              </button>
+              <button
+                className="btn-primary"
+                onClick={() => void handleSaveDivisions()}
+                disabled={saving || !sessionId || divisions.length === 0}
+              >
+                {saving ? <Loader2 className="animate-spin" size={16} /> : t('common.save')}
+              </button>
+            </>
+          }
+        >
+          <p className="user-dialog-note">
+            {dialog.user.name} · {dialog.user.email}
+          </p>
+          <p className="user-dialog-note">{t('users.divisionsHint')}</p>
+          {divisions.length === 0 ? (
+            <p className="user-dialog-note">{t('users.noDivisions')}</p>
+          ) : (
+            <fieldset className="user-divisions-field">
+              <legend className="users-divisions-legend">{t('users.divisions')}</legend>
+              {divisions.map(division => (
+                <label key={division.id} className="user-checkbox" htmlFor={`user-division-${division.id}`}>
+                  <input
+                    id={`user-division-${division.id}`}
+                    type="checkbox"
+                    checked={divisionDraft.includes(division.id)}
+                    onChange={event =>
+                      setDivisionDraft(prev =>
+                        event.target.checked ? [...prev, division.id] : prev.filter(id => id !== division.id),
+                      )
+                    }
+                  />
+                  {division.name}
+                  {!division.isActive && <span className="status-badge inactive">{t('common.inactive')}</span>}
+                </label>
+              ))}
+            </fieldset>
+          )}
           {errorNote}
         </Modal>
       )}
