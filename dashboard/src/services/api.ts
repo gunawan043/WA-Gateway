@@ -1852,6 +1852,12 @@ export interface InboxConversation {
   assigneeName: string | null;
   divisionId: string | null;
   divisionName: string | null;
+  firstInboundAt: string | null;
+  firstResponseAt: string | null;
+  slaStartedAt: string | null;
+  slaDueAt: string | null;
+  slaBreachedAt: string | null;
+  slaMinutes: number | null;
   resolvedAt: string | null;
 }
 
@@ -1892,6 +1898,63 @@ export interface AgentDirectoryEntry {
   name: string;
 }
 
+export interface InboxReportTotals {
+  conversations: number;
+  open: number;
+  resolved: number;
+  unassigned: number;
+  awaitingFirstResponse: number;
+  avgFirstResponseMinutes: number | null;
+  slaEligible: number;
+  slaBreached: number;
+  /** Fraction 0–1, or null when nothing in the range was eligible. */
+  slaComplianceRate: number | null;
+}
+
+export interface InboxReportDivision {
+  divisionId: string | null;
+  divisionName: string | null;
+  conversations: number;
+  slaEligible: number;
+  slaBreached: number;
+  avgFirstResponseMinutes: number | null;
+  slaComplianceRate: number | null;
+}
+
+export interface InboxReportAgent {
+  assigneeKeyId: string | null;
+  assigneeName: string | null;
+  conversations: number;
+  resolved: number;
+  slaEligible: number;
+  slaBreached: number;
+  avgFirstResponseMinutes: number | null;
+}
+
+export interface InboxReportDaily {
+  /** UTC day, `YYYY-MM-DD`. */
+  date: string;
+  conversations: number;
+  slaBreached: number;
+  avgFirstResponseMinutes: number | null;
+}
+
+export interface InboxReport {
+  from: string;
+  to: string;
+  totals: InboxReportTotals;
+  byDivision: InboxReportDivision[];
+  byAgent: InboxReportAgent[];
+  daily: InboxReportDaily[];
+}
+
+export interface InboxReportParams {
+  from?: string;
+  to?: string;
+  /** `unassigned`, or a division id. */
+  division?: string;
+}
+
 export const inboxApi = {
   agents: () => request<AgentDirectoryEntry[]>('/auth/agents'),
   list: (sessionId: string, params: InboxListParams = {}) => {
@@ -1906,6 +1969,14 @@ export const inboxApi = {
     return request<InboxConversation[]>(`/sessions/${sessionId}/inbox/conversations${suffix ? `?${suffix}` : ''}`);
   },
   summary: (sessionId: string) => request<InboxSummary>(`/sessions/${sessionId}/inbox/summary`),
+  report: (sessionId: string, params: InboxReportParams = {}) => {
+    const query = new URLSearchParams();
+    if (params.from) query.set('from', params.from);
+    if (params.to) query.set('to', params.to);
+    if (params.division && params.division !== 'all') query.set('division', params.division);
+    const suffix = query.toString();
+    return request<InboxReport>(`/sessions/${sessionId}/inbox/reports${suffix ? `?${suffix}` : ''}`);
+  },
   get: (sessionId: string, chatId: string) =>
     request<InboxConversationDetail>(`/sessions/${sessionId}/inbox/conversations/${encodeURIComponent(chatId)}`),
   update: (
@@ -1946,6 +2017,7 @@ export interface Division {
   menuLabel: string | null;
   welcomeText: string | null;
   sortOrder: number;
+  slaMinutes: number;
   isActive: boolean;
   agents: DivisionAgent[];
   createdAt: string;
@@ -1966,6 +2038,7 @@ export interface DivisionInput {
   menuLabel?: string | null;
   welcomeText?: string | null;
   sortOrder?: number;
+  slaMinutes?: number;
   isActive?: boolean;
   agentKeyIds?: string[];
 }

@@ -24,6 +24,7 @@ function context(overrides: Partial<DivisionRoutingContext> = {}): DivisionRouti
         welcomeText: null,
         keywords: ['smp', 'smp putra'],
         sortOrder: 0,
+        slaMinutes: 0,
         agentKeyIds: ['key-1'],
       },
       {
@@ -33,6 +34,7 @@ function context(overrides: Partial<DivisionRoutingContext> = {}): DivisionRouti
         welcomeText: 'Halo dari Putri',
         keywords: ['smp putri', 'putri'],
         sortOrder: 1,
+        slaMinutes: 0,
         agentKeyIds: ['key-2'],
       },
     ],

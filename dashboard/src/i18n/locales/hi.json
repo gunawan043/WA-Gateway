@@ -72,6 +72,7 @@
     "plugins": "प्लगइन्स",
     "logs": "लॉग्स",
     "inbox": "इनबॉक्स",
+    "reports": "रिपोर्ट",
     "pipeline": "पाइपलाइन",
     "campaigns": "कैंपेन",
     "users": "उपयोगकर्ता",
@@ -1554,7 +1555,60 @@
       "label": "प्रभाग",
       "all": "सभी प्रभाग",
       "unassigned": "कोई प्रभाग नहीं"
+    },
+    "sla": {
+      "breached": "देर हो चुकी",
+      "remaining": "{{value}} मिनट बाकी"
     }
+  },
+  "reports": {
+    "title": "रिपोर्ट",
+    "subtitle": "इनबॉक्स के लिए पहला जवाब और SLA अनुपालन।",
+    "session": "सत्र",
+    "noSessions": "अभी कोई सत्र नहीं",
+    "range": {
+      "label": "अवधि",
+      "days7": "7 दिन",
+      "days30": "30 दिन",
+      "days90": "90 दिन"
+    },
+    "division": {
+      "label": "विभाग",
+      "all": "सभी विभाग",
+      "unassigned": "बिना विभाग"
+    },
+    "cards": {
+      "conversations": "बातचीत",
+      "avgResponse": "औसत पहला जवाब",
+      "compliance": "SLA अनुपालन",
+      "breached": "अभी देर हो चुकी",
+      "awaiting": "{{value}} पहले जवाब की प्रतीक्षा में",
+      "eligible": "{{value}} लक्ष्य के विरुद्ध मापी गईं"
+    },
+    "charts": {
+      "byDivision": "विभाग के अनुसार बातचीत",
+      "daily": "प्रतिदिन बातचीत",
+      "conversations": "बातचीत"
+    },
+    "agents": {
+      "title": "एजेंट के अनुसार",
+      "name": "एजेंट",
+      "conversations": "बातचीत",
+      "resolved": "सुलझीं",
+      "avgResponse": "औसत जवाब",
+      "breached": "देर",
+      "unassigned": "बिना सौंपी"
+    },
+    "empty": {
+      "selectSession": "रिपोर्ट देखने के लिए सत्र चुनें।",
+      "none": "इस अवधि में कोई बातचीत शुरू नहीं हुई।"
+    },
+    "error": {
+      "forbidden": "आपकी कुंजी इस सत्र का इनबॉक्स नहीं पढ़ सकती।"
+    },
+    "minutes": "{{value}} मिनट",
+    "percent": "{{value}}%",
+    "noValue": "—"
   },
   "pipeline": {
     "title": "सेल्स पाइपलाइन",
@@ -1809,6 +1863,8 @@
     "settings.idleHours": "मेन्यू लौटने से पहले चुप्पी के घंटे",
     "settings.idleHoursHint": "0 रखने पर बातचीत पूरी होने तक अपने प्रभाग में रहती है।",
     "settings.saved": "सेटिंग्स सहेजी गईं।",
-    "settings.saveFailed": "सेटिंग्स सहेजी नहीं जा सकीं।"
+    "settings.saveFailed": "सेटिंग्स सहेजी नहीं जा सकीं।",
+    "slaMinutes": "पहले जवाब का लक्ष्य (मिनट)",
+    "slaMinutesHint": "0 SLA बंद कर देता है। गिनती उस ग्राहक संदेश से शुरू होती है जिसका जवाब नहीं दिया गया और पहले मानवीय जवाब पर रुकती है।"
   }
 }

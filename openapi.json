@@ -114,6 +114,7 @@
                 "inbox_conversation_division_changed",
                 "inbox_note_added",
                 "inbox_note_deleted",
+                "inbox_sla_breached",
                 "division_created",
                 "division_updated",
                 "division_deleted",
@@ -17155,6 +17156,95 @@
         ]
       }
     },
+    "/api/sessions/{sessionId}/inbox/reports": {
+      "get": {
+        "operationId": "InboxController_report",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "required": true,
+            "in": "path",
+            "description": "Session ID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "ISO date/time, inclusive. Default: 30 days before `to`.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "ISO date/time, inclusive. Default: now.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "division",
+            "required": false,
+            "in": "query",
+            "description": "`unassigned`, or a division id. Omit for every conversation.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InboxReportDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid range, a range over 366 days, or more than 20000 conversations.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API key is missing, unknown, revoked, or expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key's role, session or chat scope, or IP allow-list does not allow this operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "First-response and SLA metrics over a date range",
+        "tags": [
+          "inbox"
+        ]
+      }
+    },
     "/api/sessions/{sessionId}/inbox/conversations/{chatId}": {
       "get": {
         "operationId": "InboxController_get",
@@ -24132,6 +24222,9 @@
           "sortOrder": {
             "type": "integer"
           },
+          "slaMinutes": {
+            "type": "integer"
+          },
           "isActive": {
             "type": "boolean"
           },
@@ -24156,6 +24249,7 @@
           "name",
           "keywords",
           "sortOrder",
+          "slaMinutes",
           "isActive",
           "agents",
           "createdAt",
@@ -24196,6 +24290,13 @@
             "default": 0,
             "minimum": 0,
             "maximum": 1000
+          },
+          "slaMinutes": {
+            "type": "integer",
+            "description": "First-response target in minutes. 0 (the default) means this division has no SLA. The clock starts on a customer message that nobody has answered yet and stops on the first human reply.",
+            "default": 0,
+            "minimum": 0,
+            "maximum": 10080
           },
           "isActive": {
             "type": "boolean",
@@ -24302,6 +24403,12 @@
             "description": "Menu position; ties fall back to the name",
             "minimum": 0,
             "maximum": 1000
+          },
+          "slaMinutes": {
+            "type": "integer",
+            "description": "First-response target in minutes; 0 disables the SLA",
+            "minimum": 0,
+            "maximum": 10080
           },
           "isActive": {
             "type": "boolean",
@@ -29653,6 +29760,36 @@
             "nullable": true,
             "description": "Snapshot of the division name at routing time."
           },
+          "firstInboundAt": {
+            "type": "string",
+            "nullable": true,
+            "description": "ISO instant of the first customer message ever seen for this chat."
+          },
+          "firstResponseAt": {
+            "type": "string",
+            "nullable": true,
+            "description": "ISO instant of the first human reply. Null while the customer has never been answered."
+          },
+          "slaStartedAt": {
+            "type": "string",
+            "nullable": true,
+            "description": "ISO instant the current first-response window opened."
+          },
+          "slaDueAt": {
+            "type": "string",
+            "nullable": true,
+            "description": "ISO deadline of the current window: slaStartedAt + slaMinutes. Null when no target applies."
+          },
+          "slaBreachedAt": {
+            "type": "string",
+            "nullable": true,
+            "description": "ISO instant the sweeper first saw this window overdue. Cleared when the window restarts."
+          },
+          "slaMinutes": {
+            "type": "integer",
+            "nullable": true,
+            "description": "First-response target in minutes that the current window is measured against."
+          },
           "resolvedAt": {
             "type": "string",
             "nullable": true,
@@ -29702,6 +29839,195 @@
           "resolved",
           "unassigned",
           "mine"
+        ]
+      },
+      "InboxReportTotalsDto": {
+        "type": "object",
+        "properties": {
+          "conversations": {
+            "type": "number",
+            "description": "Conversations whose first inbound message falls in the range."
+          },
+          "open": {
+            "type": "number"
+          },
+          "resolved": {
+            "type": "number"
+          },
+          "unassigned": {
+            "type": "number",
+            "description": "Conversations with no assignee."
+          },
+          "awaitingFirstResponse": {
+            "type": "number",
+            "description": "Conversations that have never received a human reply."
+          },
+          "avgFirstResponseMinutes": {
+            "type": "number",
+            "nullable": true,
+            "description": "Mean minutes between the first customer message and the first human reply. Null with no sample."
+          },
+          "slaEligible": {
+            "type": "number",
+            "description": "Conversations measured against a division target."
+          },
+          "slaBreached": {
+            "type": "number",
+            "description": "Eligible conversations whose current window is overdue."
+          },
+          "slaComplianceRate": {
+            "type": "number",
+            "nullable": true,
+            "description": "Fraction 0–1 of eligible conversations that met the target. Null when nothing was eligible."
+          }
+        },
+        "required": [
+          "conversations",
+          "open",
+          "resolved",
+          "unassigned",
+          "awaitingFirstResponse",
+          "slaEligible",
+          "slaBreached"
+        ]
+      },
+      "InboxReportDivisionDto": {
+        "type": "object",
+        "properties": {
+          "divisionId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Null for conversations with no division tag."
+          },
+          "divisionName": {
+            "type": "string",
+            "nullable": true
+          },
+          "conversations": {
+            "type": "number"
+          },
+          "slaEligible": {
+            "type": "number"
+          },
+          "slaBreached": {
+            "type": "number"
+          },
+          "avgFirstResponseMinutes": {
+            "type": "number",
+            "nullable": true
+          },
+          "slaComplianceRate": {
+            "type": "number",
+            "nullable": true
+          }
+        },
+        "required": [
+          "conversations",
+          "slaEligible",
+          "slaBreached"
+        ]
+      },
+      "InboxReportAgentDto": {
+        "type": "object",
+        "properties": {
+          "assigneeKeyId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Null for unassigned conversations."
+          },
+          "assigneeName": {
+            "type": "string",
+            "nullable": true
+          },
+          "conversations": {
+            "type": "number"
+          },
+          "resolved": {
+            "type": "number"
+          },
+          "slaEligible": {
+            "type": "number"
+          },
+          "slaBreached": {
+            "type": "number"
+          },
+          "avgFirstResponseMinutes": {
+            "type": "number",
+            "nullable": true
+          }
+        },
+        "required": [
+          "conversations",
+          "resolved",
+          "slaEligible",
+          "slaBreached"
+        ]
+      },
+      "InboxReportDailyDto": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "example": "2026-11-20",
+            "description": "UTC day."
+          },
+          "conversations": {
+            "type": "number"
+          },
+          "slaBreached": {
+            "type": "number"
+          },
+          "avgFirstResponseMinutes": {
+            "type": "number",
+            "nullable": true
+          }
+        },
+        "required": [
+          "date",
+          "conversations",
+          "slaBreached"
+        ]
+      },
+      "InboxReportDto": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "description": "ISO instant the range starts (inclusive)."
+          },
+          "to": {
+            "type": "string",
+            "description": "ISO instant the range ends (inclusive)."
+          },
+          "totals": {
+            "$ref": "#/components/schemas/InboxReportTotalsDto"
+          },
+          "byDivision": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InboxReportDivisionDto"
+            }
+          },
+          "byAgent": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InboxReportAgentDto"
+            }
+          },
+          "daily": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InboxReportDailyDto"
+            }
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "totals",
+          "byDivision",
+          "byAgent",
+          "daily"
         ]
       },
       "InboxNoteDto": {
@@ -29801,6 +30127,36 @@
             "type": "string",
             "nullable": true,
             "description": "Snapshot of the division name at routing time."
+          },
+          "firstInboundAt": {
+            "type": "string",
+            "nullable": true,
+            "description": "ISO instant of the first customer message ever seen for this chat."
+          },
+          "firstResponseAt": {
+            "type": "string",
+            "nullable": true,
+            "description": "ISO instant of the first human reply. Null while the customer has never been answered."
+          },
+          "slaStartedAt": {
+            "type": "string",
+            "nullable": true,
+            "description": "ISO instant the current first-response window opened."
+          },
+          "slaDueAt": {
+            "type": "string",
+            "nullable": true,
+            "description": "ISO deadline of the current window: slaStartedAt + slaMinutes. Null when no target applies."
+          },
+          "slaBreachedAt": {
+            "type": "string",
+            "nullable": true,
+            "description": "ISO instant the sweeper first saw this window overdue. Cleared when the window restarts."
+          },
+          "slaMinutes": {
+            "type": "integer",
+            "nullable": true,
+            "description": "First-response target in minutes that the current window is measured against."
           },
           "resolvedAt": {
             "type": "string",

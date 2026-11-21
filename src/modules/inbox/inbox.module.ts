@@ -5,7 +5,9 @@ import { DIVISION_INBOX_PORT } from '../division/division-inbox.port';
 import { DivisionModule } from '../division/division.module';
 import { SessionModule } from '../session/session.module';
 import { InboxController } from './inbox.controller';
+import { InboxReportsService } from './inbox-reports.service';
 import { InboxService } from './inbox.service';
+import { InboxSlaService } from './inbox-sla.service';
 import { InboxConversation } from './entities/inbox-conversation.entity';
 import { InboxNote } from './entities/inbox-note.entity';
 
@@ -27,7 +29,12 @@ import { InboxNote } from './entities/inbox-note.entity';
     DivisionModule,
   ],
   controllers: [InboxController],
-  providers: [InboxService, { provide: DIVISION_INBOX_PORT, useExisting: InboxService }],
+  providers: [
+    InboxService,
+    InboxSlaService,
+    InboxReportsService,
+    { provide: DIVISION_INBOX_PORT, useExisting: InboxService },
+  ],
   exports: [InboxService, DIVISION_INBOX_PORT],
 })
 export class InboxModule {}

@@ -7493,18 +7493,43 @@ is not in the session answers `404`.
 `status` is `open`, `pending` or `resolved`. A resolved conversation whose chat receives newer
 activity is reopened (`open`, `resolvedAt` cleared) by the next read, and `inbox.updated` is emitted.
 
+Each conversation also carries a first-response clock. `firstInboundAt` and `firstResponseAt` are the
+first customer message and the first agent reply ever; `slaStartedAt`, `slaDueAt` and `slaBreachedAt`
+describe the window that is open now, and `slaMinutes` is the target snapshotted when it opened
+(`null` when no division target applied). The window starts at a customer message and its deadline
+is set once the chat carries a division with a target — routing runs after the inbound hook, so the
+first message is measured against the division it is about to land in. Only a send a person made
+through the API stops the clock: a gateway send (routing menu, welcome, campaign, automation, the
+phone echo) is not a reply. A window whose deadline passed is marked breached, and the mark survives
+a late reply — only a new customer message clears it and restarts the clock. Resolving a
+conversation stops the clock and keeps the history.
+
 #### GET /api/sessions/:sessionId/inbox/conversations
 
 The session's chats with their inbox state, newest activity first. Optional `status`, `assignee`
 (`me`, `unassigned`, or an API key id), `division` (`unassigned`, or a division id — the tag the
 routing wrote, see §6.4.22), `q` (name, chat id or last message), `limit` (1-200, default 50) and
 `offset`. **Auth:** API key (VIEWER+) · **Response** `200`, an array of conversations, each with
-`divisionId` and `divisionName` (`null` when the chat was never routed).
+`divisionId` and `divisionName` (`null` when the chat was never routed) and the clock fields
+described above.
 
 #### GET /api/sessions/:sessionId/inbox/summary
 
 Counts for the inbox header: `{ total, open, pending, resolved, unassigned, mine }`, computed over
 the same chat-scope-filtered set. **Auth:** API key (VIEWER+) · **Response** `200`.
+
+#### GET /api/sessions/:sessionId/inbox/reports
+
+First-response and SLA metrics over a date range, aggregated over the same chat-scope-filtered set
+the list route returns. `from` and `to` are ISO timestamps bounding the conversations by
+`firstInboundAt` (default: the 30 days ending now; the range may span at most 366 days), and
+`division` narrows the report to one division id or to `unassigned`. The response is
+`{ from, to, totals, byDivision, byAgent, daily }`: response times are minutes (rounded to one
+decimal, `null` with no sample), `slaComplianceRate` is a 0–1 fraction (`null` when no conversation
+was measured against a target), and `daily` holds zero-filled UTC buckets. `totals.slaBreached`
+counts conversations whose current window is overdue, not every breach ever recorded — the audit log
+keeps those. **Auth:** API key (VIEWER+) · **Response** `200`.
+**Errors:** `400` an unparsable or reversed range, a range longer than 366 days, or more than 20000 conversations in it
 
 #### GET /api/sessions/:sessionId/inbox/conversations/:chatId
 
@@ -7891,6 +7916,12 @@ Routing writes `divisionId`/`divisionName` onto the inbox conversation, which is
 filters and groups by. Deleting a division clears that tag and keeps the assignee; the conversation
 does not silently fall back to another team.
 
+A division may also carry a first-response target, `slaMinutes` (0-10080, default `0`). A positive
+value starts the inbox clock for the conversations routed to it and sets their deadline; `0` leaves
+them unmeasured, so they count as neither compliant nor breached in the reports. Editing the target
+does not move a deadline that already started — the conversation keeps the snapshot it opened with —
+and it applies to the next window.
+
 #### GET /api/sessions/:sessionId/divisions
 
 The session's divisions in menu order, each with its keywords and its CS (`agents`, ordered by when
@@ -7899,10 +7930,11 @@ they joined the division). **Auth:** API key (VIEWER) · **Response** `200`, an 
 #### POST /api/sessions/:sessionId/divisions
 
 Creates a division. `name` is required and must be unique within the session; `keywords`,
-`menuLabel`, `welcomeText`, `sortOrder` (0-1000, default 0), `isActive` (default `true`) and
-`agentKeyIds` are optional. `agentKeyIds` must name active API keys, and it replaces the whole set
-when the division is updated. **Auth:** API key (ADMIN) · **Response** `201` with the division.
-**Errors:** `400` a keyword made only of digits, an unknown or inactive agent key, or the 20th division already exists · `404` no such session · `409` a division with this name already exists in the session
+`menuLabel`, `welcomeText`, `sortOrder` (0-1000, default 0), `slaMinutes` (0-10080, default 0),
+`isActive` (default `true`) and `agentKeyIds` are optional. `agentKeyIds` must name active API keys,
+and it replaces the whole set when the division is updated. **Auth:** API key (ADMIN) · **Response**
+`201` with the division.
+**Errors:** `400` a keyword made only of digits, an unknown or inactive agent key, a target above 10080 minutes, or the 20th division already exists · `404` no such session · `409` a division with this name already exists in the session
 
 #### GET /api/sessions/:sessionId/divisions/settings
 
@@ -7918,9 +7950,10 @@ restores the built-in wording. **Auth:** API key (ADMIN) · **Response** `200` w
 
 #### PATCH /api/sessions/:sessionId/divisions/:divisionId
 
-Partial update of a division, including its CS list (`agentKeyIds` replaces the set). An empty
-update answers `400`. **Auth:** API key (ADMIN) · **Response** `200` with the division ·
-**Errors:** `400` an invalid keyword, an unknown or inactive agent key, or an empty body · `404` no such division in this session · `409` a division with this name already exists in the session
+Partial update of a division, including its CS list (`agentKeyIds` replaces the set) and its
+first-response target (`slaMinutes`). An empty update answers `400`. **Auth:** API key (ADMIN) ·
+**Response** `200` with the division ·
+**Errors:** `400` an invalid keyword, an unknown or inactive agent key, a target above 10080 minutes, or an empty body · `404` no such division in this session · `409` a division with this name already exists in the session
 
 #### DELETE /api/sessions/:sessionId/divisions/:divisionId
 
@@ -8043,6 +8076,7 @@ presence.update
 event.response
 poll.vote
 inbox.updated
+inbox.sla_breached
 group.join
 group.leave
 group.update
@@ -8060,7 +8094,7 @@ A subscribe request whose `events` array contains no recognized name (after filt
 
 ### Wildcards and scoping
 
-- **Chat-restricted keys receive only events for `allowedChats`.** Message, presence, `event.response`, `poll.vote` and `inbox.updated` events require `data.chatId`; group events require `data.groupId`. Persisted phone/LID aliases are matched at delivery time, including mappings learned after subscribing. An event without a resolvable chat is omitted. Account events, calls, statuses, QR codes, and `group.join_request` (it names people outside the allowed chats, as the membership-request routes do) are omitted even with `events: ["*"]`; a request containing only account events answers `FORBIDDEN_EVENTS`. These filters apply across Redis replicas. A changed chat authorization disconnects the socket on its next subscribe.
+- **Chat-restricted keys receive only events for `allowedChats`.** Message, presence, `event.response`, `poll.vote`, `inbox.updated` and `inbox.sla_breached` events require `data.chatId`; group events require `data.groupId`. Persisted phone/LID aliases are matched at delivery time, including mappings learned after subscribing. An event without a resolvable chat is omitted. Account events, calls, statuses, QR codes, and `group.join_request` (it names people outside the allowed chats, as the membership-request routes do) are omitted even with `events: ["*"]`; a request containing only account events answers `FORBIDDEN_EVENTS`. These filters apply across Redis replicas. A changed chat authorization disconnects the socket on its next subscribe.
 - **`sessionId: "*"`** subscribes to every session; **`events: ["*"]`** subscribes to every subscribable event except `message.receipt`, whose per-recipient volume makes it opt-in by name. They combine (e.g. `"*"` + `["*"]` = every wildcard-covered event of every session).
 - The API key is **re-validated on every `subscribe`** (not just at connect), so a key revoked or expired mid-connection is caught — the server replies `UNAUTHORIZED` and disconnects.
 - **Per-key session scope is enforced** against the fresh key: a key restricted via `allowedSessions` may NOT subscribe to `"*"` and may NOT subscribe to a session outside its allowlist — either is rejected with `FORBIDDEN_SESSION`. An unrestricted key (no `allowedSessions`) may subscribe to anything, including `"*"`.
@@ -8133,6 +8167,7 @@ These are the events OpenWA actually emits. A webhook is registered with an `eve
 | `event.response`                                  | A guest answered a WhatsApp event invitation (going, not going, maybe). **Baileys only**; see the payload note below                                                                                                                  | `{ sessionId, eventMessageId, chatId, responderId, contact?, fromMe, response, extraGuestCount?, eventName?, responseMessageId, timestamp }`. `response` is `going`/`not_going`/`maybe`/`unknown`; `timestamp` is epoch **seconds** on the guest's clock. Order a guest's answers by `timestamp`, not by delivery                                                                                                                                                                                                                                                                                                                                                                               |
 | `poll.vote`                                       | A voter selected or cleared options on a poll; see the payload note below                                                                                                                                                             | `{ sessionId, pollMessageId, chatId, voterId, selectedOptions, pollName?, timestamp, timestampMs }`. `selectedOptions` holds the option texts now selected, `[]` when the vote was cleared; `timestamp` is epoch **seconds** and `timestampMs` the same instant in milliseconds, both on the voter's clock. Order a voter's changes by `timestampMs`, not by delivery                                                                                                                                                                                                                                                                                                                           |
 | `inbox.updated`                                   | A conversation's inbox state changed: an agent assigned or unassigned it, or its status moved between open, pending and resolved. Emitted by the team-inbox routes and by the reopen reconciliation on a read                         | `{ sessionId, chatId, status, assigneeKeyId, assigneeName }` — `status` is `open`/`pending`/`resolved`, and the assignee fields are `null` when unassigned. Chat-restricted keys receive it only for an allowed chat                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `inbox.sla_breached`                              | A conversation passed its first-response deadline with no reply. Emitted once per window by the SLA sweeper, which claims the row atomically so only one node announces it                                                            | `{ sessionId, chatId, divisionId, divisionName, assigneeKeyId, assigneeName, slaMinutes, slaStartedAt, slaDueAt, breachedAt }` — the division and assignee are the snapshot at breach time and `null` when unset; the timestamps are ISO. Chat-restricted keys receive it only for an allowed chat. No `inbox.updated` follows: a client that holds the conversation should set `slaBreachedAt` from `breachedAt` itself.                                                                                                                                                                                                                                                                       |
 | `session.restriction`                             | WhatsApp places a restriction on the account, or lifts one. Deduped: an unchanged restriction is not re-announced, and a lift is only sent when one was in force                                                                      | `{ sessionId, active, kind, code, expiresAt }` — `active` is `false` for a lift and `kind`/`code` then describe the restriction that ended; `expiresAt` is an ISO timestamp or `null`. See `restriction` on the session response for the `kind` values                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | `session.status`                                  | The session status transitions                                                                                                                                                                                                        | `{ sessionId, status }` where `status` is one of `created` / `initializing` / `qr_ready` / `authenticating` / `ready` / `disconnected` / `action_required` / `failed`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | `group.join`                                      | Participant(s) are added to or join a group this session is in                                                                                                                                                                        | `{ groupId, actorId?, participantIds, timestamp }`. `actorId` is the admin/inviter when known. **Baileys**: a session added to or joining a group reports only its own id in `participantIds` (members added with it are not listed)                                                                                                                                                                                                                                                                                                                                                                                                                                                            |

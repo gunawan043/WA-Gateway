@@ -74,6 +74,7 @@
     "logs": "Registros",
     "templates": "Modelos",
     "inbox": "Inbox",
+    "reports": "Relatórios",
     "pipeline": "Pipeline",
     "campaigns": "Campaigns",
     "users": "Usuários",
@@ -1563,7 +1564,60 @@
       "label": "Divisão",
       "all": "Todas as divisões",
       "unassigned": "Sem divisão"
+    },
+    "sla": {
+      "breached": "Atrasada",
+      "remaining": "Faltam {{value}} min"
     }
+  },
+  "reports": {
+    "title": "Relatórios",
+    "subtitle": "Primeira resposta e conformidade do SLA da caixa de entrada.",
+    "session": "Sessão",
+    "noSessions": "Nenhuma sessão ainda",
+    "range": {
+      "label": "Período",
+      "days7": "7 dias",
+      "days30": "30 dias",
+      "days90": "90 dias"
+    },
+    "division": {
+      "label": "Divisão",
+      "all": "Todas as divisões",
+      "unassigned": "Sem divisão"
+    },
+    "cards": {
+      "conversations": "Conversas",
+      "avgResponse": "Primeira resposta média",
+      "compliance": "Conformidade do SLA",
+      "breached": "Atrasadas agora",
+      "awaiting": "{{value}} aguardando primeira resposta",
+      "eligible": "{{value}} medidas contra uma meta"
+    },
+    "charts": {
+      "byDivision": "Conversas por divisão",
+      "daily": "Conversas por dia",
+      "conversations": "Conversas"
+    },
+    "agents": {
+      "title": "Por atendente",
+      "name": "Atendente",
+      "conversations": "Conversas",
+      "resolved": "Resolvidas",
+      "avgResponse": "Resposta média",
+      "breached": "Atrasadas",
+      "unassigned": "Sem responsável"
+    },
+    "empty": {
+      "selectSession": "Escolha uma sessão para ver os relatórios.",
+      "none": "Nenhuma conversa começou neste período."
+    },
+    "error": {
+      "forbidden": "Sua chave não pode ler a caixa de entrada desta sessão."
+    },
+    "minutes": "{{value}} min",
+    "percent": "{{value}}%",
+    "noValue": "—"
   },
   "pipeline": {
     "title": "Sales Pipeline",
@@ -1818,6 +1872,8 @@
     "settings.idleHours": "Horas de silêncio até o menu voltar",
     "settings.idleHoursHint": "0 mantém a conversa na divisão até ser resolvida.",
     "settings.saved": "Configurações salvas.",
-    "settings.saveFailed": "Não foi possível salvar as configurações."
+    "settings.saveFailed": "Não foi possível salvar as configurações.",
+    "slaMinutes": "Meta de primeira resposta (minutos)",
+    "slaMinutesHint": "0 desativa o SLA. O relógio começa em uma mensagem sem resposta e para na primeira resposta humana."
   }
 }

@@ -112,7 +112,7 @@ export class InboxService implements DivisionInboxPort {
     actor: ApiKey,
   ): Promise<InboxConversationDetailDto> {
     await this.findChat(sessionId, chatId);
-    const row = await this.getOrCreateRow(sessionId, chatId);
+    const row = await this.ensureConversation(sessionId, chatId);
     const previousStatus = row.status;
     const previousAssignee = row.assigneeKeyId;
     const previousDivision = row.divisionId;
@@ -120,6 +120,8 @@ export class InboxService implements DivisionInboxPort {
     if (dto.status !== undefined && dto.status !== row.status) {
       row.status = dto.status;
       row.resolvedAt = dto.status === 'resolved' ? new Date() : null;
+      // Resolving closes the current window; the response history stays for the reports.
+      if (dto.status === 'resolved') this.clearSlaClock(row);
       await this.audit.logInfo(AuditAction.INBOX_CONVERSATION_STATUS_CHANGED, {
         sessionId,
         apiKey: actor,
@@ -167,6 +169,7 @@ export class InboxService implements DivisionInboxPort {
       assigneeName: saved.assigneeName,
       divisionId: saved.divisionId,
       divisionName: saved.divisionName,
+      ...this.slaFields(saved),
     });
 
     return this.get(sessionId, chatId);
@@ -174,7 +177,7 @@ export class InboxService implements DivisionInboxPort {
 
   async addNote(sessionId: string, chatId: string, body: string, actor: ApiKey): Promise<InboxNoteDto> {
     await this.findChat(sessionId, chatId);
-    const row = await this.getOrCreateRow(sessionId, chatId);
+    const row = await this.ensureConversation(sessionId, chatId);
     const note = await this.notes.save(
       this.notes.create({ conversationId: row.id, authorKeyId: actor.id, authorName: actor.name, body }),
     );
@@ -211,12 +214,16 @@ export class InboxService implements DivisionInboxPort {
    */
   async routeConversation(input: DivisionRouteInput): Promise<DivisionRouteResult> {
     const { sessionId, chatId, divisionId, divisionName, agentKeyIds } = input;
-    const row = await this.getOrCreateRow(sessionId, chatId);
+    const row = await this.ensureConversation(sessionId, chatId);
     const previousDivision = row.divisionId;
     const previousAssignee = row.assigneeKeyId;
 
     row.divisionId = divisionId;
     row.divisionName = divisionName;
+    // The inbound hook runs before routing, so the first message of a new customer already opened a
+    // window with no target. Filling in the division's target here gives that first contact a
+    // deadline from the moment it arrived, instead of waiting for the customer to write again.
+    this.applySlaTarget(row, input.slaMinutes);
 
     const keepAssignee =
       previousDivision === divisionId && previousAssignee !== null && agentKeyIds.includes(previousAssignee);
@@ -246,6 +253,7 @@ export class InboxService implements DivisionInboxPort {
       assigneeName: saved.assigneeName,
       divisionId: saved.divisionId,
       divisionName: saved.divisionName,
+      ...this.slaFields(saved),
     });
     return { assigneeKeyId: saved.assigneeKeyId, assigneeName: saved.assigneeName };
   }
@@ -259,7 +267,12 @@ export class InboxService implements DivisionInboxPort {
     const affected = await this.conversations.find({ where: { sessionId, divisionId } });
     if (affected.length === 0) return;
 
-    await this.conversations.update({ sessionId, divisionId }, { divisionId: null, divisionName: null });
+    // The deadline belonged to the deleted division, so it goes with the tag. `slaStartedAt` stays:
+    // tagging the chat with another division later measures from the same customer message.
+    await this.conversations.update(
+      { sessionId, divisionId },
+      { divisionId: null, divisionName: null, slaMinutes: null, slaDueAt: null },
+    );
     for (const row of affected) {
       this.events.emitInboxUpdated(sessionId, {
         chatId: row.chatId,
@@ -268,8 +281,27 @@ export class InboxService implements DivisionInboxPort {
         assigneeName: row.assigneeName,
         divisionId: null,
         divisionName: null,
+        ...this.slaFields(row),
+        slaMinutes: null,
+        slaDueAt: null,
       });
     }
+  }
+
+  /**
+   * Announces a conversation the SLA tracker changed. Same payload as the inbox writes here, so a
+   * client can patch the row it already has instead of refetching the list.
+   */
+  notifyChanged(row: InboxConversation): void {
+    this.events.emitInboxUpdated(row.sessionId, {
+      chatId: row.chatId,
+      status: row.status,
+      assigneeKeyId: row.assigneeKeyId,
+      assigneeName: row.assigneeName,
+      divisionId: row.divisionId,
+      divisionName: row.divisionName,
+      ...this.slaFields(row),
+    });
   }
 
   /** Counts for the inbox header, computed from the same (already chat-scope-filtered) list. */
@@ -290,11 +322,16 @@ export class InboxService implements DivisionInboxPort {
     return chat;
   }
 
-  private async getOrCreateRow(sessionId: string, chatId: string): Promise<InboxConversation> {
+  /**
+   * The conversation row for this chat, created on first use.
+   *
+   * Public because the SLA tracker writes to the same row from the message path; persisting before
+   * returning matters there too (the update needs an id, and two writers at once rely on the unique
+   * `(sessionId, chatId)` index rather than a read-then-write race).
+   */
+  async ensureConversation(sessionId: string, chatId: string): Promise<InboxConversation> {
     const existing = await this.conversations.findOne({ where: { sessionId, chatId } });
     if (existing) return existing;
-    // Persist before returning: a note needs this row's id, and two agents acting at once rely on
-    // the unique (sessionId, chatId) index rather than a read-then-write race.
     return this.conversations.save(
       this.conversations.create({
         sessionId,
@@ -304,6 +341,12 @@ export class InboxService implements DivisionInboxPort {
         assigneeName: null,
         divisionId: null,
         divisionName: null,
+        firstInboundAt: null,
+        firstResponseAt: null,
+        slaStartedAt: null,
+        slaDueAt: null,
+        slaBreachedAt: null,
+        slaMinutes: null,
         resolvedAt: null,
         lastInboundAt: null,
       }),
@@ -361,6 +404,7 @@ export class InboxService implements DivisionInboxPort {
     if (divisionId === null) {
       row.divisionId = null;
       row.divisionName = null;
+      this.applySlaTarget(row, null);
       return;
     }
     const division = await this.divisions.lookup(sessionId, divisionId);
@@ -369,6 +413,26 @@ export class InboxService implements DivisionInboxPort {
     }
     row.divisionId = division.id;
     row.divisionName = division.name;
+    // Moving a chat between divisions re-measures the open window against the new target, from the
+    // customer message that opened it. A target of 0 clears the deadline.
+    this.applySlaTarget(row, division.slaMinutes);
+  }
+
+  /**
+   * Sets the target the open window is measured against. With no target the deadline is cleared;
+   * the snapshot follows the current division rather than keeping a stale number.
+   */
+  private applySlaTarget(row: InboxConversation, slaMinutes: number | null): void {
+    const target = slaMinutes !== null && slaMinutes > 0 ? slaMinutes : null;
+    row.slaMinutes = target;
+    row.slaDueAt = target !== null && row.slaStartedAt ? new Date(row.slaStartedAt.getTime() + target * 60_000) : null;
+  }
+
+  /** Stops the current window without touching the response history the reports read. */
+  private clearSlaClock(row: InboxConversation): void {
+    row.slaStartedAt = null;
+    row.slaDueAt = null;
+    row.slaBreachedAt = null;
   }
 
   /** `undefined` = no filter, `null` = untagged only, string = that division id. */
@@ -415,6 +479,7 @@ export class InboxService implements DivisionInboxPort {
         assigneeName: row.assigneeName,
         divisionId: row.divisionId,
         divisionName: row.divisionName,
+        ...this.slaFields(row),
       });
     }
   }
@@ -436,7 +501,28 @@ export class InboxService implements DivisionInboxPort {
       assigneeName: row?.assigneeName ?? null,
       divisionId: row?.divisionId ?? null,
       divisionName: row?.divisionName ?? null,
+      ...this.slaFields(row),
       resolvedAt: row?.resolvedAt ? row.resolvedAt.toISOString() : null,
+    };
+  }
+
+  /** The SLA fields as the API and the `inbox.updated` payload carry them: ISO strings or null. */
+  private slaFields(row?: InboxConversation | null): {
+    firstInboundAt: string | null;
+    firstResponseAt: string | null;
+    slaStartedAt: string | null;
+    slaDueAt: string | null;
+    slaBreachedAt: string | null;
+    slaMinutes: number | null;
+  } {
+    const iso = (value: Date | null | undefined): string | null => (value ? value.toISOString() : null);
+    return {
+      firstInboundAt: iso(row?.firstInboundAt),
+      firstResponseAt: iso(row?.firstResponseAt),
+      slaStartedAt: iso(row?.slaStartedAt),
+      slaDueAt: iso(row?.slaDueAt),
+      slaBreachedAt: iso(row?.slaBreachedAt),
+      slaMinutes: row?.slaMinutes ?? null,
     };
   }
 

@@ -72,6 +72,7 @@
     "plugins": "플러그인",
     "logs": "로그",
     "inbox": "받은편지함",
+    "reports": "보고서",
     "pipeline": "파이프라인",
     "campaigns": "캠페인",
     "users": "사용자",
@@ -1554,7 +1555,60 @@
       "label": "부서",
       "all": "모든 부서",
       "unassigned": "부서 없음"
+    },
+    "sla": {
+      "breached": "지연",
+      "remaining": "{{value}}분 남음"
     }
+  },
+  "reports": {
+    "title": "보고서",
+    "subtitle": "받은편지함의 첫 응답과 SLA 준수율입니다.",
+    "session": "세션",
+    "noSessions": "아직 세션이 없습니다",
+    "range": {
+      "label": "기간",
+      "days7": "7일",
+      "days30": "30일",
+      "days90": "90일"
+    },
+    "division": {
+      "label": "부서",
+      "all": "모든 부서",
+      "unassigned": "부서 없음"
+    },
+    "cards": {
+      "conversations": "대화",
+      "avgResponse": "평균 첫 응답",
+      "compliance": "SLA 준수율",
+      "breached": "현재 지연",
+      "awaiting": "{{value}}건 첫 응답 대기 중",
+      "eligible": "{{value}}건 목표 대비 측정"
+    },
+    "charts": {
+      "byDivision": "부서별 대화",
+      "daily": "일별 대화",
+      "conversations": "대화"
+    },
+    "agents": {
+      "title": "상담원별",
+      "name": "상담원",
+      "conversations": "대화",
+      "resolved": "해결됨",
+      "avgResponse": "평균 응답",
+      "breached": "지연",
+      "unassigned": "미배정"
+    },
+    "empty": {
+      "selectSession": "보고서를 보려면 세션을 선택하세요.",
+      "none": "이 기간에 시작된 대화가 없습니다."
+    },
+    "error": {
+      "forbidden": "이 키로는 이 세션의 받은편지함을 읽을 수 없습니다."
+    },
+    "minutes": "{{value}}분",
+    "percent": "{{value}}%",
+    "noValue": "—"
   },
   "pipeline": {
     "title": "영업 파이프라인",
@@ -1809,6 +1863,8 @@
     "settings.idleHours": "메뉴가 다시 나오기까지의 무응답 시간",
     "settings.idleHoursHint": "0이면 상담이 종료될 때까지 부서에 남습니다.",
     "settings.saved": "설정이 저장되었습니다.",
-    "settings.saveFailed": "설정을 저장하지 못했습니다."
+    "settings.saveFailed": "설정을 저장하지 못했습니다.",
+    "slaMinutes": "첫 응답 목표(분)",
+    "slaMinutesHint": "0이면 SLA를 사용하지 않습니다. 답장이 없는 고객 메시지에서 시작해 첫 사람 답장에서 멈춥니다."
   }
 }

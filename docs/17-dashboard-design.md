@@ -156,6 +156,11 @@ session-scoped key; `/logs` is mounted for any admin key.
                      group, clear, delete) [operator]; contact info
                      panel and group info dialog; new chat / new group [operator]; read-only
                      channel feed on whatsapp-web.js)
+/inbox             → Team inbox (routed conversations, status/assignee/division filters, notes,
+                     reply composer, first-response badge)
+/reports           → Inbox reports (first-response and SLA metrics over a date range)
+/pipeline          → CRM pipeline (deals, stages and history) [unscoped key only]
+/campaigns         → Broadcast campaigns (audience, schedule, progress, recipients)
 /number-checker    → Number Checker (single and bulk check of whether numbers are on WhatsApp) [operator]
 /webhooks          → Webhooks (per-session webhook endpoints)
 /templates         → Message Templates
@@ -463,6 +468,48 @@ the Inbox, so this page never sends anything.
 The Inbox page reads the same data from the other side: a `division` filter beside the status and
 assignee filters, a division chip on each row, a division selector in the conversation pane, and the
 last 20 messages plus a reply composer, so a CS answers the routed chat without leaving the inbox.
+A conversation with a running first-response clock also carries an SLA badge beside the division
+chip (and in the conversation header): amber with the minutes left while the deadline is ahead, red
+once it has passed or the API has marked it breached, and nothing when the division sets no target.
+
+### Inbox Reports
+
+First-response and SLA metrics for one session over a 7, 30 or 90 day window, optionally narrowed to
+a division or to unassigned conversations. The numbers come from the same chat-scope-filtered set the
+Inbox lists, so a key restricted to selected chats sees only its own conversations in every figure.
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  Reports                                    [Session: Nomor Pusat ▾] │
+│  First-response and SLA metrics for the team inbox.                 │
+├─────────────────────────────────────────────────────────────────────┤
+│  [ 7 days ] [ 30 days ] [ 90 days ]      Division: [ All ▾ ]        │
+│  ┌────────────┐ ┌────────────┐ ┌────────────┐ ┌────────────┐        │
+│  │ 248        │ │ 37         │ │ 12.4 min   │ │ 86.2%      │        │
+│  │Conversations│ │Awaiting   │ │Avg first   │ │Compliance  │        │
+│  │            │ │first reply │ │response    │ │(112 of 130)│        │
+│  └────────────┘ └────────────┘ └────────────┘ └────────────┘        │
+│  ┌───────────────────────────────┐ ┌───────────────────────────────┐│
+│  │ By division                   │ │ Daily                         ││
+│  │ ▇▇▇ SMP Putra   120           │ │      ╱╲    ╱╲                 ││
+│  │ ▇▇▇ SMA Putri    84           │ │  ╱╲╱  ╲╱╲╱  ╲╱╲              ││
+│  │ ▇ Unassigned     44           │ │                               ││
+│  └───────────────────────────────┘ └───────────────────────────────┘│
+│  Agents                                                             │
+│  ┌───────────────────────────────────────────────────────────────┐  │
+│  │ Name        Conversations  Resolved  Avg response  Breached   │  │
+│  │ Rina        96             71        9.8 min       6          │  │
+│  │ Budi        78             55        14.1 min      11         │  │
+│  └───────────────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+The range defaults to 30 days and the division filter to every conversation. Response times are
+minutes with one decimal; compliance is the share of conversations that had a division target and
+met it, shown as a dash when nothing in the range was measured rather than a misleading 100%. A
+range longer than 366 days, or one whose `from` is after its `to`, is refused by the API and shown
+as an error instead of an empty chart. The route is mounted for every role that may open the Inbox,
+and the API's `403` replaces the cards when the key may not read the session.
 
 ## 17.4 Component Library
 

@@ -74,6 +74,7 @@
     "plugins": "Plugins",
     "logs": "Journaux",
     "inbox": "Inbox",
+    "reports": "Rapports",
     "pipeline": "Pipeline",
     "campaigns": "Campaigns",
     "users": "Utilisateurs",
@@ -1563,7 +1564,60 @@
       "label": "Division",
       "all": "Toutes les divisions",
       "unassigned": "Aucune division"
+    },
+    "sla": {
+      "breached": "En retard",
+      "remaining": "{{value}} min restantes"
     }
+  },
+  "reports": {
+    "title": "Rapports",
+    "subtitle": "Première réponse et respect du SLA pour la boîte de réception.",
+    "session": "Session",
+    "noSessions": "Aucune session pour l'instant",
+    "range": {
+      "label": "Période",
+      "days7": "7 jours",
+      "days30": "30 jours",
+      "days90": "90 jours"
+    },
+    "division": {
+      "label": "Division",
+      "all": "Toutes les divisions",
+      "unassigned": "Non attribué"
+    },
+    "cards": {
+      "conversations": "Conversations",
+      "avgResponse": "Première réponse moyenne",
+      "compliance": "Respect du SLA",
+      "breached": "En retard maintenant",
+      "awaiting": "{{value}} en attente d'une première réponse",
+      "eligible": "{{value}} mesurées par rapport à un objectif"
+    },
+    "charts": {
+      "byDivision": "Conversations par division",
+      "daily": "Conversations par jour",
+      "conversations": "Conversations"
+    },
+    "agents": {
+      "title": "Par agent",
+      "name": "Agent",
+      "conversations": "Conversations",
+      "resolved": "Résolues",
+      "avgResponse": "Réponse moy.",
+      "breached": "En retard",
+      "unassigned": "Non attribué"
+    },
+    "empty": {
+      "selectSession": "Choisissez une session pour voir ses rapports.",
+      "none": "Aucune conversation n'a commencé sur cette période."
+    },
+    "error": {
+      "forbidden": "Votre clé ne peut pas lire la boîte de réception de cette session."
+    },
+    "minutes": "{{value}} min",
+    "percent": "{{value}} %",
+    "noValue": "—"
   },
   "pipeline": {
     "title": "Sales Pipeline",
@@ -1818,6 +1872,8 @@
     "settings.idleHours": "Heures de silence avant le retour du menu",
     "settings.idleHoursHint": "0 garde la conversation dans sa division jusqu'à sa résolution.",
     "settings.saved": "Réglages enregistrés.",
-    "settings.saveFailed": "Impossible d'enregistrer les réglages."
+    "settings.saveFailed": "Impossible d'enregistrer les réglages.",
+    "slaMinutes": "Objectif de première réponse (minutes)",
+    "slaMinutesHint": "0 désactive le SLA. Le compteur démarre sur un message sans réponse et s’arrête à la première réponse humaine."
   }
 }

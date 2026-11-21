@@ -25,7 +25,9 @@ import {
   InboxSummaryDto,
   UpdateInboxConversationDto,
 } from './dto/inbox.dto';
+import { InboxReportDto } from './dto/inbox-report.dto';
 import type { InboxConversationStatus } from './entities/inbox-conversation.entity';
+import { InboxReportsService } from './inbox-reports.service';
 import { InboxService } from './inbox.service';
 
 const DEFAULT_LIMIT = 50;
@@ -36,6 +38,7 @@ const MAX_LIMIT = 200;
 export class InboxController {
   constructor(
     private readonly inbox: InboxService,
+    private readonly reports: InboxReportsService,
     private readonly chatScope: ChatScopeService,
   ) {}
 
@@ -99,6 +102,36 @@ export class InboxController {
     const all = await this.inbox.listAll(sessionId, {}, apiKey?.id);
     const visible = await this.chatScope.filter(apiKey, all, conversation => conversation.chatId);
     return this.inbox.summarize(visible, apiKey?.id);
+  }
+
+  @Get('reports')
+  @RequireRole(ApiKeyRole.VIEWER)
+  @ChatScoped('filtered')
+  @ApiOperation({ summary: 'First-response and SLA metrics over a date range' })
+  @ApiParam({ name: 'sessionId', description: 'Session ID' })
+  @ApiQuery({
+    name: 'from',
+    required: false,
+    description: 'ISO date/time, inclusive. Default: 30 days before `to`.',
+  })
+  @ApiQuery({ name: 'to', required: false, description: 'ISO date/time, inclusive. Default: now.' })
+  @ApiQuery({
+    name: 'division',
+    required: false,
+    description: '`unassigned`, or a division id. Omit for every conversation.',
+  })
+  @ApiResponse({ status: 200, type: InboxReportDto })
+  @ApiResponse({ status: 400, description: 'Invalid range, a range over 366 days, or more than 20000 conversations.' })
+  async report(
+    @Param('sessionId') sessionId: string,
+    @CurrentApiKey() apiKey: ApiKey | undefined,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('division') division?: string,
+  ): Promise<InboxReportDto> {
+    const loaded = await this.reports.load(sessionId, { from, to, division });
+    const visible = await this.chatScope.filter(apiKey, loaded.rows, row => row.chatId);
+    return this.reports.build({ ...loaded, rows: visible });
   }
 
   @Get('conversations/:chatId')

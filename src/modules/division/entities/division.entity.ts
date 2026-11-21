@@ -57,6 +57,12 @@ export class Division {
   @Column({ type: 'int', default: 0 })
   sortOrder!: number;
 
+  // First-response target in minutes. 0 disables the SLA for this division, which is the default so
+  // an existing division keeps behaving exactly as before. Read as a snapshot when a conversation's
+  // clock starts — see InboxConversation.slaMinutes.
+  @Column({ type: 'int', default: 0 })
+  slaMinutes!: number;
+
   // An inactive division is skipped by the menu and by keyword matching, and its routed chats fall
   // back to the menu on their next inbound message.
   @Column({ type: 'boolean', default: true })

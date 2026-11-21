@@ -19,6 +19,7 @@ const Dashboard = lazy(() => import('./pages/Dashboard').then(m => ({ default: m
 const Sessions = lazy(() => import('./pages/Sessions').then(m => ({ default: m.Sessions })));
 const Chats = lazy(() => import('./pages/Chats').then(m => ({ default: m.Chats })));
 const Inbox = lazy(() => import('./pages/Inbox').then(m => ({ default: m.Inbox })));
+const Reports = lazy(() => import('./pages/Reports').then(m => ({ default: m.Reports })));
 const Divisions = lazy(() => import('./pages/Divisions').then(m => ({ default: m.Divisions })));
 const Pipeline = lazy(() => import('./pages/Pipeline').then(m => ({ default: m.Pipeline })));
 const Campaigns = lazy(() => import('./pages/Campaigns').then(m => ({ default: m.Campaigns })));
@@ -172,6 +173,7 @@ function AppContent() {
                 <Route path="sessions" element={<Sessions />} />
                 <Route path="chats" element={<Chats />} />
                 <Route path="inbox" element={<Inbox />} />
+                <Route path="reports" element={<Reports />} />
                 {role === 'admin' && <Route path="divisions" element={<Divisions />} />}
                 <Route path="pipeline" element={<Pipeline />} />
                 <Route path="campaigns" element={<Campaigns />} />

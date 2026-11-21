@@ -31,6 +31,8 @@ export type InboxConversationStatus = 'open' | 'pending' | 'resolved';
 @Index('IDX_inbox_conversations_session_status', ['sessionId', 'status'])
 @Index('IDX_inbox_conversations_session_assignee', ['sessionId', 'assigneeKeyId'])
 @Index('IDX_inbox_conversations_session_division', ['sessionId', 'divisionId'])
+@Index('IDX_inbox_conversations_sla_due', ['slaDueAt'])
+@Index('IDX_inbox_conversations_session_first_inbound', ['sessionId', 'firstInboundAt'])
 export class InboxConversation {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
@@ -64,6 +66,37 @@ export class InboxConversation {
 
   @Column({ type: 'varchar', length: 100, nullable: true })
   divisionName!: string | null;
+
+  // ---- first-response SLA -------------------------------------------------------------------
+  //
+  // The clock is stored, not derived: `slaDueAt` is fixed when a customer message starts a window,
+  // so editing the division's target later cannot move a deadline that already passed or rescue one
+  // that did not. `slaMinutes` is the target snapshot for the same reason — it is what the window was
+  // measured against, not what the division says today.
+  //
+  // A window opens on an inbound message while nobody has answered, restarts on a newer inbound
+  // while it is still open, and stops on the first human outbound reply. `slaBreachedAt` is written
+  // once by the sweeper and never cleared, so a late answer still leaves the breach on the record.
+
+  // First inbound message ever seen for this chat (reports: time to first response).
+  @Column({ type: dateColumnType(), nullable: true, transformer: DateTransformer })
+  firstInboundAt!: Date | null;
+
+  // First human reply after the current window opened.
+  @Column({ type: dateColumnType(), nullable: true, transformer: DateTransformer })
+  firstResponseAt!: Date | null;
+
+  @Column({ type: dateColumnType(), nullable: true, transformer: DateTransformer })
+  slaStartedAt!: Date | null;
+
+  @Column({ type: dateColumnType(), nullable: true, transformer: DateTransformer })
+  slaDueAt!: Date | null;
+
+  @Column({ type: dateColumnType(), nullable: true, transformer: DateTransformer })
+  slaBreachedAt!: Date | null;
+
+  @Column({ type: 'int', nullable: true })
+  slaMinutes!: number | null;
 
   // Set when the status becomes `resolved`; the list uses it to decide whether newer inbound
   // activity should reopen the conversation.

@@ -195,3 +195,67 @@ describe('DivisionService configuration', () => {
     );
   });
 });
+
+describe('DivisionService first-response target', () => {
+  it('stores the target on create and returns it in the view', async () => {
+    const { service, divisions } = makeService();
+
+    const created = await service.create('sess-1', { name: 'CS SMP Putra', slaMinutes: 15 });
+
+    expect(divisions.save).toHaveBeenCalledWith(expect.objectContaining({ slaMinutes: 15 }));
+    expect(created.slaMinutes).toBe(15);
+  });
+
+  it('defaults the target to 0, which means no SLA', async () => {
+    const { service, divisions } = makeService();
+
+    await service.create('sess-1', { name: 'CS SMP Putra' });
+
+    expect(divisions.save).toHaveBeenCalledWith(expect.objectContaining({ slaMinutes: 0 }));
+  });
+
+  it('records a target change in the audited field list', async () => {
+    const { service, divisions, audit } = makeService();
+    divisions.findOne.mockResolvedValue({
+      id: 'div-1',
+      sessionId: 'sess-1',
+      name: 'CS',
+      keywords: [],
+      sortOrder: 0,
+      slaMinutes: 15,
+      isActive: true,
+    });
+
+    await service.update('sess-1', 'div-1', { slaMinutes: 30 });
+
+    expect(divisions.save).toHaveBeenCalledWith(expect.objectContaining({ slaMinutes: 30 }));
+    expect(audit.logInfo).toHaveBeenCalledWith(
+      AuditAction.DIVISION_UPDATED,
+      expect.objectContaining({
+        sessionId: 'sess-1',
+        metadata: { divisionId: 'div-1', fields: ['slaMinutes'] },
+      }),
+    );
+  });
+
+  it('maps only the divisions that have a target, and caches the map until invalidated', async () => {
+    const { service, divisions } = makeService();
+    divisions.find.mockResolvedValueOnce([
+      { id: 'div-1', slaMinutes: 15 },
+      { id: 'div-2', slaMinutes: 0 },
+    ]);
+
+    const first = await service.slaMinutesByDivision('sess-1');
+    expect([...first]).toEqual([['div-1', 15]]);
+
+    await service.slaMinutesByDivision('sess-1');
+    expect(divisions.find).toHaveBeenCalledTimes(1);
+
+    service.invalidate('sess-1');
+    divisions.find.mockResolvedValueOnce([{ id: 'div-1', slaMinutes: 45 }]);
+    const refreshed = await service.slaMinutesByDivision('sess-1');
+
+    expect(divisions.find).toHaveBeenCalledTimes(2);
+    expect(refreshed.get('div-1')).toBe(45);
+  });
+});

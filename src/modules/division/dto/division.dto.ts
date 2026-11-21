@@ -26,6 +26,8 @@ export const KEYWORD_MAX_LENGTH = 40;
 export const DIVISION_TEXT_MAX_LENGTH = 2_000;
 /** One month, so a long holiday does not silently disable the idle re-prompt. */
 export const IDLE_HOURS_MAX = 720;
+/** One week. A longer target is not an SLA: nobody waits that long before asking again. */
+export const SLA_MINUTES_MAX = 10_080;
 
 const KEYWORDS_DESCRIPTION =
   'Words or short phrases a customer may type instead of the menu number, matched as whole words ' +
@@ -84,6 +86,22 @@ export class CreateDivisionDto {
   @Min(0)
   @Max(1000)
   sortOrder?: number;
+
+  @ApiPropertyOptional({
+    description:
+      'First-response target in minutes. 0 (the default) means this division has no SLA. The clock ' +
+      'starts on a customer message that nobody has answered yet and stops on the first human reply.',
+    default: 0,
+    minimum: 0,
+    maximum: SLA_MINUTES_MAX,
+    type: 'integer',
+  })
+  @IsOptional()
+  @ToStrictNumber()
+  @IsInt()
+  @Min(0)
+  @Max(SLA_MINUTES_MAX)
+  slaMinutes?: number;
 
   @ApiPropertyOptional({ description: 'Whether the division appears in the menu and matches keywords', default: true })
   @IsOptional()
@@ -158,6 +176,19 @@ export class UpdateDivisionDto {
   @Min(0)
   @Max(1000)
   sortOrder?: number;
+
+  @ApiPropertyOptional({
+    description: 'First-response target in minutes; 0 disables the SLA',
+    minimum: 0,
+    maximum: SLA_MINUTES_MAX,
+    type: 'integer',
+  })
+  @ValidateIf((o: UpdateDivisionDto) => o.slaMinutes !== undefined)
+  @ToStrictNumber()
+  @IsInt()
+  @Min(0)
+  @Max(SLA_MINUTES_MAX)
+  slaMinutes?: number;
 
   @ApiPropertyOptional({ description: 'Whether the division appears in the menu and matches keywords' })
   @ValidateIf((o: UpdateDivisionDto) => o.isActive !== undefined)
@@ -251,6 +282,9 @@ export class DivisionDto {
 
   @ApiProperty({ type: 'integer' })
   sortOrder!: number;
+
+  @ApiProperty({ type: 'integer' })
+  slaMinutes!: number;
 
   @ApiProperty()
   isActive!: boolean;

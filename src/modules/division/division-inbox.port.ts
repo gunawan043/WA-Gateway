@@ -13,6 +13,8 @@ export interface DivisionRouteInput {
   chatId: string;
   divisionId: string;
   divisionName: string;
+  /** First-response target of the division; 0 means no SLA. Snapshotted onto the conversation. */
+  slaMinutes: number;
   /** Candidate assignees in stable order; the least busy active one wins. */
   agentKeyIds: string[];
 }

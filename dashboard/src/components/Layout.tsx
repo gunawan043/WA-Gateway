@@ -29,6 +29,7 @@ import {
   Network,
   KanbanSquare,
   Megaphone,
+  BarChart3,
 } from 'lucide-react';
 import { useTheme } from '../hooks/useTheme';
 import { useRole, type UserRole } from '../hooks/useRole';
@@ -48,6 +49,8 @@ const allNavItems = [
   { to: '/sessions', icon: Smartphone, key: 'sessions' as const, adminOnly: false },
   { to: '/chats', icon: MessageSquare, key: 'chats' as const, adminOnly: false },
   { to: '/inbox', icon: InboxIcon, key: 'inbox' as const, adminOnly: false },
+  // Metrics over the inbox. Read-only and open to every role that may open the inbox, so no guard.
+  { to: '/reports', icon: BarChart3, key: 'reports' as const, adminOnly: false },
   // Session-scoped configuration (the menu a customer sees on the shared number). Reading is
   // VIEWER, every write is ADMIN, so the item is shown to admins only.
   { to: '/divisions', icon: Network, key: 'divisions' as const, adminOnly: true },

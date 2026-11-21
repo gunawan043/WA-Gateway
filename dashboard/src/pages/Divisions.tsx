@@ -24,6 +24,7 @@ interface Draft {
   menuLabel: string;
   welcomeText: string;
   sortOrder: string;
+  slaMinutes: string;
   isActive: boolean;
   agentKeyIds: string[];
 }
@@ -43,6 +44,7 @@ const emptyDraft = (): Draft => ({
   menuLabel: '',
   welcomeText: '',
   sortOrder: '0',
+  slaMinutes: '0',
   isActive: true,
   agentKeyIds: [],
 });
@@ -53,6 +55,7 @@ const draftOf = (division: Division): Draft => ({
   menuLabel: division.menuLabel ?? '',
   welcomeText: division.welcomeText ?? '',
   sortOrder: String(division.sortOrder),
+  slaMinutes: String(division.slaMinutes),
   isActive: division.isActive,
   agentKeyIds: division.agents.map(agent => agent.apiKeyId),
 });
@@ -133,6 +136,7 @@ export function Divisions() {
       menuLabel: draft.menuLabel.trim() || null,
       welcomeText: draft.welcomeText.trim() || null,
       sortOrder: Number.parseInt(draft.sortOrder, 10) || 0,
+      slaMinutes: Number.parseInt(draft.slaMinutes, 10) || 0,
       isActive: draft.isActive,
       agentKeyIds: draft.agentKeyIds,
     };
@@ -402,15 +406,28 @@ export function Divisions() {
                 onChange={event => setDraft(prev => ({ ...prev, sortOrder: event.target.value }))}
               />
             </div>
-            <label className="divisions-check">
+            <div>
+              <label htmlFor="division-sla">{t('divisions.slaMinutes')}</label>
               <input
-                type="checkbox"
-                checked={draft.isActive}
-                onChange={event => setDraft(prev => ({ ...prev, isActive: event.target.checked }))}
+                id="division-sla"
+                type="number"
+                min={0}
+                max={10080}
+                value={draft.slaMinutes}
+                onChange={event => setDraft(prev => ({ ...prev, slaMinutes: event.target.value }))}
               />
-              {t('divisions.isActive')}
-            </label>
+            </div>
           </div>
+          <p className="divisions-hint">{t('divisions.slaMinutesHint')}</p>
+
+          <label className="divisions-check">
+            <input
+              type="checkbox"
+              checked={draft.isActive}
+              onChange={event => setDraft(prev => ({ ...prev, isActive: event.target.checked }))}
+            />
+            {t('divisions.isActive')}
+          </label>
 
           <fieldset className="divisions-agents-field">
             <legend>{t('divisions.agents')}</legend>

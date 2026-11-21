@@ -72,6 +72,7 @@
     "plugins": "Plugins",
     "logs": "Protokolle",
     "inbox": "Inbox",
+    "reports": "Berichte",
     "pipeline": "Pipeline",
     "campaigns": "Campaigns",
     "users": "Benutzer",
@@ -1554,7 +1555,60 @@
       "label": "Abteilung",
       "all": "Alle Abteilungen",
       "unassigned": "Keine Abteilung"
+    },
+    "sla": {
+      "breached": "Überfällig",
+      "remaining": "Noch {{value}} Min."
     }
+  },
+  "reports": {
+    "title": "Berichte",
+    "subtitle": "Erste Antwort und SLA-Einhaltung für den Posteingang.",
+    "session": "Session",
+    "noSessions": "Noch keine Sessions",
+    "range": {
+      "label": "Zeitraum",
+      "days7": "7 Tage",
+      "days30": "30 Tage",
+      "days90": "90 Tage"
+    },
+    "division": {
+      "label": "Abteilung",
+      "all": "Alle Abteilungen",
+      "unassigned": "Nicht zugewiesen"
+    },
+    "cards": {
+      "conversations": "Unterhaltungen",
+      "avgResponse": "Durchschnittliche erste Antwort",
+      "compliance": "SLA-Einhaltung",
+      "breached": "Jetzt überfällig",
+      "awaiting": "{{value}} warten auf eine erste Antwort",
+      "eligible": "{{value}} an einem Ziel gemessen"
+    },
+    "charts": {
+      "byDivision": "Unterhaltungen nach Abteilung",
+      "daily": "Unterhaltungen pro Tag",
+      "conversations": "Unterhaltungen"
+    },
+    "agents": {
+      "title": "Nach Mitarbeiter",
+      "name": "Mitarbeiter",
+      "conversations": "Unterhaltungen",
+      "resolved": "Erledigt",
+      "avgResponse": "Ø Antwort",
+      "breached": "Überfällig",
+      "unassigned": "Nicht zugewiesen"
+    },
+    "empty": {
+      "selectSession": "Wähle eine Session, um ihre Berichte zu sehen.",
+      "none": "In diesem Zeitraum begann keine Unterhaltung."
+    },
+    "error": {
+      "forbidden": "Dein Schlüssel darf den Posteingang dieser Session nicht lesen."
+    },
+    "minutes": "{{value}} Min.",
+    "percent": "{{value}} %",
+    "noValue": "—"
   },
   "pipeline": {
     "title": "Sales Pipeline",
@@ -1809,6 +1863,8 @@
     "settings.idleHours": "Stunden Stille bis das Menü zurückkehrt",
     "settings.idleHoursHint": "0 lässt das Gespräch bis zum Abschluss in seiner Abteilung.",
     "settings.saved": "Einstellungen gespeichert.",
-    "settings.saveFailed": "Die Einstellungen konnten nicht gespeichert werden."
+    "settings.saveFailed": "Die Einstellungen konnten nicht gespeichert werden.",
+    "slaMinutes": "Ziel für die erste Antwort (Minuten)",
+    "slaMinutesHint": "0 schaltet die SLA aus. Die Uhr startet bei einer Kundenanfrage, die noch niemand beantwortet hat, und stoppt bei der ersten menschlichen Antwort."
   }
 }

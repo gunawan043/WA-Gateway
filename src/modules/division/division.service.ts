@@ -29,6 +29,7 @@ export interface RoutableDivision {
   welcomeText: string | null;
   keywords: string[];
   sortOrder: number;
+  slaMinutes: number;
   agentKeyIds: string[];
 }
 
@@ -58,6 +59,7 @@ const CONTEXT_TTL_MS = 15_000;
 @Injectable()
 export class DivisionService {
   private readonly contexts = new Map<string, { expiresAt: number; value: DivisionRoutingContext }>();
+  private readonly slaTargets = new Map<string, { expiresAt: number; value: Map<string, number> }>();
   private inboxPort?: DivisionInboxPort | null;
 
   constructor(
@@ -125,6 +127,7 @@ export class DivisionService {
         menuLabel: this.trimOrNull(dto.menuLabel),
         welcomeText: this.trimOrNull(dto.welcomeText),
         sortOrder: dto.sortOrder ?? 0,
+        slaMinutes: dto.slaMinutes ?? 0,
         isActive: dto.isActive ?? true,
       }),
     );
@@ -168,6 +171,10 @@ export class DivisionService {
     if (dto.sortOrder !== undefined) {
       division.sortOrder = dto.sortOrder;
       changed.push('sortOrder');
+    }
+    if (dto.slaMinutes !== undefined) {
+      division.slaMinutes = dto.slaMinutes;
+      changed.push('slaMinutes');
     }
     if (dto.isActive !== undefined) {
       division.isActive = dto.isActive;
@@ -297,6 +304,7 @@ export class DivisionService {
         welcomeText: division.welcomeText,
         keywords: division.keywords ?? [],
         sortOrder: division.sortOrder,
+        slaMinutes: division.slaMinutes ?? 0,
         agentKeyIds: agentIds.get(division.id) ?? [],
       })),
     };
@@ -304,9 +312,33 @@ export class DivisionService {
     return value;
   }
 
+  /**
+   * Division id → first-response target in minutes, for the SLA tracker.
+   *
+   * Divisions with no target are absent rather than mapped to 0, so a lookup miss and "this division
+   * has no SLA" are the same check. Inactive divisions stay in the map: a chat already routed to one
+   * keeps measuring against it until the router moves the chat elsewhere.
+   *
+   * Cached like {@link routingContext} and dropped by the same {@link invalidate}, because the
+   * tracker reads it on every inbound message.
+   */
+  async slaMinutesByDivision(sessionId: string): Promise<Map<string, number>> {
+    const cached = this.slaTargets.get(sessionId);
+    if (cached && cached.expiresAt > Date.now()) return cached.value;
+
+    const rows = await this.divisions.find({ where: { sessionId }, select: { id: true, slaMinutes: true } });
+    const value = new Map<string, number>();
+    for (const row of rows) {
+      if (row.slaMinutes > 0) value.set(row.id, row.slaMinutes);
+    }
+    this.slaTargets.set(sessionId, { expiresAt: Date.now() + CONTEXT_TTL_MS, value });
+    return value;
+  }
+
   /** Drops the cached context after any write, so an edit takes effect on the next message. */
   invalidate(sessionId: string): void {
     this.contexts.delete(sessionId);
+    this.slaTargets.delete(sessionId);
   }
 
   /**
@@ -372,6 +404,7 @@ export class DivisionService {
       menuLabel: division.menuLabel,
       welcomeText: division.welcomeText,
       sortOrder: division.sortOrder,
+      slaMinutes: division.slaMinutes,
       isActive: division.isActive,
       agents: agents.map(agent => ({ apiKeyId: agent.apiKeyId, name: agent.agentName })),
       createdAt: division.createdAt,

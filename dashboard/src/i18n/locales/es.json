@@ -74,6 +74,7 @@
     "logs": "Registros",
     "templates": "Plantillas",
     "inbox": "Inbox",
+    "reports": "Informes",
     "pipeline": "Pipeline",
     "campaigns": "Campaigns",
     "users": "Usuarios",
@@ -1563,7 +1564,60 @@
       "label": "División",
       "all": "Todas las divisiones",
       "unassigned": "Sin división"
+    },
+    "sla": {
+      "breached": "Vencida",
+      "remaining": "Quedan {{value}} min"
     }
+  },
+  "reports": {
+    "title": "Informes",
+    "subtitle": "Primera respuesta y cumplimiento del SLA del buzón.",
+    "session": "Sesión",
+    "noSessions": "Aún no hay sesiones",
+    "range": {
+      "label": "Periodo",
+      "days7": "7 días",
+      "days30": "30 días",
+      "days90": "90 días"
+    },
+    "division": {
+      "label": "División",
+      "all": "Todas las divisiones",
+      "unassigned": "Sin división"
+    },
+    "cards": {
+      "conversations": "Conversaciones",
+      "avgResponse": "Primera respuesta media",
+      "compliance": "Cumplimiento del SLA",
+      "breached": "Vencidas ahora",
+      "awaiting": "{{value}} esperan primera respuesta",
+      "eligible": "{{value}} medidas contra un objetivo"
+    },
+    "charts": {
+      "byDivision": "Conversaciones por división",
+      "daily": "Conversaciones por día",
+      "conversations": "Conversaciones"
+    },
+    "agents": {
+      "title": "Por agente",
+      "name": "Agente",
+      "conversations": "Conversaciones",
+      "resolved": "Resueltas",
+      "avgResponse": "Respuesta media",
+      "breached": "Vencidas",
+      "unassigned": "Sin asignar"
+    },
+    "empty": {
+      "selectSession": "Elige una sesión para ver sus informes.",
+      "none": "No empezó ninguna conversación en este periodo."
+    },
+    "error": {
+      "forbidden": "Tu clave no puede leer el buzón de esta sesión."
+    },
+    "minutes": "{{value}} min",
+    "percent": "{{value}} %",
+    "noValue": "—"
   },
   "pipeline": {
     "title": "Sales Pipeline",
@@ -1818,6 +1872,8 @@
     "settings.idleHours": "Horas de silencio antes de repetir el menú",
     "settings.idleHoursHint": "0 mantiene la conversación en su división hasta resolverla.",
     "settings.saved": "Ajustes guardados.",
-    "settings.saveFailed": "No se pudieron guardar los ajustes."
+    "settings.saveFailed": "No se pudieron guardar los ajustes.",
+    "slaMinutes": "Objetivo de primera respuesta (minutos)",
+    "slaMinutesHint": "0 desactiva el SLA. El reloj empieza con un mensaje sin responder y se detiene con la primera respuesta humana."
   }
 }

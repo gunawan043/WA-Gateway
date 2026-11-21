@@ -22,6 +22,7 @@ import {
   type CreateInstanceInput,
   type UpdateInstanceInput,
   type InboxListParams,
+  type InboxReportParams,
   type InboxStatus,
   type DivisionInput,
   type DivisionSettingsInput,
@@ -54,6 +55,8 @@ export const queryKeys = {
   statsMessages: (period: string) => ['stats', 'messages', period] as const,
   inbox: (sessionId: string, params: InboxListParams) => ['sessions', sessionId, 'inbox', 'list', params] as const,
   inboxSummary: (sessionId: string) => ['sessions', sessionId, 'inbox', 'summary'] as const,
+  inboxReport: (sessionId: string, params: InboxReportParams) =>
+    ['sessions', sessionId, 'inbox', 'report', params] as const,
   inboxConversation: (sessionId: string, chatId: string) =>
     ['sessions', sessionId, 'inbox', 'conversation', chatId] as const,
   inboxThread: (sessionId: string, chatId: string) => ['sessions', sessionId, 'inbox', 'thread', chatId] as const,
@@ -460,6 +463,20 @@ export function useInboxSummaryQuery(sessionId: string) {
   });
 }
 
+/**
+ * First-response metrics for the Reports page. Not polled: the numbers move on human behaviour, not
+ * on a timer, and the page has its own range/division controls that refetch on change.
+ */
+export function useInboxReportQuery(sessionId: string, params: InboxReportParams = {}) {
+  return useQuery({
+    queryKey: queryKeys.inboxReport(sessionId, params),
+    queryFn: () => inboxApi.report(sessionId, params),
+    enabled: Boolean(sessionId),
+    staleTime: 60_000,
+    retry: false,
+  });
+}
+
 export function useInboxConversationQuery(sessionId: string, chatId: string, enabled = true) {
   return useQuery({
     queryKey: queryKeys.inboxConversation(sessionId, chatId),
@@ -523,8 +540,7 @@ export function useInboxThreadQuery(sessionId: string, chatId: string, enabled =
 export function useSendInboxReplyMutation(sessionId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ chatId, text }: { chatId: string; text: string }) =>
-      messageApi.sendText(sessionId, chatId, text),
+    mutationFn: ({ chatId, text }: { chatId: string; text: string }) => messageApi.sendText(sessionId, chatId, text),
     onSuccess: (_data, variables) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.inboxThread(sessionId, variables.chatId) });
       invalidateInbox(queryClient, sessionId);

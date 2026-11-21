@@ -306,6 +306,7 @@ describe('InboxService division routing', () => {
       chatId: '628111@c.us',
       divisionId: 'div-1',
       divisionName: 'CS SMP Putra',
+      slaMinutes: 0,
       agentKeyIds: ['key-1', 'key-2'],
     });
 
@@ -337,6 +338,7 @@ describe('InboxService division routing', () => {
       chatId: '628111@c.us',
       divisionId: 'div-1',
       divisionName: 'CS SMP Putra',
+      slaMinutes: 0,
       agentKeyIds: ['key-1'],
     });
 
@@ -354,6 +356,7 @@ describe('InboxService division routing', () => {
       chatId: '628111@c.us',
       divisionId: 'div-1',
       divisionName: 'CS SMP Putra',
+      slaMinutes: 0,
       agentKeyIds: ['key-1'],
     });
 
@@ -401,5 +404,181 @@ describe('InboxService division routing', () => {
     expect(tagged).toHaveLength(1);
     expect(tagged[0].divisionName).toBe('Putra');
     expect(untagged).toHaveLength(0);
+  });
+});
+
+describe('InboxService first-response SLA', () => {
+  const STARTED = new Date('2026-11-20T08:00:00.000Z');
+  const DUE = new Date('2026-11-20T08:15:00.000Z');
+
+  it('resolving clears the clock but keeps the response history', async () => {
+    const { service, conversations } = makeService();
+    conversations.findOne.mockResolvedValue({
+      id: 'conv-1',
+      sessionId: 'sess-1',
+      chatId: '628111@c.us',
+      status: 'open',
+      assigneeKeyId: null,
+      assigneeName: null,
+      divisionId: 'div-1',
+      divisionName: 'SMP',
+      firstInboundAt: STARTED,
+      firstResponseAt: null,
+      slaStartedAt: STARTED,
+      slaDueAt: DUE,
+      slaBreachedAt: new Date('2026-11-20T08:20:00.000Z'),
+      slaMinutes: 15,
+      resolvedAt: null,
+    });
+
+    await service.update('sess-1', '628111@c.us', { status: 'resolved' }, actor);
+
+    expect(conversations.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        slaStartedAt: null,
+        slaDueAt: null,
+        slaBreachedAt: null,
+        firstInboundAt: STARTED,
+        slaMinutes: 15,
+      }),
+    );
+  });
+
+  it('re-measures an open window against the division the chat is moved to', async () => {
+    const { service, conversations, divisions } = makeService();
+    conversations.findOne.mockResolvedValue({
+      id: 'conv-1',
+      sessionId: 'sess-1',
+      chatId: '628111@c.us',
+      status: 'open',
+      divisionId: 'div-1',
+      divisionName: 'SMP',
+      slaStartedAt: STARTED,
+      slaDueAt: DUE,
+      slaMinutes: 15,
+    });
+    divisions.lookup.mockResolvedValue({ id: 'div-2', name: 'SMA', slaMinutes: 30 });
+
+    await service.update('sess-1', '628111@c.us', { divisionId: 'div-2' }, actor);
+
+    expect(conversations.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        divisionId: 'div-2',
+        slaMinutes: 30,
+        slaDueAt: new Date(STARTED.getTime() + 30 * 60_000),
+      }),
+    );
+  });
+
+  it('clears the deadline when the chat is untagged', async () => {
+    const { service, conversations } = makeService();
+    conversations.findOne.mockResolvedValue({
+      id: 'conv-1',
+      sessionId: 'sess-1',
+      chatId: '628111@c.us',
+      status: 'open',
+      divisionId: 'div-1',
+      divisionName: 'SMP',
+      slaStartedAt: STARTED,
+      slaDueAt: DUE,
+      slaMinutes: 15,
+    });
+
+    await service.update('sess-1', '628111@c.us', { divisionId: null }, actor);
+
+    expect(conversations.save).toHaveBeenCalledWith(
+      expect.objectContaining({ divisionId: null, slaMinutes: null, slaDueAt: null, slaStartedAt: STARTED }),
+    );
+  });
+
+  it('gives the first contact a deadline when routing runs after the inbound hook', async () => {
+    const { service, conversations } = makeService();
+    conversations.findOne.mockResolvedValue({
+      id: 'conv-1',
+      sessionId: 'sess-1',
+      chatId: '628111@c.us',
+      status: 'open',
+      divisionId: null,
+      divisionName: null,
+      slaStartedAt: STARTED,
+      slaDueAt: null,
+      slaMinutes: null,
+    });
+
+    await service.routeConversation({
+      sessionId: 'sess-1',
+      chatId: '628111@c.us',
+      divisionId: 'div-1',
+      divisionName: 'SMP',
+      slaMinutes: 15,
+      agentKeyIds: [],
+    });
+
+    expect(conversations.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        divisionId: 'div-1',
+        slaMinutes: 15,
+        slaDueAt: new Date(STARTED.getTime() + 15 * 60_000),
+      }),
+    );
+  });
+
+  it('drops the deadline of a deleted division from every tagged conversation', async () => {
+    const { service, conversations } = makeService();
+    conversations.find.mockResolvedValue([
+      {
+        sessionId: 'sess-1',
+        chatId: '628111@c.us',
+        status: 'open',
+        assigneeKeyId: null,
+        assigneeName: null,
+        divisionId: 'div-1',
+        divisionName: 'SMP',
+        slaStartedAt: STARTED,
+        slaDueAt: DUE,
+        slaMinutes: 15,
+      },
+    ]);
+
+    await service.clearDivision('sess-1', 'div-1');
+
+    expect(conversations.update).toHaveBeenCalledWith(
+      { sessionId: 'sess-1', divisionId: 'div-1' },
+      { divisionId: null, divisionName: null, slaMinutes: null, slaDueAt: null },
+    );
+  });
+
+  it('carries the six SLA fields in the view and in inbox.updated', async () => {
+    const { service, conversations, events } = makeService();
+    conversations.find.mockResolvedValue([
+      {
+        sessionId: 'sess-1',
+        chatId: '628111@c.us',
+        status: 'open',
+        assigneeKeyId: null,
+        assigneeName: null,
+        divisionId: 'div-1',
+        divisionName: 'SMP',
+        firstInboundAt: STARTED,
+        firstResponseAt: null,
+        slaStartedAt: STARTED,
+        slaDueAt: DUE,
+        slaBreachedAt: null,
+        slaMinutes: 15,
+      },
+    ]);
+
+    const rows = await service.listAll('sess-1');
+
+    expect(rows[0]).toMatchObject({
+      firstInboundAt: STARTED.toISOString(),
+      firstResponseAt: null,
+      slaStartedAt: STARTED.toISOString(),
+      slaDueAt: DUE.toISOString(),
+      slaBreachedAt: null,
+      slaMinutes: 15,
+    });
+    // The row is open and untouched, so the list read does not announce anything.
+    expect(events.emitInboxUpdated).not.toHaveBeenCalled();
   });
 });

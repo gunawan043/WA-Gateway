@@ -88,6 +88,7 @@ const CHAT_EVENTS = new Set([
   'event.response',
   'poll.vote',
   'inbox.updated',
+  'inbox.sla_breached',
 ]);
 
 /**
@@ -1246,6 +1247,15 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
    */
   emitInboxUpdated(sessionId: string, data: Record<string, unknown>) {
     this.emitToRooms(sessionId, 'inbox.updated', data);
+  }
+
+  /**
+   * A conversation passed its first-response deadline. Carries the window (`slaStartedAt`,
+   * `slaDueAt`) and the division, so the dashboard can turn the badge red without a refetch; the
+   * audit row written beside it is the durable record.
+   */
+  emitInboxSlaBreached(sessionId: string, data: Record<string, unknown>) {
+    this.emitToRooms(sessionId, 'inbox.sla_breached', data);
   }
 
   /**

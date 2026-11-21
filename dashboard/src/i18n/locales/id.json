@@ -72,6 +72,7 @@
     "plugins": "Plugin",
     "logs": "Log",
     "inbox": "Inbox",
+    "reports": "Laporan",
     "pipeline": "Pipeline",
     "campaigns": "Kampanye",
     "users": "Pengguna",
@@ -1554,7 +1555,60 @@
       "label": "Divisi",
       "all": "Semua divisi",
       "unassigned": "Tanpa divisi"
+    },
+    "sla": {
+      "breached": "Terlambat",
+      "remaining": "Sisa {{value}} mnt"
     }
+  },
+  "reports": {
+    "title": "Laporan",
+    "subtitle": "Respons pertama dan kepatuhan SLA untuk kotak masuk.",
+    "session": "Sesi",
+    "noSessions": "Belum ada sesi",
+    "range": {
+      "label": "Periode",
+      "days7": "7 hari",
+      "days30": "30 hari",
+      "days90": "90 hari"
+    },
+    "division": {
+      "label": "Divisi",
+      "all": "Semua divisi",
+      "unassigned": "Tanpa divisi"
+    },
+    "cards": {
+      "conversations": "Percakapan",
+      "avgResponse": "Rata-rata respons pertama",
+      "compliance": "Kepatuhan SLA",
+      "breached": "Terlambat sekarang",
+      "awaiting": "{{value}} menunggu balasan pertama",
+      "eligible": "{{value}} diukur terhadap target"
+    },
+    "charts": {
+      "byDivision": "Percakapan per divisi",
+      "daily": "Percakapan per hari",
+      "conversations": "Percakapan"
+    },
+    "agents": {
+      "title": "Per CS",
+      "name": "CS",
+      "conversations": "Percakapan",
+      "resolved": "Selesai",
+      "avgResponse": "Rata-rata respons",
+      "breached": "Terlambat",
+      "unassigned": "Tanpa penanggung jawab"
+    },
+    "empty": {
+      "selectSession": "Pilih sesi untuk melihat laporannya.",
+      "none": "Belum ada percakapan pada periode ini."
+    },
+    "error": {
+      "forbidden": "Kunci Anda tidak dapat membaca kotak masuk sesi ini."
+    },
+    "minutes": "{{value}} mnt",
+    "percent": "{{value}}%",
+    "noValue": "—"
   },
   "pipeline": {
     "title": "Pipeline Penjualan",
@@ -1809,6 +1863,8 @@
     "settings.idleHours": "Jam tanpa pesan sebelum menu muncul lagi",
     "settings.idleHoursHint": "0 membuat percakapan tetap di divisinya sampai diselesaikan.",
     "settings.saved": "Pengaturan disimpan.",
-    "settings.saveFailed": "Pengaturan gagal disimpan."
+    "settings.saveFailed": "Pengaturan gagal disimpan.",
+    "slaMinutes": "Target respons pertama (menit)",
+    "slaMinutesHint": "0 mematikan SLA. Hitungan mulai saat pesan pelanggan belum dijawab dan berhenti pada balasan manusia pertama."
   }
 }

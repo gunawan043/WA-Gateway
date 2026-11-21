@@ -74,6 +74,7 @@
     "plugins": "Plugin",
     "logs": "Log",
     "inbox": "Inbox",
+    "reports": "Rapporti",
     "pipeline": "Pipeline",
     "campaigns": "Campaigns",
     "users": "Utenti",
@@ -1563,7 +1564,60 @@
       "label": "Divisione",
       "all": "Tutte le divisioni",
       "unassigned": "Nessuna divisione"
+    },
+    "sla": {
+      "breached": "In ritardo",
+      "remaining": "{{value}} min rimasti"
     }
+  },
+  "reports": {
+    "title": "Rapporti",
+    "subtitle": "Prima risposta e rispetto dello SLA per la casella di posta.",
+    "session": "Sessione",
+    "noSessions": "Nessuna sessione",
+    "range": {
+      "label": "Periodo",
+      "days7": "7 giorni",
+      "days30": "30 giorni",
+      "days90": "90 giorni"
+    },
+    "division": {
+      "label": "Divisione",
+      "all": "Tutte le divisioni",
+      "unassigned": "Non assegnata"
+    },
+    "cards": {
+      "conversations": "Conversazioni",
+      "avgResponse": "Prima risposta media",
+      "compliance": "Rispetto dello SLA",
+      "breached": "In ritardo ora",
+      "awaiting": "{{value}} in attesa di prima risposta",
+      "eligible": "{{value}} misurate su un obiettivo"
+    },
+    "charts": {
+      "byDivision": "Conversazioni per divisione",
+      "daily": "Conversazioni al giorno",
+      "conversations": "Conversazioni"
+    },
+    "agents": {
+      "title": "Per agente",
+      "name": "Agente",
+      "conversations": "Conversazioni",
+      "resolved": "Risolte",
+      "avgResponse": "Risposta media",
+      "breached": "In ritardo",
+      "unassigned": "Non assegnata"
+    },
+    "empty": {
+      "selectSession": "Scegli una sessione per vedere i suoi rapporti.",
+      "none": "Nessuna conversazione iniziata in questo periodo."
+    },
+    "error": {
+      "forbidden": "La tua chiave non può leggere la casella di questa sessione."
+    },
+    "minutes": "{{value}} min",
+    "percent": "{{value}} %",
+    "noValue": "—"
   },
   "pipeline": {
     "title": "Sales Pipeline",
@@ -1818,6 +1872,8 @@
     "settings.idleHours": "Ore di silenzio prima che il menu torni",
     "settings.idleHoursHint": "0 mantiene la conversazione nella sua divisione fino alla chiusura.",
     "settings.saved": "Impostazioni salvate.",
-    "settings.saveFailed": "Impossibile salvare le impostazioni."
+    "settings.saveFailed": "Impossibile salvare le impostazioni.",
+    "slaMinutes": "Obiettivo di prima risposta (minuti)",
+    "slaMinutesHint": "0 disattiva lo SLA. Il contatore parte da un messaggio senza risposta e si ferma alla prima risposta umana."
   }
 }

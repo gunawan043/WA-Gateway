@@ -276,6 +276,14 @@ export interface InboxConversationRow {
   assigneeName: string | null;
   divisionId: string | null;
   divisionName: string | null;
+  // SLA history. Exported with the row because the deadlines are state, not a derived value: a
+  // restore that dropped them would silently forgive every breach recorded before the backup.
+  firstInboundAt: string | Date | null;
+  firstResponseAt: string | Date | null;
+  slaStartedAt: string | Date | null;
+  slaDueAt: string | Date | null;
+  slaBreachedAt: string | Date | null;
+  slaMinutes: number | null;
   resolvedAt: string | Date | null;
   lastInboundAt: string | Date | null;
   createdAt: string | Date;
@@ -391,6 +399,7 @@ export interface DivisionRow {
   menuLabel: string | null;
   welcomeText: string | null;
   sortOrder: number;
+  slaMinutes: number;
   isActive: boolean | number;
   createdAt: string | Date;
   updatedAt: string | Date;

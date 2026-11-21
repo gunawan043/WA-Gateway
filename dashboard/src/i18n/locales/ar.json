@@ -80,6 +80,7 @@
     "plugins": "الإضافات",
     "logs": "السجلات",
     "inbox": "صندوق الوارد",
+    "reports": "التقارير",
     "pipeline": "خط المبيعات",
     "campaigns": "الحملات",
     "users": "المستخدمون",
@@ -1591,7 +1592,60 @@
       "label": "القسم",
       "all": "كل الأقسام",
       "unassigned": "بدون قسم"
+    },
+    "sla": {
+      "breached": "متأخرة",
+      "remaining": "بقي {{value}} دقيقة"
     }
+  },
+  "reports": {
+    "title": "التقارير",
+    "subtitle": "الرد الأول والالتزام باتفاقية مستوى الخدمة لصندوق الوارد.",
+    "session": "الجلسة",
+    "noSessions": "لا توجد جلسات بعد",
+    "range": {
+      "label": "الفترة",
+      "days7": "7 أيام",
+      "days30": "30 يومًا",
+      "days90": "90 يومًا"
+    },
+    "division": {
+      "label": "القسم",
+      "all": "كل الأقسام",
+      "unassigned": "بدون قسم"
+    },
+    "cards": {
+      "conversations": "المحادثات",
+      "avgResponse": "متوسط الرد الأول",
+      "compliance": "الالتزام باتفاقية مستوى الخدمة",
+      "breached": "متأخرة الآن",
+      "awaiting": "{{value}} بانتظار الرد الأول",
+      "eligible": "{{value}} مقاسة مقابل هدف"
+    },
+    "charts": {
+      "byDivision": "المحادثات حسب القسم",
+      "daily": "المحادثات يوميًا",
+      "conversations": "المحادثات"
+    },
+    "agents": {
+      "title": "حسب الموظف",
+      "name": "الموظف",
+      "conversations": "المحادثات",
+      "resolved": "مغلقة",
+      "avgResponse": "متوسط الرد",
+      "breached": "متأخرة",
+      "unassigned": "غير مسندة"
+    },
+    "empty": {
+      "selectSession": "اختر جلسة لعرض تقاريرها.",
+      "none": "لم تبدأ أي محادثة في هذه الفترة."
+    },
+    "error": {
+      "forbidden": "مفتاحك لا يستطيع قراءة صندوق وارد هذه الجلسة."
+    },
+    "minutes": "{{value}} دقيقة",
+    "percent": "{{value}}%",
+    "noValue": "—"
   },
   "pipeline": {
     "title": "خط المبيعات",
@@ -1846,6 +1900,8 @@
     "settings.idleHours": "ساعات الصمت قبل عودة القائمة",
     "settings.idleHoursHint": "0 يبقي المحادثة في قسمها حتى إغلاقها.",
     "settings.saved": "تم حفظ الإعدادات.",
-    "settings.saveFailed": "تعذّر حفظ الإعدادات."
+    "settings.saveFailed": "تعذّر حفظ الإعدادات.",
+    "slaMinutes": "هدف الرد الأول (بالدقائق)",
+    "slaMinutesHint": "0 يعطّل الاتفاقية. يبدأ العد عند رسالة عميل لم يُرد عليها ويتوقف عند أول رد بشري."
   }
 }

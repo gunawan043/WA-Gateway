@@ -26,6 +26,7 @@ const SMP: Division = {
   menuLabel: 'SMP Putra (1)',
   welcomeText: null,
   sortOrder: 1,
+  slaMinutes: 15,
   isActive: true,
   agents: [
     { apiKeyId: 'key-1', name: 'Rina' },
@@ -43,6 +44,7 @@ const SMA: Division = {
   menuLabel: null,
   welcomeText: 'Halo, CS SMA Putri di sini.',
   sortOrder: 2,
+  slaMinutes: 0,
   isActive: false,
   agents: [],
   createdAt: '2026-01-02T00:00:00.000Z',
@@ -284,6 +286,7 @@ test('creating a division trims the keywords, sends blanks as null, and posts to
   fireEvent.change(within(dialog).getByLabelText('Name'), { target: { value: '  CS SMP Putra  ' } });
   fireEvent.change(within(dialog).getByLabelText('Keywords'), { target: { value: ' smp , , putra ' } });
   fireEvent.change(within(dialog).getByLabelText('Menu position'), { target: { value: '3' } });
+  fireEvent.change(within(dialog).getByLabelText('First response target (minutes)'), { target: { value: '15' } });
   fireEvent.click(within(dialog).getByRole('checkbox', { name: 'Rina' }));
   fireEvent.click(save);
 
@@ -295,6 +298,7 @@ test('creating a division trims the keywords, sends blanks as null, and posts to
     menuLabel: null,
     welcomeText: null,
     sortOrder: 3,
+    slaMinutes: 15,
     isActive: true,
     agentKeyIds: ['key-1'],
   });
@@ -313,6 +317,7 @@ test('editing pre-fills the form and patches only that division', async () => {
   assert.equal((within(dialog).getByLabelText('Menu label') as HTMLInputElement).value, 'SMP Putra (1)');
   assert.equal((within(dialog).getByLabelText('Keywords') as HTMLInputElement).value, 'smp, smp putra');
   assert.equal((within(dialog).getByLabelText('Menu position') as HTMLInputElement).value, '1');
+  assert.equal((within(dialog).getByLabelText('First response target (minutes)') as HTMLInputElement).value, '15');
   assert.equal((within(dialog).getByRole('checkbox', { name: 'Rina' }) as HTMLInputElement).checked, true);
   assert.equal((within(dialog).getByRole('checkbox', { name: 'Budi' }) as HTMLInputElement).checked, true);
 

@@ -179,6 +179,7 @@ export class DivisionRouterService {
       chatId,
       divisionId: division.id,
       divisionName: division.name,
+      slaMinutes: division.slaMinutes,
       agentKeyIds: division.agentKeyIds,
     });
     await this.audit.logInfo(AuditAction.DIVISION_ROUTED, {

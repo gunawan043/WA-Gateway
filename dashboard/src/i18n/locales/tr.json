@@ -72,6 +72,7 @@
     "plugins": "Eklentiler",
     "logs": "Kayıtlar (Logs)",
     "inbox": "Inbox",
+    "reports": "Raporlar",
     "pipeline": "Pipeline",
     "campaigns": "Campaigns",
     "users": "Kullanıcılar",
@@ -1554,7 +1555,60 @@
       "label": "Bölüm",
       "all": "Tüm bölümler",
       "unassigned": "Bölüm yok"
+    },
+    "sla": {
+      "breached": "Gecikmiş",
+      "remaining": "{{value}} dk kaldı"
     }
+  },
+  "reports": {
+    "title": "Raporlar",
+    "subtitle": "Gelen kutusu için ilk yanıt ve SLA uyumu.",
+    "session": "Oturum",
+    "noSessions": "Henüz oturum yok",
+    "range": {
+      "label": "Dönem",
+      "days7": "7 gün",
+      "days30": "30 gün",
+      "days90": "90 gün"
+    },
+    "division": {
+      "label": "Bölüm",
+      "all": "Tüm bölümler",
+      "unassigned": "Atanmamış"
+    },
+    "cards": {
+      "conversations": "Görüşmeler",
+      "avgResponse": "Ortalama ilk yanıt",
+      "compliance": "SLA uyumu",
+      "breached": "Şu anda gecikmiş",
+      "awaiting": "{{value}} ilk yanıt bekliyor",
+      "eligible": "{{value}} hedefe göre ölçüldü"
+    },
+    "charts": {
+      "byDivision": "Bölüme göre görüşmeler",
+      "daily": "Günlük görüşmeler",
+      "conversations": "Görüşmeler"
+    },
+    "agents": {
+      "title": "Temsilciye göre",
+      "name": "Temsilci",
+      "conversations": "Görüşmeler",
+      "resolved": "Çözüldü",
+      "avgResponse": "Ort. yanıt",
+      "breached": "Gecikmiş",
+      "unassigned": "Atanmamış"
+    },
+    "empty": {
+      "selectSession": "Raporlarını görmek için bir oturum seçin.",
+      "none": "Bu dönemde hiç görüşme başlamadı."
+    },
+    "error": {
+      "forbidden": "Anahtarınız bu oturumun gelen kutusunu okuyamaz."
+    },
+    "minutes": "{{value}} dk",
+    "percent": "%{{value}}",
+    "noValue": "—"
   },
   "pipeline": {
     "title": "Sales Pipeline",
@@ -1809,6 +1863,8 @@
     "settings.idleHours": "Menü dönmeden önceki sessizlik saati",
     "settings.idleHoursHint": "0, görüşme kapatılana kadar bölümünde kalır.",
     "settings.saved": "Ayarlar kaydedildi.",
-    "settings.saveFailed": "Ayarlar kaydedilemedi."
+    "settings.saveFailed": "Ayarlar kaydedilemedi.",
+    "slaMinutes": "İlk yanıt hedefi (dakika)",
+    "slaMinutesHint": "0 SLA’yı kapatır. Süre, yanıtsız bir müşteri mesajıyla başlar ve ilk insan yanıtıyla durur."
   }
 }

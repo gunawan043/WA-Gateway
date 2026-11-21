@@ -90,6 +90,48 @@ export class InboxConversationDto {
   @ApiPropertyOptional({ type: String, nullable: true, description: 'Snapshot of the division name at routing time.' })
   divisionName!: string | null;
 
+  @ApiPropertyOptional({
+    type: String,
+    nullable: true,
+    description: 'ISO instant of the first customer message ever seen for this chat.',
+  })
+  firstInboundAt!: string | null;
+
+  @ApiPropertyOptional({
+    type: String,
+    nullable: true,
+    description: 'ISO instant of the first human reply. Null while the customer has never been answered.',
+  })
+  firstResponseAt!: string | null;
+
+  @ApiPropertyOptional({
+    type: String,
+    nullable: true,
+    description: 'ISO instant the current first-response window opened.',
+  })
+  slaStartedAt!: string | null;
+
+  @ApiPropertyOptional({
+    type: String,
+    nullable: true,
+    description: 'ISO deadline of the current window: slaStartedAt + slaMinutes. Null when no target applies.',
+  })
+  slaDueAt!: string | null;
+
+  @ApiPropertyOptional({
+    type: String,
+    nullable: true,
+    description: 'ISO instant the sweeper first saw this window overdue. Cleared when the window restarts.',
+  })
+  slaBreachedAt!: string | null;
+
+  @ApiPropertyOptional({
+    type: 'integer',
+    nullable: true,
+    description: 'First-response target in minutes that the current window is measured against.',
+  })
+  slaMinutes!: number | null;
+
   @ApiPropertyOptional({ type: String, nullable: true, description: 'ISO instant the conversation was resolved.' })
   resolvedAt!: string | null;
 }

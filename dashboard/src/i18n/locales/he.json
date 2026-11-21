@@ -76,6 +76,7 @@
     "plugins": "תוספים",
     "logs": "לוגים",
     "inbox": "תיבת דואר נכנס",
+    "reports": "דוחות",
     "pipeline": "צינור מכירות",
     "campaigns": "קמפיינים",
     "users": "משתמשים",
@@ -1573,7 +1574,60 @@
       "label": "חטיבה",
       "all": "כל החטיבות",
       "unassigned": "ללא חטיבה"
+    },
+    "sla": {
+      "breached": "באיחור",
+      "remaining": "נותרו {{value}} דק׳"
     }
+  },
+  "reports": {
+    "title": "דוחות",
+    "subtitle": "תגובה ראשונה ועמידה ב-SLA בתיבת הדואר הנכנס.",
+    "session": "Session",
+    "noSessions": "אין עדיין Sessions",
+    "range": {
+      "label": "תקופה",
+      "days7": "7 ימים",
+      "days30": "30 ימים",
+      "days90": "90 ימים"
+    },
+    "division": {
+      "label": "מחלקה",
+      "all": "כל המחלקות",
+      "unassigned": "ללא מחלקה"
+    },
+    "cards": {
+      "conversations": "שיחות",
+      "avgResponse": "זמן תגובה ראשונה ממוצע",
+      "compliance": "עמידה ב-SLA",
+      "breached": "באיחור כעת",
+      "awaiting": "{{value}} ממתינות לתגובה ראשונה",
+      "eligible": "{{value}} נמדדו מול יעד"
+    },
+    "charts": {
+      "byDivision": "שיחות לפי מחלקה",
+      "daily": "שיחות ליום",
+      "conversations": "שיחות"
+    },
+    "agents": {
+      "title": "לפי נציג",
+      "name": "נציג",
+      "conversations": "שיחות",
+      "resolved": "נסגרו",
+      "avgResponse": "תגובה ממוצעת",
+      "breached": "באיחור",
+      "unassigned": "ללא שיוך"
+    },
+    "empty": {
+      "selectSession": "בחר Session כדי לראות את הדוחות שלה.",
+      "none": "לא החלו שיחות בתקופה זו."
+    },
+    "error": {
+      "forbidden": "המפתח שלך אינו יכול לקרוא את תיבת הדואר של Session זו."
+    },
+    "minutes": "{{value}} דק׳",
+    "percent": "{{value}}%",
+    "noValue": "—"
   },
   "pipeline": {
     "title": "צינור מכירות",
@@ -1828,6 +1882,8 @@
     "settings.idleHours": "שעות שקט לפני שהתפריט חוזר",
     "settings.idleHoursHint": "0 משאיר את השיחה בחטיבה עד לסגירתה.",
     "settings.saved": "ההגדרות נשמרו.",
-    "settings.saveFailed": "לא ניתן לשמור את ההגדרות."
+    "settings.saveFailed": "לא ניתן לשמור את ההגדרות.",
+    "slaMinutes": "יעד לתגובה ראשונה (דקות)",
+    "slaMinutesHint": "0 מבטל את ה-SLA. הספירה מתחילה בהודעת לקוח שעדיין לא נענתה ונעצרת בתגובה אנושית ראשונה."
   }
 }

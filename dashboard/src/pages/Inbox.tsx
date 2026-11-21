@@ -1,16 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  AlertCircle,
-  Check,
-  Loader2,
-  MessageSquare,
-  Search,
-  Send,
-  StickyNote,
-  Trash2,
-  UserPlus,
-} from 'lucide-react';
+import { AlertCircle, Check, Loader2, MessageSquare, Search, Send, StickyNote, Trash2, UserPlus } from 'lucide-react';
 import { PageHeader } from '../components/PageHeader';
 import { useToast } from '../hooks/useToast';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
@@ -27,7 +17,7 @@ import {
   useSessionsQuery,
   useUpdateInboxMutation,
 } from '../hooks/queries';
-import type { InboxAssigneeFilter, InboxStatus } from '../services/api';
+import type { InboxAssigneeFilter, InboxConversation, InboxStatus } from '../services/api';
 import './Inbox.css';
 
 type StatusTab = InboxStatus | 'all';
@@ -42,6 +32,22 @@ function formatTime(timestamp: number): string {
   return sameDay
     ? date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
     : date.toLocaleDateString(undefined, { day: '2-digit', month: 'short' });
+}
+
+/**
+ * The first-response badge: red once the window is overdue (or the sweeper flagged it), amber with
+ * the minutes left while it is still running, and nothing at all when no target applies.
+ */
+function SlaBadge({ conversation }: { conversation: InboxConversation }) {
+  const { t } = useTranslation();
+  if (!conversation.slaDueAt) return null;
+  const remaining = Math.ceil((new Date(conversation.slaDueAt).getTime() - Date.now()) / 60_000);
+  const breached = conversation.slaBreachedAt !== null || remaining <= 0;
+  return (
+    <span className={`inbox-sla ${breached ? 'is-breached' : 'is-due'}`}>
+      {breached ? t('inbox.sla.breached') : t('inbox.sla.remaining', { value: remaining })}
+    </span>
+  );
 }
 
 /**
@@ -282,6 +288,7 @@ export function Inbox() {
                             <span className="inbox-assignee inbox-unassigned">{t('inbox.unassigned')}</span>
                           )}
                           {row.divisionName && <span className="inbox-division">{row.divisionName}</span>}
+                          <SlaBadge conversation={row} />
                           {row.unreadCount > 0 && <span className="inbox-unread">{row.unreadCount}</span>}
                         </span>
                       </span>
@@ -313,6 +320,7 @@ export function Inbox() {
                   <div>
                     <h2>{active.name || active.chatId}</h2>
                     <code>{active.chatId}</code>
+                    <SlaBadge conversation={active} />
                   </div>
                   <div className="inbox-detail-actions">
                     {(['open', 'pending', 'resolved'] as InboxStatus[]).map(next => (
@@ -390,9 +398,7 @@ export function Inbox() {
                       {(thread.data?.messages ?? []).map(item => (
                         <li key={item.id} className={item.direction === 'outgoing' ? 'is-out' : 'is-in'}>
                           <p>
-                            {item.type === 'text'
-                              ? item.body
-                              : t('inbox.detail.mediaMessage', { type: item.type })}
+                            {item.type === 'text' ? item.body : t('inbox.detail.mediaMessage', { type: item.type })}
                           </p>
                           <time>
                             {new Date(item.timestamp ? item.timestamp * 1000 : item.createdAt).toLocaleString()}

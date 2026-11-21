@@ -72,6 +72,7 @@
     "plugins": "Plugins",
     "logs": "Logs",
     "inbox": "Inbox",
+    "reports": "Reports",
     "pipeline": "Pipeline",
     "campaigns": "Campaigns",
     "users": "Users",
@@ -1554,7 +1555,60 @@
       "label": "Division",
       "all": "All divisions",
       "unassigned": "No division"
+    },
+    "sla": {
+      "breached": "Overdue",
+      "remaining": "{{value}} min left"
     }
+  },
+  "reports": {
+    "title": "Reports",
+    "subtitle": "First response and SLA compliance for the inbox.",
+    "session": "Session",
+    "noSessions": "No sessions yet",
+    "range": {
+      "label": "Period",
+      "days7": "7 days",
+      "days30": "30 days",
+      "days90": "90 days"
+    },
+    "division": {
+      "label": "Division",
+      "all": "All divisions",
+      "unassigned": "Unassigned"
+    },
+    "cards": {
+      "conversations": "Conversations",
+      "avgResponse": "Average first response",
+      "compliance": "SLA compliance",
+      "breached": "Overdue now",
+      "awaiting": "{{value}} awaiting a first reply",
+      "eligible": "{{value}} measured against a target"
+    },
+    "charts": {
+      "byDivision": "Conversations by division",
+      "daily": "Conversations per day",
+      "conversations": "Conversations"
+    },
+    "agents": {
+      "title": "By agent",
+      "name": "Agent",
+      "conversations": "Conversations",
+      "resolved": "Resolved",
+      "avgResponse": "Avg. response",
+      "breached": "Overdue",
+      "unassigned": "Unassigned"
+    },
+    "empty": {
+      "selectSession": "Pick a session to see its reports.",
+      "none": "No conversations started in this period."
+    },
+    "error": {
+      "forbidden": "Your key cannot read this session's inbox."
+    },
+    "minutes": "{{value}} min",
+    "percent": "{{value}}%",
+    "noValue": "—"
   },
   "pipeline": {
     "title": "Sales Pipeline",
@@ -1809,6 +1863,8 @@
     "settings.idleHours": "Idle hours before the menu returns",
     "settings.idleHoursHint": "0 keeps the conversation in its division until it is resolved.",
     "settings.saved": "Settings saved.",
-    "settings.saveFailed": "Could not save the settings."
+    "settings.saveFailed": "Could not save the settings.",
+    "slaMinutes": "First response target (minutes)",
+    "slaMinutesHint": "0 disables the SLA. The clock starts on a customer message nobody has answered yet and stops on the first human reply."
   }
 }

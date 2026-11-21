@@ -72,6 +72,7 @@
     "plugins": "插件",
     "logs": "日志",
     "inbox": "收件箱",
+    "reports": "报表",
     "pipeline": "销售管道",
     "campaigns": "活动",
     "users": "用户",
@@ -1554,7 +1555,60 @@
       "label": "部门",
       "all": "所有部门",
       "unassigned": "无部门"
+    },
+    "sla": {
+      "breached": "已超时",
+      "remaining": "剩余 {{value}} 分钟"
     }
+  },
+  "reports": {
+    "title": "报表",
+    "subtitle": "收件箱的首次响应与 SLA 达标情况。",
+    "session": "会话",
+    "noSessions": "暂无会话",
+    "range": {
+      "label": "时间范围",
+      "days7": "7 天",
+      "days30": "30 天",
+      "days90": "90 天"
+    },
+    "division": {
+      "label": "部门",
+      "all": "所有部门",
+      "unassigned": "未分配"
+    },
+    "cards": {
+      "conversations": "会话数",
+      "avgResponse": "平均首次响应",
+      "compliance": "SLA 达标率",
+      "breached": "当前超时",
+      "awaiting": "{{value}} 个等待首次回复",
+      "eligible": "{{value}} 个按目标考核"
+    },
+    "charts": {
+      "byDivision": "各部门会话数",
+      "daily": "每日会话数",
+      "conversations": "会话数"
+    },
+    "agents": {
+      "title": "按客服",
+      "name": "客服",
+      "conversations": "会话数",
+      "resolved": "已解决",
+      "avgResponse": "平均响应",
+      "breached": "超时",
+      "unassigned": "未分配"
+    },
+    "empty": {
+      "selectSession": "选择一个会话查看报表。",
+      "none": "该时间段内没有新会话。"
+    },
+    "error": {
+      "forbidden": "你的密钥无法读取该会话的收件箱。"
+    },
+    "minutes": "{{value}} 分钟",
+    "percent": "{{value}}%",
+    "noValue": "—"
   },
   "pipeline": {
     "title": "销售管道",
@@ -1809,6 +1863,8 @@
     "settings.idleHours": "菜单重现前的静默小时数",
     "settings.idleHoursHint": "0 表示会话在结束前一直留在该部门。",
     "settings.saved": "设置已保存。",
-    "settings.saveFailed": "无法保存设置。"
+    "settings.saveFailed": "无法保存设置。",
+    "slaMinutes": "首次响应目标（分钟）",
+    "slaMinutesHint": "0 表示关闭 SLA。计时从无人回复的客户消息开始，在首次人工回复时停止。"
   }
 }

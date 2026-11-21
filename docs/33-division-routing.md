@@ -163,7 +163,10 @@ system of record for "which team owns this chat":
   including a chat that never saw the menu;
 - deleting a division clears the tag but **keeps the assignee** — the conversation does not
   silently fall back to another team;
-- resolving a conversation re-arms the menu (see §33.5).
+- resolving a conversation re-arms the menu (see §33.5);
+- a division with a positive `slaMinutes` starts the conversation's first-response clock and sets
+  its deadline. The target is snapshotted on the conversation when the window opens, so editing the
+  division does not move a deadline already running; `0` leaves the chat unmeasured in the reports.
 
 The tag is denormalised on purpose: the inbox is the system of record, the filter must run before
 pagination, and a join would make the filter a second source of truth.
@@ -193,6 +196,7 @@ curl -X POST "$BASE/api/sessions/$SESSION/divisions" \
     "menuLabel": "SMP Putra (1)",
     "keywords": ["smp", "smp putra"],
     "sortOrder": 1,
+    "slaMinutes": 30,
     "agentKeyIds": ["<api-key-uuid>", "<api-key-uuid>"]
   }'
 ```
@@ -211,8 +215,9 @@ Defaults when settings were never saved: `enabled: true`, `menuHeader: null`, `i
   `GET /api/infra/export-data` / `POST /api/infra/import-data`, and `division_agents` is cleared
   before the sessions delete on a restore.
 - **Audit:** `DIVISION_CREATED`, `DIVISION_UPDATED`, `DIVISION_DELETED`,
-  `DIVISION_SETTINGS_UPDATED`, `DIVISION_ROUTED` (with the chosen division and assignee) and
-  `INBOX_CONVERSATION_DIVISION_CHANGED` (a manual re-tag).
+  `DIVISION_SETTINGS_UPDATED`, `DIVISION_ROUTED` (with the chosen division and assignee),
+  `INBOX_CONVERSATION_DIVISION_CHANGED` (a manual re-tag) and `INBOX_SLA_BREACHED` (once per
+  first-response window that passes its deadline).
 - **Caching:** the router reads a per-session routing context cached for 15 s; every write
   invalidates it, so a menu edit shows up on the next message rather than after a restart.
 

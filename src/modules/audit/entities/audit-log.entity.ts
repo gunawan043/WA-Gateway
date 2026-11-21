@@ -96,6 +96,9 @@ export enum AuditAction {
   INBOX_CONVERSATION_DIVISION_CHANGED = 'inbox_conversation_division_changed',
   INBOX_NOTE_ADDED = 'inbox_note_added',
   INBOX_NOTE_DELETED = 'inbox_note_deleted',
+  // A customer waited past the division's first-response target. Emitted by the sweeper, not by a
+  // request, so the row is the operational record of a missed deadline rather than a user action.
+  INBOX_SLA_BREACHED = 'inbox_sla_breached',
 
   // Division routing. The configuration events record who changed the menu a customer sees; a
   // routing event records which division a chat reached and which CS it was handed to.

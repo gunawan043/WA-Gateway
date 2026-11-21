@@ -489,6 +489,25 @@
   white-space: nowrap;
 }
 
+/* First-response badge: amber while the window is open, red once it is overdue. */
+.inbox-page .inbox-sla {
+  padding: 0.05rem 0.45rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background-color: var(--bg-light);
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.inbox-page .inbox-sla.is-due {
+  color: var(--warning-text);
+}
+
+.inbox-page .inbox-sla.is-breached {
+  color: var(--error-text);
+}
+
 /* Compact reply pane: the inbox is for triage, the full thread (media, paging) lives on Chats. */
 .inbox-page .inbox-thread {
   display: flex;

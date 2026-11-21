@@ -607,8 +607,8 @@ export const TABLE_IMPORTERS: AnyTableImporter[] = [
   defineTableImporter({
     key: 'divisions',
     label: 'division',
-    sql: `INSERT INTO divisions (id, "sessionId", name, keywords, "menuLabel", "welcomeText", "sortOrder", "isActive", "createdAt", "updatedAt")
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+    sql: `INSERT INTO divisions (id, "sessionId", name, keywords, "menuLabel", "welcomeText", "sortOrder", "slaMinutes", "isActive", "createdAt", "updatedAt")
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
     id: (row: DivisionRow) => row.id,
     map: (row: DivisionRow) => [
       row.id,
@@ -618,6 +618,7 @@ export const TABLE_IMPORTERS: AnyTableImporter[] = [
       nulFree(row.menuLabel),
       nulFree(row.welcomeText),
       row.sortOrder ?? 0,
+      row.slaMinutes ?? 0,
       row.isActive ?? true,
       row.createdAt,
       row.updatedAt,
@@ -678,8 +679,8 @@ export const TABLE_IMPORTERS: AnyTableImporter[] = [
   defineTableImporter({
     key: 'inboxConversations',
     label: 'inbox conversation',
-    sql: `INSERT INTO inbox_conversations (id, "sessionId", "chatId", status, "assigneeKeyId", "assigneeName", "divisionId", "divisionName", "resolvedAt", "lastInboundAt", "createdAt", "updatedAt")
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+    sql: `INSERT INTO inbox_conversations (id, "sessionId", "chatId", status, "assigneeKeyId", "assigneeName", "divisionId", "divisionName", "firstInboundAt", "firstResponseAt", "slaStartedAt", "slaDueAt", "slaBreachedAt", "slaMinutes", "resolvedAt", "lastInboundAt", "createdAt", "updatedAt")
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)`,
     id: (row: InboxConversationRow) => row.id,
     map: (row: InboxConversationRow) => [
       row.id,
@@ -690,6 +691,12 @@ export const TABLE_IMPORTERS: AnyTableImporter[] = [
       nulFree(row.assigneeName),
       row.divisionId ?? null,
       nulFree(row.divisionName),
+      row.firstInboundAt ?? null,
+      row.firstResponseAt ?? null,
+      row.slaStartedAt ?? null,
+      row.slaDueAt ?? null,
+      row.slaBreachedAt ?? null,
+      row.slaMinutes ?? null,
       row.resolvedAt ?? null,
       row.lastInboundAt ?? null,
       row.createdAt,
