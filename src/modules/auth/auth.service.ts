@@ -28,6 +28,8 @@ import { apiKeyAuthorizationFingerprint, normalizeScopeList } from './api-key-au
 import { normalizeChatAllowList } from '../../common/security/chat-scope';
 import { EventsGateway, type ApiKeyEvictionReason } from '../events/events.gateway';
 import { isSwaggerEnabled } from '../../config/bootstrap-security';
+import { PermissionService } from './permission.service';
+import { BRIDGE_LEVELS } from './permissions';
 
 /**
  * A 401 that names no stored key: the credential was missing or matched no row. Producing one costs
@@ -136,6 +138,9 @@ export class AuthService implements OnModuleInit, OnModuleDestroy {
     @Optional()
     @InjectRepository(User, 'main')
     private readonly userRepository?: Repository<User>,
+    // Optional so a spec can build the service without the assignments table; the bridge then falls
+    // back to `api_keys.role`, which is what it did before Fase 1.
+    @Optional() private readonly permissions?: PermissionService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -346,6 +351,7 @@ export class AuthService implements OnModuleInit, OnModuleDestroy {
       allowedSessions: apiKey.allowedSessions,
       allowedChats: apiKey.allowedChats,
       expiresAt: apiKey.expiresAt,
+      authzVersion: apiKey.authzVersion,
     };
 
     const patch: QueryDeepPartialEntity<ApiKey> = {};
@@ -678,13 +684,30 @@ export class AuthService implements OnModuleInit, OnModuleDestroy {
     return allowedIps.some(entry => ipMatches(clientIp, entry));
   }
 
-  hasPermission(apiKey: ApiKey, requiredRole: ApiKeyRole): boolean {
-    const roleHierarchy: Record<ApiKeyRole, number> = {
-      [ApiKeyRole.VIEWER]: 1,
-      [ApiKeyRole.OPERATOR]: 2,
-      [ApiKeyRole.ADMIN]: 3,
-    };
+  hasPermission(apiKey: ApiKey, requiredRole: ApiKeyRole): Promise<boolean> {
+    return this.permissions
+      ? this.permissions.bridgeLevel(apiKey).then(level => BRIDGE_LEVELS[level] >= BRIDGE_LEVELS[requiredRole])
+      : Promise.resolve(BRIDGE_LEVELS[apiKey.role] >= BRIDGE_LEVELS[requiredRole]);
+  }
 
-    return roleHierarchy[apiKey.role] >= roleHierarchy[requiredRole];
+  /**
+   * Post-commit half of an authorization change (docs/35 §35.5.4): drop the cached authority so the
+   * next evaluation reads the new rows, and cut live sockets so an already-connected client cannot
+   * keep receiving events for authority it just lost. The `authzVersion` increment itself belongs in
+   * the writer's transaction, next to the `role_assignments` rows.
+   */
+  invalidateAuthorization(keyId: string): void {
+    this.permissions?.invalidate(keyId);
+    this.evictActiveSockets(keyId, 'authorization_changed');
+  }
+
+  /**
+   * Increment `authzVersion` and invalidate, for a caller that is not already inside a transaction.
+   * The fingerprint includes the version, so the increment alone is enough to make the gateway's
+   * periodic sweep evict a socket this call could not reach.
+   */
+  async bumpAuthorization(keyId: string): Promise<void> {
+    await this.apiKeyRepository.increment({ id: keyId }, 'authzVersion', 1);
+    this.invalidateAuthorization(keyId);
   }
 }

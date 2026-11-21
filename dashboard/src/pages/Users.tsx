@@ -27,6 +27,19 @@ const roleNames = ['admin', 'operator', 'viewer'] as const;
 
 type Role = (typeof roleNames)[number];
 
+/**
+ * The Fase 1 grant a legacy role maps to. The full eight-role editor belongs to Fase 1c; until then
+ * the create form states the role and the scope, and the gateway derives `api_keys.role` from it.
+ */
+type AssignmentRole = 'system_admin' | 'agent' | 'analyst';
+
+type ScopeType = 'global' | 'session' | 'team' | 'object';
+
+const assignmentRoleFor = (role: Role): AssignmentRole =>
+  role === 'admin' ? 'system_admin' : role === 'viewer' ? 'analyst' : 'agent';
+
+const scopeTypes: ScopeType[] = ['global', 'session', 'team', 'object'];
+
 type Dialog =
   | { type: 'create' }
   | { type: 'edit'; user: AuthUser }
@@ -44,6 +57,8 @@ interface Draft {
   confirm: string;
   current: string;
   isActive: boolean;
+  scopeType: ScopeType;
+  scopeId: string;
 }
 
 const emptyDraft: Draft = {
@@ -54,6 +69,8 @@ const emptyDraft: Draft = {
   confirm: '',
   current: '',
   isActive: true,
+  scopeType: 'session',
+  scopeId: '',
 };
 
 function draftFor(dialog: Dialog): Draft {
@@ -151,7 +168,10 @@ export function Users() {
   }, [load]);
 
   const open = (next: Exclude<Dialog, null>) => {
-    setDraft(draftFor(next));
+    const base = draftFor(next);
+    // A new account defaults to the session the page is already showing, so the scope picker is
+    // never left on an empty target.
+    setDraft(next.type === 'create' ? { ...base, scopeId: sessionId } : base);
     setError('');
     setDialog(next);
   };
@@ -165,6 +185,11 @@ export function Users() {
   const passwordTooShort = draft.password.length > 0 && draft.password.length < MIN_PASSWORD_LENGTH;
   const passwordMismatch = draft.confirm.length > 0 && draft.confirm !== draft.password;
   const passwordReady = draft.password.length >= MIN_PASSWORD_LENGTH && draft.confirm === draft.password;
+  // A global grant has no target; every other scope needs one before the form may be submitted.
+  // An untouched session picker shows — and sends — the session the page is already showing, so the
+  // displayed value and the request can never disagree.
+  const scopeIdValue = draft.scopeId || (draft.scopeType === 'session' ? sessionId : '');
+  const scopeReady = draft.scopeType === 'global' || scopeIdValue.trim().length > 0;
 
   // A 409 means two different things on this page: the address is taken when creating, and the
   // account is the last usable admin when editing or deleting.
@@ -183,11 +208,20 @@ export function Users() {
     setSaving(true);
     setError('');
     try {
+      // A new account never gets access implicitly: the scope is part of the request, and the
+      // gateway refuses an account without it (docs/35 §35.4.1).
       await usersApi.create({
         email: draft.email.trim(),
         name: draft.name.trim(),
         password: draft.password,
         role: draft.role,
+        assignments: [
+          {
+            role: assignmentRoleFor(draft.role),
+            scopeType: draft.scopeType,
+            scopeId: draft.scopeType === 'global' ? undefined : scopeIdValue.trim(),
+          },
+        ],
       });
       toast.success(t('users.created'));
       setDialog(null);
@@ -547,7 +581,7 @@ export function Users() {
               <button
                 className="btn-primary"
                 onClick={() => void handleCreate()}
-                disabled={saving || !draft.email.trim() || !draft.name.trim() || !passwordReady}
+                disabled={saving || !draft.email.trim() || !draft.name.trim() || !passwordReady || !scopeReady}
               >
                 {saving ? <Loader2 className="animate-spin" size={16} /> : t('common.create')}
               </button>
@@ -585,6 +619,67 @@ export function Users() {
               </option>
             ))}
           </select>
+          <label htmlFor="user-scope">{t('users.scope')}</label>
+          <select
+            id="user-scope"
+            value={draft.scopeType}
+            onChange={e => {
+              const scopeType = e.target.value as ScopeType;
+              setDraft(prev => ({
+                ...prev,
+                scopeType,
+                scopeId: scopeType === 'session' ? sessionId : '',
+              }));
+            }}
+          >
+            {scopeTypes.map(scope => (
+              <option key={scope} value={scope}>
+                {t(`users.scope_${scope}`)}
+              </option>
+            ))}
+          </select>
+          {draft.scopeType !== 'global' && (
+            <>
+              <label htmlFor="user-scope-target">{t('users.scopeTarget')}</label>
+              {draft.scopeType === 'session' ? (
+                <select
+                  id="user-scope-target"
+                  value={scopeIdValue}
+                  onChange={e => setDraft(prev => ({ ...prev, scopeId: e.target.value }))}
+                >
+                  {sessions.length === 0 && <option value="">{t('users.noSessions')}</option>}
+                  {sessions.map(session => (
+                    <option key={session.id} value={session.id}>
+                      {session.name || session.id}
+                    </option>
+                  ))}
+                </select>
+              ) : draft.scopeType === 'team' ? (
+                <select
+                  id="user-scope-target"
+                  value={scopeIdValue}
+                  onChange={e => setDraft(prev => ({ ...prev, scopeId: e.target.value }))}
+                >
+                  <option value="">{t('users.scopeTargetPlaceholder')}</option>
+                  {divisions.map(division => (
+                    <option key={division.id} value={division.id}>
+                      {division.name}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  id="user-scope-target"
+                  type="text"
+                  autoComplete="off"
+                  value={draft.scopeId}
+                  placeholder={t('users.scopeTargetPlaceholder')}
+                  onChange={e => setDraft(prev => ({ ...prev, scopeId: e.target.value }))}
+                />
+              )}
+              <span className="user-field-hint">{t('users.scopeHint')}</span>
+            </>
+          )}
           {passwordFields(t('common.password'))}
           {errorNote}
         </Modal>

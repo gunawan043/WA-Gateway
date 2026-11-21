@@ -1826,7 +1826,15 @@
     "divisionsFailed": "Could not update the divisions",
     "divisionsLoadError": "Could not load divisions",
     "noDivisions": "This session has no divisions yet. Create one on the Divisions page.",
-    "filteredEmpty": "No user matches this filter."
+    "filteredEmpty": "No user matches this filter.",
+    "scope": "Scope",
+    "scope_global": "Global (all sessions)",
+    "scope_session": "One session",
+    "scope_team": "One team",
+    "scope_object": "One chat",
+    "scopeTarget": "Scope target",
+    "scopeTargetPlaceholder": "Choose a target",
+    "scopeHint": "The account can only act inside this scope. Choose Global only for an administrator who manages the whole deployment."
   },
   "divisions": {
     "title": "Divisions",

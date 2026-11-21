@@ -1845,7 +1845,15 @@
     "divisionsFailed": "עדכון החטיבות נכשל",
     "divisionsLoadError": "טעינת החטיבות נכשלה",
     "noDivisions": "ב-Session הזה אין עדיין חטיבות. אפשר ליצור אחת בעמוד החטיבות.",
-    "filteredEmpty": "אין משתמש שמתאים לסינון הזה."
+    "filteredEmpty": "אין משתמש שמתאים לסינון הזה.",
+    "scope": "היקף",
+    "scope_global": "גלובלי (כל ה-Sessions)",
+    "scope_session": "Session אחת",
+    "scope_team": "צוות אחד",
+    "scope_object": "צ'אט אחד",
+    "scopeTarget": "יעד ההיקף",
+    "scopeTargetPlaceholder": "בחרו יעד",
+    "scopeHint": "החשבון יכול לפעול רק בתוך ההיקף הזה. בחרו גלובלי רק עבור מנהל שמנהל את כל הפריסה."
   },
   "divisions": {
     "title": "חטיבות",

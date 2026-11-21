@@ -1835,7 +1835,15 @@
     "divisionsFailed": "Impossibile aggiornare le divisioni",
     "divisionsLoadError": "Impossibile caricare le divisioni",
     "noDivisions": "Questa sessione non ha ancora divisioni. Creane una nella pagina Divisioni.",
-    "filteredEmpty": "Nessun utente corrisponde a questo filtro."
+    "filteredEmpty": "Nessun utente corrisponde a questo filtro.",
+    "scope": "Ambito",
+    "scope_global": "Globale (tutte le sessioni)",
+    "scope_session": "Una sessione",
+    "scope_team": "Un team",
+    "scope_object": "Una chat",
+    "scopeTarget": "Destinazione dell'ambito",
+    "scopeTargetPlaceholder": "Scegli una destinazione",
+    "scopeHint": "L'account può agire solo all'interno di questo ambito. Scegli Globale solo per un amministratore che gestisce l'intera installazione."
   },
   "divisions": {
     "title": "Divisioni",

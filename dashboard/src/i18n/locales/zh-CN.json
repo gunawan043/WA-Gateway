@@ -1826,7 +1826,15 @@
     "divisionsFailed": "无法更新部门",
     "divisionsLoadError": "无法加载部门",
     "noDivisions": "此会话还没有部门。请在部门页面创建一个。",
-    "filteredEmpty": "没有用户符合此筛选条件。"
+    "filteredEmpty": "没有用户符合此筛选条件。",
+    "scope": "范围",
+    "scope_global": "全局（所有会话）",
+    "scope_session": "单个会话",
+    "scope_team": "单个团队",
+    "scope_object": "单个聊天",
+    "scopeTarget": "范围目标",
+    "scopeTargetPlaceholder": "选择目标",
+    "scopeHint": "该账号只能在此范围内操作。仅应为管理整个部署的管理员选择“全局”。"
   },
   "divisions": {
     "title": "部门",

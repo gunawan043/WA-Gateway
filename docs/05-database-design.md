@@ -614,6 +614,7 @@ CREATE TABLE api_keys (
     "expiresAt" DATETIME,
     "lastUsedAt" DATETIME,
     "usageCount" INTEGER NOT NULL DEFAULT 0,
+    "authzVersion" INTEGER NOT NULL DEFAULT 0,     -- bumped with every role_assignments write; part of the socket fingerprint
     "createdAt" DATETIME NOT NULL DEFAULT (datetime('now')),
     "updatedAt" DATETIME NOT NULL DEFAULT (datetime('now'))
 );
@@ -622,7 +623,12 @@ CREATE UNIQUE INDEX "IDX_api_keys_keyHash" ON api_keys("keyHash");
 ```
 
 > [!NOTE]
-> Access control is **role-based** (`admin` / `operator` / `viewer`), optionally scoped by `allowedIps`, `allowedSessions` and `allowedChats`. There is no granular `permissions` string array — see [04 - Security Design](./04-security-design.md) for what each role can do.
+> `api_keys.role` is still the credential's **legacy** role (`admin` / `operator` / `viewer`), and a
+> key with no assignment is authorized by it alone. From Fase 1 a key's real authority comes from its
+> `role_assignments` rows (see §5.3.6c); once a key has any, the legacy column no longer grants
+> permission and only survives as the compatibility path and the last-admin fallback. The credential
+> fences `allowedIps` / `allowedSessions` / `allowedChats` stay above either model and are checked
+> first.
 
 ---
 
@@ -778,6 +784,47 @@ The browser receives the raw token once, as `owa_s1_<64 hex>`, and sends it in `
 > revoked or expired, which it could not do if the row were gone. Rows past `"expiresAt"` are pruned
 > on a schedule (§5.7), and `"lastSeenAt"` is written at most once every five minutes per session so
 > a chatty dashboard does not turn every request into a write.
+
+---
+
+### 5.3.6c role_assignments
+
+The role grants of a key (Fase 1). Lives on the **main** (always-SQLite) connection, next to
+`api_keys`. A key with no row here is authorized by its legacy `api_keys.role`; a key with at least
+one row is authorized only by these rows.
+
+```sql
+CREATE TABLE role_assignments (
+    id VARCHAR PRIMARY KEY,
+    "apiKeyId" VARCHAR(36) NOT NULL,               -- the actor; INDEX
+    "userId" VARCHAR(36),                          -- supplementary link to a dashboard account; INDEX
+    role VARCHAR(32) NOT NULL,                     -- system_admin | connect_admin | supervisor | team_leader | agent | quality_evaluator | campaign_manager | analyst
+    "scopeType" VARCHAR(16) NOT NULL,              -- global | session | team | object  (unit: Fase 4)
+    "scopeId" VARCHAR(64) NOT NULL DEFAULT '',     -- session/division/chat id; '' for global
+    source VARCHAR(16) NOT NULL DEFAULT 'local',   -- local | alim (Fase 4 sync)
+    "externalId" VARCHAR(64),
+    "validFrom" DATETIME,
+    "validTo" DATETIME,
+    "grantedByKeyId" VARCHAR(36),
+    "createdAt" DATETIME NOT NULL DEFAULT (datetime('now')),
+    "updatedAt" DATETIME NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE UNIQUE INDEX "UQ_role_assignments_scope" ON role_assignments("apiKeyId", role, "scopeType", "scopeId");
+CREATE INDEX "IDX_role_assignments_apiKeyId" ON role_assignments("apiKeyId");
+CREATE INDEX "IDX_role_assignments_userId" ON role_assignments("userId");
+```
+
+> [!NOTE]
+> `scopeId` is `''` for a global grant, never NULL: SQLite treats every NULL as distinct, so a
+> nullable column would let the unique index admit the same global grant twice. There is no foreign
+> key to `sessions` or `divisions` (those live in the other database file); the service validates the
+> id when the grant is written.
+>
+> The migration that creates this table also backfills one global grant per existing key
+> (`admin` → `system_admin` **and** `connect_admin`, `operator` → `agent`, `viewer` → `analyst`) with
+> `INSERT OR IGNORE`, so it is safe to re-run. `npm run rbac:verify` compares each backfilled key's
+> legacy level with the level its grants produce and exits non-zero on any difference.
 
 ### 5.3.7 message_batches
 
@@ -1009,7 +1056,9 @@ src/database/migrations-main/      # main connection (auth + audit, SQLite)
 ├── 1779900000000-CreateAuthAuditTables.ts   # creates api_keys + audit_logs
 ├── 1786600000000-AddApiKeyAllowedChats.ts   # adds api_keys.allowedChats
 ├── 1786610000000-DropSynchronizeIndexDuplicates.ts  # drops synchronize-named duplicate indexes
-└── 1786700000000-AddUsersAndSessions.ts     # creates users + user_sessions (dashboard sign-in)
+├── 1786700000000-AddUsersAndSessions.ts     # creates users + user_sessions (dashboard sign-in)
+├── 1787000000000-CreateRoleAssignments.ts   # creates role_assignments and backfills one global grant per legacy role
+└── 1787010000000-AddApiKeyAuthzVersion.ts   # adds api_keys.authzVersion (bumped on every grant change, drives socket eviction)
 
 src/database/migrations/           # data connection (pluggable)
 ├── 1770108659848-AddMessageStatus.ts

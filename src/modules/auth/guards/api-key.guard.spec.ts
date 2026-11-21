@@ -32,6 +32,7 @@ function createMockApiKey(overrides: Partial<ApiKey> = {}): ApiKey {
     expiresAt: null,
     lastUsedAt: null,
     usageCount: 0,
+    authzVersion: 0,
     createdAt: new Date(),
     updatedAt: new Date(),
     ...overrides,

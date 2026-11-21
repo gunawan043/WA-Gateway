@@ -1835,7 +1835,15 @@
     "divisionsFailed": "Não foi possível atualizar as divisões",
     "divisionsLoadError": "Não foi possível carregar as divisões",
     "noDivisions": "Esta sessão ainda não tem divisões. Crie uma na página Divisões.",
-    "filteredEmpty": "Nenhum usuário corresponde a este filtro."
+    "filteredEmpty": "Nenhum usuário corresponde a este filtro.",
+    "scope": "Escopo",
+    "scope_global": "Global (todas as sessões)",
+    "scope_session": "Uma sessão",
+    "scope_team": "Uma equipe",
+    "scope_object": "Um chat",
+    "scopeTarget": "Alvo do escopo",
+    "scopeTargetPlaceholder": "Escolha um alvo",
+    "scopeHint": "A conta só pode agir dentro deste escopo. Escolha Global apenas para um administrador que gerencia toda a instalação."
   },
   "divisions": {
     "title": "Divisões",

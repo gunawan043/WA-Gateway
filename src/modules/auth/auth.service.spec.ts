@@ -37,6 +37,7 @@ function createMockApiKey(overrides: Partial<ApiKey> = {}): ApiKey {
     expiresAt: null,
     lastUsedAt: null,
     usageCount: 0,
+    authzVersion: 0,
     createdAt: new Date(),
     updatedAt: new Date(),
     ...overrides,
@@ -1311,29 +1312,29 @@ describe('AuthService', () => {
   // ── hasPermission ─────────────────────────────────────────────────
 
   describe('hasPermission', () => {
-    it('should allow ADMIN to access ADMIN routes', () => {
+    it('should allow ADMIN to access ADMIN routes', async () => {
       const key = createMockApiKey({ role: ApiKeyRole.ADMIN });
-      expect(service.hasPermission(key, ApiKeyRole.ADMIN)).toBe(true);
+      expect(await service.hasPermission(key, ApiKeyRole.ADMIN)).toBe(true);
     });
 
-    it('should allow ADMIN to access OPERATOR routes', () => {
+    it('should allow ADMIN to access OPERATOR routes', async () => {
       const key = createMockApiKey({ role: ApiKeyRole.ADMIN });
-      expect(service.hasPermission(key, ApiKeyRole.OPERATOR)).toBe(true);
+      expect(await service.hasPermission(key, ApiKeyRole.OPERATOR)).toBe(true);
     });
 
-    it('should allow ADMIN to access VIEWER routes', () => {
+    it('should allow ADMIN to access VIEWER routes', async () => {
       const key = createMockApiKey({ role: ApiKeyRole.ADMIN });
-      expect(service.hasPermission(key, ApiKeyRole.VIEWER)).toBe(true);
+      expect(await service.hasPermission(key, ApiKeyRole.VIEWER)).toBe(true);
     });
 
-    it('should deny VIEWER access to OPERATOR routes', () => {
+    it('should deny VIEWER access to OPERATOR routes', async () => {
       const key = createMockApiKey({ role: ApiKeyRole.VIEWER });
-      expect(service.hasPermission(key, ApiKeyRole.OPERATOR)).toBe(false);
+      expect(await service.hasPermission(key, ApiKeyRole.OPERATOR)).toBe(false);
     });
 
-    it('should deny OPERATOR access to ADMIN routes', () => {
+    it('should deny OPERATOR access to ADMIN routes', async () => {
       const key = createMockApiKey({ role: ApiKeyRole.OPERATOR });
-      expect(service.hasPermission(key, ApiKeyRole.ADMIN)).toBe(false);
+      expect(await service.hasPermission(key, ApiKeyRole.ADMIN)).toBe(false);
     });
   });
 

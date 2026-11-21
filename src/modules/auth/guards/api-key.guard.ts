@@ -123,7 +123,7 @@ export class ApiKeyGuard implements CanActivate {
     // so the operator could see that a key had been denied but not which one to revoke.
     setRequestActor({ apiKeyId: apiKey.id, apiKeyName: apiKey.name, ipAddress: clientIp });
 
-    if (requiredRole && !this.authService.hasPermission(apiKey, requiredRole)) {
+    if (requiredRole && !(await this.authService.hasPermission(apiKey, requiredRole))) {
       throw new ForbiddenException(`Insufficient permissions. Required: ${requiredRole}`);
     }
 

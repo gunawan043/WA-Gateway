@@ -1835,7 +1835,15 @@
     "divisionsFailed": "Impossible de mettre à jour les divisions",
     "divisionsLoadError": "Impossible de charger les divisions",
     "noDivisions": "Cette session n'a pas encore de division. Créez-en une sur la page Divisions.",
-    "filteredEmpty": "Aucun utilisateur ne correspond à ce filtre."
+    "filteredEmpty": "Aucun utilisateur ne correspond à ce filtre.",
+    "scope": "Périmètre",
+    "scope_global": "Global (toutes les sessions)",
+    "scope_session": "Une session",
+    "scope_team": "Une équipe",
+    "scope_object": "Une discussion",
+    "scopeTarget": "Cible du périmètre",
+    "scopeTargetPlaceholder": "Choisir une cible",
+    "scopeHint": "Le compte ne peut agir que dans ce périmètre. Choisissez Global uniquement pour un administrateur qui gère tout le déploiement."
   },
   "divisions": {
     "title": "Divisions",

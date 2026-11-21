@@ -255,11 +255,32 @@ export interface MeResult {
   keyName: string;
 }
 
+/** The eight Fase 1 roles. They live on a role assignment, not on `api_keys.role`. */
+export type AssignmentRole =
+  | 'system_admin'
+  | 'connect_admin'
+  | 'supervisor'
+  | 'team_leader'
+  | 'agent'
+  | 'quality_evaluator'
+  | 'campaign_manager'
+  | 'analyst';
+
+export interface AssignmentInput {
+  role: AssignmentRole;
+  scopeType: 'global' | 'session' | 'team' | 'object';
+  scopeId?: string;
+  validFrom?: string;
+  validTo?: string;
+}
+
 export interface CreateUserInput {
   email: string;
   name: string;
   password: string;
   role?: 'admin' | 'operator' | 'viewer';
+  /** Required by the gateway: a new account never gets access implicitly. */
+  assignments: AssignmentInput[];
 }
 
 export interface UpdateUserInput {

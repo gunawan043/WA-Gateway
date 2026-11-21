@@ -94,16 +94,29 @@ describe('Dashboard sign-in (e2e)', () => {
   });
 
   it('creates a viewer account from the session, then refuses it the account list', async () => {
-    await request(app.getHttpServer())
+    // Since Fase 1a the account's access comes from `assignments`, not from `role`: a global
+    // `analyst` grant is the backfill-equivalent of the old `viewer` role.
+    const created = await request(app.getHttpServer())
       .post('/api/auth/users')
       .set('X-API-Key', token)
       .send({
         email: 'e2e-viewer@example.com',
         name: 'E2E Viewer',
         password: 'e2e-viewer-password-1234',
-        role: 'viewer',
+        assignments: [{ role: 'analyst', scopeType: 'global' }],
       })
       .expect(201);
+
+    expect((created.body as Account).role).toBe('viewer');
+
+    // The grants are readable through the listing, which is how the dashboard shows them.
+    const list = await request(app.getHttpServer()).get('/api/auth/users').set('X-API-Key', token).expect(200);
+    const viewer = (list.body as Array<Account & { roles?: string[]; assignments?: Array<{ role: string }> }>).find(
+      user => user.email === 'e2e-viewer@example.com',
+    );
+    expect(viewer?.role).toBe('viewer');
+    expect(viewer?.roles).toEqual(['analyst']);
+    expect(viewer?.assignments).toEqual([expect.objectContaining({ role: 'analyst', scopeType: 'global' })]);
 
     const login = await request(app.getHttpServer())
       .post('/api/auth/login')

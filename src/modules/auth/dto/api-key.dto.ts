@@ -181,6 +181,45 @@ export class ValidateApiKeyResponseDto {
     example: 'Agen A',
   })
   keyName?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Catalogue permissions this key currently holds, after its assignments (or its legacy role when it has none).',
+    type: [String],
+    example: ['inbox.read', 'message.send'],
+  })
+  permissions?: string[];
+
+  @ApiPropertyOptional({
+    description: 'The eight-role names behind those permissions. Empty is never returned; a legacy key maps to one.',
+    type: [String],
+    example: ['agent'],
+  })
+  roles?: string[];
+
+  @ApiPropertyOptional({
+    description: 'Active assignments of the key, with the scope each grant is bounded to.',
+    type: 'array',
+    items: {
+      type: 'object',
+      properties: {
+        id: { type: 'string' },
+        role: { type: 'string' },
+        scopeType: { type: 'string' },
+        scopeId: { type: 'string' },
+        validFrom: { type: 'string', nullable: true },
+        validTo: { type: 'string', nullable: true },
+      },
+    },
+  })
+  assignments?: Array<{
+    id: string;
+    role: string;
+    scopeType: string;
+    scopeId: string;
+    validFrom: string | null;
+    validTo: string | null;
+  }>;
 }
 
 export class UpdateApiKeyDto {

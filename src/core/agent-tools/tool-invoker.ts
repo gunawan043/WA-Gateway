@@ -63,7 +63,7 @@ export async function invokeTool(
     apiKey = await authService.validateApiKey(rawKey, undefined, sessionId);
     onAuthenticated?.(apiKey.id);
 
-    if (tool.requiredRole && !authService.hasPermission(apiKey, tool.requiredRole)) {
+    if (tool.requiredRole && !(await authService.hasPermission(apiKey, tool.requiredRole))) {
       throw new ForbiddenException('API key lacks the required role');
     }
 

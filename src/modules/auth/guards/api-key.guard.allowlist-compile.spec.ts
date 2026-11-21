@@ -24,6 +24,7 @@ describe('ApiKeyGuard chat fence cost', () => {
     expiresAt: null,
     lastUsedAt: null,
     usageCount: 0,
+    authzVersion: 0,
     createdAt: new Date(),
     updatedAt: new Date(),
   };

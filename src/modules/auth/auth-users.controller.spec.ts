@@ -21,6 +21,24 @@ describe('AuthUsersController', () => {
     remove: jest.fn(),
   };
   const audit = { logInfo: jest.fn() as AuditFn };
+  const assignments = {
+    listForKeys: jest.fn().mockResolvedValue([]),
+    prepareForNewUser: jest.fn(
+      (
+        inputs: Array<{ role: string; scopeType: string; scopeId?: string }>,
+      ): Promise<Array<{ role: string; scopeType: string; scopeId: string; validFrom: null; validTo: null }>> =>
+        Promise.resolve(
+          inputs.map(input => ({
+            role: input.role,
+            scopeType: input.scopeType,
+            scopeId: input.scopeId ?? '',
+            validFrom: null,
+            validTo: null,
+          })),
+        ),
+    ),
+    assertGrantable: jest.fn().mockResolvedValue(undefined),
+  };
   let controller: AuthUsersController;
 
   const user = (over: Partial<User> = {}): User => ({
@@ -42,7 +60,7 @@ describe('AuthUsersController', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    controller = new AuthUsersController(usersService as never, audit as never);
+    controller = new AuthUsersController(usersService as never, assignments as never, audit as never);
   });
 
   it('is fenced to ADMIN and to unscoped keys at the class level', () => {
@@ -62,36 +80,59 @@ describe('AuthUsersController', () => {
     expect(JSON.stringify(result)).not.toContain('scrypt$');
   });
 
-  it('creates an account, defaulting the role to operator, and audits the target', async () => {
+  it('creates an account with its required assignment and audits the target', async () => {
     usersService.create.mockResolvedValue(user());
 
     const result = await controller.create(
-      { email: 'someone@example.com', name: 'Someone', password: 'a-long-password-1' },
+      {
+        email: 'someone@example.com',
+        name: 'Someone',
+        password: 'a-long-password-1',
+        assignments: [{ role: 'agent', scopeType: 'global' }],
+      },
       request(),
     );
 
+    // `role` is derived from the grant (agent -> operator) because the caller omitted it.
     expect(usersService.create).toHaveBeenCalledWith({
       email: 'someone@example.com',
       name: 'Someone',
       role: ApiKeyRole.OPERATOR,
       password: 'a-long-password-1',
+      assignments: [{ role: 'agent', scopeType: 'global', scopeId: '', validFrom: null, validTo: null }],
+      grantedByKeyId: null,
     });
     expect(result).toMatchObject({ id: 'u1', email: 'someone@example.com', role: ApiKeyRole.OPERATOR });
-    expect(audit.logInfo).toHaveBeenCalledWith(
-      AuditAction.USER_CREATED,
-      expect.objectContaining({
-        metadata: { targetUserId: 'u1', targetEmail: 'someone@example.com', role: ApiKeyRole.OPERATOR },
-      }),
-    );
+    const [action, payload] = audit.logInfo.mock.calls[0];
+    expect(action).toBe(AuditAction.USER_CREATED);
+    expect(payload.metadata).toMatchObject({
+      targetUserId: 'u1',
+      targetEmail: 'someone@example.com',
+      role: ApiKeyRole.OPERATOR,
+    });
   });
 
-  it('passes an explicit role through', async () => {
+  it('derives admin from a global system_admin grant and passes an explicit role through', async () => {
     usersService.create.mockResolvedValue(user({ role: ApiKeyRole.ADMIN }));
     await controller.create(
-      { email: 'a@b.c', name: 'A', role: ApiKeyRole.ADMIN, password: 'a-long-password-1' },
+      {
+        email: 'a@b.c',
+        name: 'A',
+        role: ApiKeyRole.ADMIN,
+        password: 'a-long-password-1',
+        assignments: [{ role: 'system_admin', scopeType: 'global' }],
+      },
       request(),
     );
     expect(usersService.create).toHaveBeenCalledWith(expect.objectContaining({ role: ApiKeyRole.ADMIN }));
+  });
+
+  it('refuses to create an account without assignments, before writing anything', async () => {
+    assignments.prepareForNewUser.mockImplementationOnce(() => Promise.reject(new Error('assignments is required')));
+    await expect(
+      controller.create({ email: 'a@b.c', name: 'A', password: 'a-long-password-1', assignments: [] }, request()),
+    ).rejects.toThrow('assignments is required');
+    expect(usersService.create).not.toHaveBeenCalled();
   });
 
   it('updates an account and audits the resulting state', async () => {

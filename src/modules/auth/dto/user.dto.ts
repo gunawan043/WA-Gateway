@@ -4,6 +4,7 @@ import { ToStrictBoolean, ToStrictString } from '../../../common/utils/strict-bo
 import { MaxCodePoints } from '../../../common/validation/max-code-points';
 import { ApiKeyRole } from '../entities/api-key.entity';
 import { User } from '../entities/user.entity';
+import { AssignmentListDto, AssignmentResponseDto } from './assignment.dto';
 
 /** Shortest password the gateway will store. Long enough to matter, short enough for a phone. */
 export const MIN_PASSWORD_LENGTH = 12;
@@ -24,7 +25,13 @@ export class LoginDto {
   password!: string;
 }
 
-export class CreateUserDto {
+/**
+ * A new dashboard account. `assignments` is REQUIRED (docs/35 §35.4.1): a new credential never gets
+ * global access implicitly, so the caller must state the role and the scope it is granted. The
+ * legacy `role` stays accepted and only decides `api_keys.role`; when omitted it is derived from the
+ * grants so the last-admin rule and the old UI keep a meaningful value.
+ */
+export class CreateUserDto extends AssignmentListDto {
   @ApiProperty({ description: 'Email address, stored lowercased; must be unique', example: 'agent@example.com' })
   @ToStrictString()
   @IsEmail()
@@ -39,9 +46,10 @@ export class CreateUserDto {
   name!: string;
 
   @ApiPropertyOptional({
-    description: 'Role the account and its linked key receive',
+    description:
+      'Legacy role of the account and its linked key. Optional: derived from `assignments` when omitted. ' +
+      'It no longer decides what the account may do once it has assignments.',
     enum: ApiKeyRole,
-    default: ApiKeyRole.OPERATOR,
   })
   @IsOptional()
   @IsEnum(ApiKeyRole)
@@ -139,6 +147,24 @@ export class UserResponseDto {
 
   @ApiProperty({ description: 'Creation time', type: String, format: 'date-time' })
   createdAt!: string;
+
+  @ApiPropertyOptional({
+    description: 'Roles the account’s linked key holds (Fase 1, additive).',
+    type: [String],
+  })
+  roles?: string[];
+
+  @ApiPropertyOptional({
+    description: 'Permissions the account’s linked key currently holds (Fase 1, additive).',
+    type: [String],
+  })
+  permissions?: string[];
+
+  @ApiPropertyOptional({
+    description: 'Role assignments of the account’s linked key (Fase 1, additive).',
+    type: [AssignmentResponseDto],
+  })
+  assignments?: AssignmentResponseDto[];
 }
 
 /**

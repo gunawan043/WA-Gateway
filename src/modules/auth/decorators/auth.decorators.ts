@@ -1,11 +1,13 @@
 import { SetMetadata, createParamDecorator, ExecutionContext } from '@nestjs/common';
 import { ApiKeyRole } from '../entities/api-key.entity';
+import type { Permission } from '../permissions';
 import { Request } from 'express';
 import { ApiKey } from '../entities/api-key.entity';
 import { User } from '../entities/user.entity';
 import { UserSession } from '../entities/user-session.entity';
 
 export const REQUIRED_ROLE_KEY = 'requiredRole';
+export const PERMISSIONS_KEY = 'requiredPermissions';
 export const PUBLIC_KEY = 'isPublic';
 export const SESSION_SCOPED_KEY = 'sessionScoped';
 export const UNSCOPED_KEY = 'requireUnscopedKey';
@@ -17,6 +19,14 @@ export const CHAT_QUOTED_ALLOWED_KEY = 'chatQuotedAllowed';
  * @example @RequireRole(ApiKeyRole.ADMIN)
  */
 export const RequireRole = (role: ApiKeyRole) => SetMetadata(REQUIRED_ROLE_KEY, role);
+
+/**
+ * Demand permissions from the catalogue, evaluated by PermissionGuard. ALL of them must be held
+ * (AND); Fase 1 has no `anyOf`. The grant is still bounded by the assignment's scope, and by the
+ * credential's own `allowedSessions`/`allowedChats` fences, which are checked before this runs.
+ * @example @RequirePermission('role.assign')
+ */
+export const RequirePermission = (...permissions: Permission[]) => SetMetadata(PERMISSIONS_KEY, permissions);
 
 /**
  * Mark a controller (or route) whose `:id` route param denotes a WhatsApp session id, so the

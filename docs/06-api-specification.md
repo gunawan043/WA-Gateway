@@ -5434,6 +5434,8 @@ Validate the supplied `X-API-Key` and report its validity, its role, and the eng
 
 The key is read from the `X-API-Key` header, not the body; send an empty body. This route sits behind the global guard (it is not `@Public`), so a missing/invalid/revoked/expired key is rejected with `401` at the guard before the handler runs, and a key refused by its `allowedIps` with `403`. On success it returns the caller's role and `engineType`, the engine the process resolved at boot (`whatsapp-web.js` or `baileys`). The engine is reported to every role because `GET /api/infra/engines/current` is ADMIN-only. It also returns `scoped`, true when the key is restricted to selected sessions (a non-empty `allowedSessions`). A key restricted with `allowedChats` is refused with `403 "API key is restricted to selected chats"`: the route is not open to a chat-scoped key.
 
+From Fase 1 it additionally returns `permissions` (the catalogue permissions the key currently holds), `roles` (the eight-role names behind them) and `assignments` (the active grants with their scope). A key with no assignment reports the single role its legacy `api_keys.role` maps to, so an older client that only reads `role` keeps working.
+
 **Response** `200`
 
 ```json
@@ -5443,7 +5445,19 @@ The key is read from the `X-API-Key` header, not the body; send an empty body. T
   "engineType": "whatsapp-web.js",
   "scoped": false,
   "keyId": "6f1c…",
-  "keyName": "Agen A"
+  "keyName": "Agen A",
+  "permissions": ["inbox.read", "message.read", "message.send"],
+  "roles": ["agent"],
+  "assignments": [
+    {
+      "id": "9b2e…",
+      "role": "agent",
+      "scopeType": "team",
+      "scopeId": "3f7a…",
+      "validFrom": null,
+      "validTo": null
+    }
+  ]
 }
 ```
 
@@ -7783,8 +7797,10 @@ hash are never returned.
 
 Bare JSON array of `UserResponseDto`, ordered by `createdAt` DESC.
 
+Each row also carries `roles`, `permissions` and `assignments` for the account's linked key (Fase 1, additive). The password hash, the session hashes and the linked key's hash are never returned.
+
 ```json
-[ { "id": "0a941dac-…", "email": "admin@example.com", "name": "Administrator", "role": "admin", "isActive": true, "apiKeyId": "8f3c2b1a-…", "lastLoginAt": "2026-11-21T09:59:58.000Z", "createdAt": "2026-11-20T05:30:00.000Z" } ]
+[ { "id": "0a941dac-…", "email": "admin@example.com", "name": "Administrator", "role": "admin", "isActive": true, "apiKeyId": "8f3c2b1a-…", "lastLoginAt": "2026-11-21T09:59:58.000Z", "createdAt": "2026-11-20T05:30:00.000Z", "roles": ["system_admin", "connect_admin"], "permissions": ["inbox.read", "role.assign"], "assignments": [ { "id": "9b2e…", "apiKeyId": "8f3c2b1a-…", "role": "system_admin", "scopeType": "global", "scopeId": "", "source": "local", "validFrom": null, "validTo": null, "createdAt": "2026-11-20T05:30:00.000Z" } ] } ]
 ```
 
 **Errors:** `401` missing or invalid credential · `403` role below ADMIN, or a session-scoped key
@@ -7798,20 +7814,36 @@ is discarded, so the only way to use it is through this account or through a sep
 
 **Request body** — `CreateUserDto`
 
-| Field      | Type   | Required | Notes                                    |
-| ---------- | ------ | -------- | ---------------------------------------- |
-| `email`    | string | yes      | Unique, stored lowercased                |
-| `name`     | string | yes      | 2-100 characters                         |
-| `role`     | enum   | no       | `admin`, `operator` (default), `viewer`  |
-| `password` | string | yes      | At least 12 characters                   |
+| Field         | Type   | Required | Notes                                                                                     |
+| ------------- | ------ | -------- | ----------------------------------------------------------------------------------------- |
+| `email`       | string | yes      | Unique, stored lowercased                                                                  |
+| `name`        | string | yes      | 2-100 characters                                                                           |
+| `role`        | enum   | no       | `admin`, `operator`, `viewer`. Derived from `assignments` when omitted                     |
+| `password`    | string | yes      | At least 12 characters                                                                     |
+| `assignments` | array  | yes      | At least one grant. A new account never gets global access implicitly (see below)          |
+
+Each entry of `assignments` is `{ "role", "scopeType", "scopeId"?, "validFrom"?, "validTo"? }`:
+
+| Field       | Type   | Required | Notes                                                                              |
+| ----------- | ------ | -------- | ---------------------------------------------------------------------------------- |
+| `role`      | enum   | yes      | `system_admin`, `connect_admin`, `supervisor`, `team_leader`, `agent`, `quality_evaluator`, `campaign_manager`, `analyst` |
+| `scopeType` | enum   | yes      | `global`, `session`, `team`, `object`. `unit` is reserved for Fase 4 and refused with `400` |
+| `scopeId`   | string | no       | Session id, division id or chat id. Omitted or empty for `global`                    |
+| `validFrom` | string | no       | ISO 8601 start of the validity window                                              |
+| `validTo`   | string | no       | ISO 8601 end of the validity window                                                |
 
 ```json
-{ "email": "agent@example.com", "name": "Siti", "role": "operator", "password": "a-long-passphrase" }
+{
+  "email": "agent@example.com",
+  "name": "Siti",
+  "password": "a-long-passphrase",
+  "assignments": [{ "role": "agent", "scopeType": "team", "scopeId": "3f7a…" }]
+}
 ```
 
 **Response** `201` — `UserResponseDto`
 
-**Errors:** `401` missing or invalid credential · `403` role below ADMIN, or a session-scoped key · `409` a user with that email already exists
+**Errors:** `400` validation failed, `assignments` missing/empty, or an invalid role/scope · `401` missing or invalid credential · `403` role below ADMIN, a session-scoped key, or a scope the caller cannot itself reach · `409` a user with that email already exists
 
 #### PATCH /api/auth/users/:id
 
@@ -7885,6 +7917,75 @@ admin (a second admin user or a hand-minted admin key must exist first).
 **Response** `204`
 
 **Errors:** `401` missing or invalid credential · `403` role below ADMIN, or a session-scoped key · `404` no such account · `409` the account is the last admin
+
+#### GET /api/auth/assignments
+
+List the role assignments of one key or dashboard account, oldest first.
+
+**Auth:** API key holding `role.read`, unscoped (a session-scoped key is refused)
+
+**Query parameters**
+
+| Parameter  | Type   | Required | Notes                                                          |
+| ---------- | ------ | -------- | -------------------------------------------------------------- |
+| `apiKeyId` | string | yes      | A key id, or a dashboard account's linked key id                |
+
+**Response** `200`
+
+Bare JSON array of assignments:
+
+```json
+[ { "id": "9b2e…", "apiKeyId": "8f3c2b1a-…", "userId": "0a941dac-…", "role": "agent", "scopeType": "team", "scopeId": "3f7a…", "source": "local", "validFrom": null, "validTo": null, "createdAt": "2026-11-21T09:59:58.000Z" } ]
+```
+
+**Errors:** `400` `apiKeyId` missing · `401` missing or invalid credential · `403` missing `role.read`, or a session-scoped key · `404` no key with that id
+
+#### POST /api/auth/assignments
+
+Grant a role to a key, optionally bounded to a scope and a validity window.
+
+**Auth:** API key holding `role.assign`, unscoped
+
+**Request body**
+
+| Field       | Type   | Required | Notes                                                                              |
+| ----------- | ------ | -------- | ---------------------------------------------------------------------------------- |
+| `apiKeyId`  | string | yes      | The key (or the account's linked key) receiving the grant                          |
+| `role`      | enum   | yes      | One of the eight Fase 1 roles                                                      |
+| `scopeType` | enum   | yes      | `global`, `session`, `team`, `object`; `unit` is refused with `400` (Fase 4)       |
+| `scopeId`   | string | no       | Required for `session`/`team`/`object`; must exist for a session or division       |
+| `validFrom` | string | no       | ISO 8601                                                                           |
+| `validTo`   | string | no       | ISO 8601, must be in the future                                                    |
+
+```json
+{ "apiKeyId": "8f3c2b1a-…", "role": "agent", "scopeType": "team", "scopeId": "3f7a…" }
+```
+
+**Response** `201` — the assignment.
+
+**Errors:** `400` invalid role/scope/window, or a scope id that does not exist · `401` missing or invalid credential · `403` missing `role.assign`, a session-scoped key, or a scope outside the caller's own · `404` no key with that id · `409` the grant already exists
+
+#### PATCH /api/auth/assignments/:id
+
+Change an assignment's role, scope or validity window. Removing the last global `system_admin` grant is refused.
+
+**Auth:** API key holding `role.assign`, unscoped
+
+**Request body** — any of `role`, `scopeType`, `scopeId`, `validFrom`, `validTo`.
+
+**Response** `200` — the assignment.
+
+**Errors:** `400` invalid role/scope/window · `401` missing or invalid credential · `403` missing `role.assign`, a session-scoped key, or a scope outside the caller's own · `404` no such assignment · `409` the change would collide with an existing grant, or remove the last global administrator
+
+#### DELETE /api/auth/assignments/:id
+
+Revoke an assignment. The key's cached authority is dropped and its live WebSocket connections are closed immediately; the next request re-evaluates from the remaining grants.
+
+**Auth:** API key holding `role.assign`, unscoped
+
+**Response** `204`
+
+**Errors:** `401` missing or invalid credential · `403` missing `role.assign`, or a session-scoped key · `404` no such assignment · `409` it is the last global administrator
 
 ### 6.4.22 Division routing (one number, several teams)
 

@@ -1826,7 +1826,15 @@
     "divisionsFailed": "無法更新部門",
     "divisionsLoadError": "無法載入部門",
     "noDivisions": "此工作階段還沒有部門。請在部門頁面建立一個。",
-    "filteredEmpty": "沒有用戶符合此篩選條件。"
+    "filteredEmpty": "沒有用戶符合此篩選條件。",
+    "scope": "範圍",
+    "scope_global": "全域（所有工作階段）",
+    "scope_session": "單一工作階段",
+    "scope_team": "單一團隊",
+    "scope_object": "單一聊天",
+    "scopeTarget": "範圍目標",
+    "scopeTargetPlaceholder": "選擇目標",
+    "scopeHint": "此帳號只能在此範圍內操作。僅應為管理整個部署的管理員選擇「全域」。"
   },
   "divisions": {
     "title": "部門",

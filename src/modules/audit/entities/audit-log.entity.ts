@@ -19,6 +19,11 @@ export enum AuditAction {
   USER_PASSWORD_RESET = 'user_password_reset',
   USER_SESSION_REVOKED = 'user_session_revoked',
 
+  // Role assignment events (docs/35): who granted, changed or revoked whose authority
+  ROLE_ASSIGNMENT_CREATED = 'role_assignment_created',
+  ROLE_ASSIGNMENT_UPDATED = 'role_assignment_updated',
+  ROLE_ASSIGNMENT_REVOKED = 'role_assignment_revoked',
+
   // Rate-limit enforcement (sampled: at most one row per subject+kind per minute — see
   // EventsGateway — so enforcing a limit never becomes an audit-write flood of its own).
   RATE_LIMIT_EXCEEDED = 'rate_limit_exceeded',

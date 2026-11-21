@@ -1826,7 +1826,15 @@
     "divisionsFailed": "Gagal memperbarui divisi",
     "divisionsLoadError": "Gagal memuat divisi",
     "noDivisions": "Sesi ini belum punya divisi. Buat dulu di halaman Divisi.",
-    "filteredEmpty": "Tidak ada pengguna yang cocok dengan filter ini."
+    "filteredEmpty": "Tidak ada pengguna yang cocok dengan filter ini.",
+    "scope": "Cakupan",
+    "scope_global": "Global (semua sesi)",
+    "scope_session": "Satu sesi",
+    "scope_team": "Satu tim",
+    "scope_object": "Satu chat",
+    "scopeTarget": "Target cakupan",
+    "scopeTargetPlaceholder": "Pilih target",
+    "scopeHint": "Akun hanya dapat bertindak di dalam cakupan ini. Pilih Global hanya untuk administrator yang mengelola seluruh deployment."
   },
   "divisions": {
     "title": "Divisi",

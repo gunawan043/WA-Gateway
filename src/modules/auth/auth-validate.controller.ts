@@ -4,11 +4,15 @@ import { CurrentApiKey } from './decorators/auth.decorators';
 import { ApiKey } from './entities/api-key.entity';
 import { ValidateApiKeyResponseDto } from './dto';
 import { EngineFactory } from '../../engine/engine.factory';
+import { PermissionService } from './permission.service';
 
 @ApiTags('auth')
 @Controller('auth')
 export class AuthValidateController {
-  constructor(private readonly engineFactory: EngineFactory) {}
+  constructor(
+    private readonly engineFactory: EngineFactory,
+    private readonly permissions: PermissionService,
+  ) {}
 
   @Post('validate')
   @HttpCode(HttpStatus.OK)
@@ -21,14 +25,7 @@ export class AuthValidateController {
     description:
       'The key is valid but refused here: its allowedIps exclude this client, or it is restricted to selected chats',
   })
-  validate(@CurrentApiKey() apiKey?: ApiKey): {
-    valid: boolean;
-    role?: string;
-    engineType?: string;
-    scoped?: boolean;
-    keyId?: string;
-    keyName?: string;
-  } {
+  async validate(@CurrentApiKey() apiKey?: ApiKey): Promise<ValidateApiKeyResponseDto> {
     // This route is behind the global API-key guard, so only a validated key reaches this handler
     // (a missing/invalid key 401s first). The guard has already verified the key — including its
     // client-IP and session-scope restrictions — and attached it to the request. Re-validating here
@@ -39,6 +36,15 @@ export class AuthValidateController {
     if (!apiKey) {
       return { valid: false };
     }
+
+    // `permissions` is what the dashboard gates on from Fase 1 onward; `role` stays for a client
+    // that has not switched yet (docs/35 §35.7.4).
+    const [permissions, roles, assignments] = await Promise.all([
+      this.permissions.permissionsOf(apiKey),
+      this.permissions.rolesOf(apiKey),
+      this.permissions.activeAssignments(apiKey.id),
+    ]);
+
     // The engine rides along because GET /infra/engines/current is admin-only, and the dashboard needs
     // it for every role that can post a status or read channels. `scoped` lets it skip the routes that
     // refuse a session-scoped key (@RequireUnscopedKey) instead of sending reads the guard rejects.
@@ -51,6 +57,16 @@ export class AuthValidateController {
       // own key, so exposing them to the caller reveals nothing it did not already present.
       keyId: apiKey.id,
       keyName: apiKey.name,
+      permissions,
+      roles,
+      assignments: assignments.map(row => ({
+        id: row.id,
+        role: row.role,
+        scopeType: row.scopeType,
+        scopeId: row.scopeId,
+        validFrom: row.validFrom ? new Date(row.validFrom).toISOString() : null,
+        validTo: row.validTo ? new Date(row.validTo).toISOString() : null,
+      })),
     };
   }
 }

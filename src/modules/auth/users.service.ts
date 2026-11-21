@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException, Optional, UnauthorizedException } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { randomBytes } from 'crypto';
@@ -9,6 +9,7 @@ import { hashApiKey } from './api-key-hash';
 import { dummyPasswordHash, hashPassword, verifyPassword } from './password-hash';
 import { SessionAuthService } from './session-auth.service';
 import { AuthService } from './auth.service';
+import { AssignmentsService, type AssignmentSpec } from './assignments.service';
 import { createLogger } from '../../common/services/logger.service';
 
 export interface CreateUserInput {
@@ -16,6 +17,13 @@ export interface CreateUserInput {
   name: string;
   role: ApiKeyRole;
   password: string;
+  /**
+   * The grants the account receives. Required by `POST /auth/users`: a new account never gets
+   * global access implicitly (docs/35 §35.4.1). An empty list is refused before the row is written.
+   */
+  assignments?: AssignmentSpec[];
+  /** The key that created the account, recorded on each assignment it grants. */
+  grantedByKeyId?: string | null;
 }
 
 export interface UpdateUserInput {
@@ -48,6 +56,9 @@ export class UsersService {
     @InjectDataSource('main')
     private readonly dataSource: DataSource,
     private readonly sessions: SessionAuthService,
+    // Optional so a spec can build the service without the assignments table; the grants are then
+    // simply not written, which is only reachable from a test.
+    @Optional() private readonly assignments?: AssignmentsService,
   ) {}
 
   async findAll(): Promise<User[]> {
@@ -91,6 +102,7 @@ export class UsersService {
 
     const passwordHash = await hashPassword(input.password);
     const rawKey = `owa_k1_${randomBytes(32).toString('hex')}`;
+    const grants = input.assignments ?? [];
 
     const saved = await this.dataSource.transaction(async manager => {
       const key = manager.create(ApiKey, {
@@ -114,7 +126,19 @@ export class UsersService {
         apiKeyId: savedKey.id,
         lastLoginAt: null,
       });
-      return manager.save(user);
+      const savedUser = await manager.save(user);
+
+      // Same transaction as the key and the account: an account can never exist without the grants
+      // that make it usable, and a grant can never point at a half-written account.
+      if (grants.length > 0 && this.assignments) {
+        await this.assignments.insertForNewUser(manager, {
+          apiKeyId: savedKey.id,
+          userId: savedUser.id,
+          specs: grants,
+          grantedByKeyId: input.grantedByKeyId ?? null,
+        });
+      }
+      return savedUser;
     });
 
     this.logger.log(`User created: ${saved.email}`, {
@@ -211,8 +235,19 @@ export class UsersService {
    * The admin lockout guard, judged on the keys rather than the users: the linked key of every user
    * lives in `api_keys`, so "another usable admin key that is not this account's" covers a second
    * dashboard admin and a hand-minted API admin alike.
+   *
+   * From Fase 1 the survivor must be able to manage keys as the design defines it: a global
+   * `system_admin` assignment, or a legacy ADMIN key that has no assignment at all (35.4.4). The
+   * legacy query below is the fallback for a service built without the assignment tables.
    */
   private async assertAnotherUsableAdmin(excludingKeyId: string): Promise<void> {
+    if (this.assignments) {
+      if ((await this.assignments.countGlobalAdmins({ apiKeyId: excludingKeyId })) === 0) {
+        throw new ConflictException('Cannot remove the last admin: create another admin user or admin API key first');
+      }
+      return;
+    }
+
     const survivors = await this.apiKeyRepository
       .createQueryBuilder('key')
       .where('key.id != :id', { id: excludingKeyId })

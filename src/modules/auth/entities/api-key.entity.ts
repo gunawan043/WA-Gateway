@@ -55,6 +55,14 @@ export class ApiKey {
   @Column({ type: 'int', default: 0 })
   usageCount!: number;
 
+  /**
+   * Bumped in the same transaction as every write to this key's `role_assignments`. It rides in the
+   * authorization fingerprint, so a socket authenticated before the change is evicted even though no
+   * column the fingerprint used to read moved (docs/35 §35.5.4).
+   */
+  @Column({ type: 'int', default: 0 })
+  authzVersion!: number;
+
   @CreateDateColumn()
   createdAt!: Date;
 

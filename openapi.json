@@ -71,6 +71,9 @@
                 "user_password_changed",
                 "user_password_reset",
                 "user_session_revoked",
+                "role_assignment_created",
+                "role_assignment_updated",
+                "role_assignment_revoked",
                 "rate_limit_exceeded",
                 "queue_board_mutated",
                 "session_created",
@@ -920,7 +923,7 @@
             }
           },
           "400": {
-            "description": "Validation failed",
+            "description": "Validation failed, or `assignments` is missing or invalid",
             "content": {
               "application/json": {
                 "schema": {
@@ -940,7 +943,7 @@
             }
           },
           "403": {
-            "description": "Role below ADMIN, or a session-scoped key. Also returned when the API key's role, session or chat scope, or IP allow-list does not allow this operation.",
+            "description": "Role below ADMIN, a session-scoped key, or a scope outside your own. Also returned when the API key's role, session or chat scope, or IP allow-list does not allow this operation.",
             "content": {
               "application/json": {
                 "schema": {
@@ -960,7 +963,7 @@
             }
           }
         },
-        "summary": "Create a dashboard account (admin only)",
+        "summary": "Create a dashboard account with its role assignments (admin only)",
         "tags": [
           "auth"
         ]
@@ -1188,6 +1191,314 @@
           }
         },
         "summary": "Set a new password for an account and revoke its sessions (admin only)",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/assignments": {
+      "get": {
+        "operationId": "AuthAssignmentsController_list",
+        "parameters": [
+          {
+            "name": "apiKeyId",
+            "required": true,
+            "in": "query",
+            "description": "The key's id, or a dashboard account's linked key id",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Assignments, oldest first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AssignmentResponseDto"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "apiKeyId is missing",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credential",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing role.read, or a session-scoped key. Also returned when the API key's role, session or chat scope, or IP allow-list does not allow this operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No key with that id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List the role assignments of one key or account (admin or scoped reader)",
+        "tags": [
+          "auth"
+        ]
+      },
+      "post": {
+        "operationId": "AuthAssignmentsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAssignmentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Assignment created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssignmentResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid role, scope or validity window",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credential",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing role.assign, a session-scoped key, or a scope outside your own. Also returned when the API key's role, session or chat scope, or IP allow-list does not allow this operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No key with that id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "That assignment already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Grant a role, optionally bounded to a scope and a validity window",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/assignments/{id}": {
+      "patch": {
+        "operationId": "AuthAssignmentsController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAssignmentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Assignment updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssignmentResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid role, scope or validity window",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credential",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing role.assign, a session-scoped key, or a scope outside your own. Also returned when the API key's role, session or chat scope, or IP allow-list does not allow this operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such assignment",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "That assignment already exists, or it is the last global administrator",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Change an assignment’s role, scope or validity window",
+        "tags": [
+          "auth"
+        ]
+      },
+      "delete": {
+        "operationId": "AuthAssignmentsController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Assignment revoked; the key’s cached authority and live sockets are dropped"
+          },
+          "401": {
+            "description": "Missing or invalid credential",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing role.assign, or a session-scoped key. Also returned when the API key's role, session or chat scope, or IP allow-list does not allow this operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such assignment",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "It is the last global administrator",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Revoke an assignment",
         "tags": [
           "auth"
         ]
@@ -22460,6 +22771,56 @@
             "type": "string",
             "description": "The calling key's own name (the agent display name); present only when valid.",
             "example": "Agen A"
+          },
+          "permissions": {
+            "description": "Catalogue permissions this key currently holds, after its assignments (or its legacy role when it has none).",
+            "example": [
+              "inbox.read",
+              "message.send"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "roles": {
+            "description": "The eight-role names behind those permissions. Empty is never returned; a legacy key maps to one.",
+            "example": [
+              "agent"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "assignments": {
+            "type": "array",
+            "description": "Active assignments of the key, with the scope each grant is bounded to.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "role": {
+                  "type": "string"
+                },
+                "scopeType": {
+                  "type": "string"
+                },
+                "scopeId": {
+                  "type": "string"
+                },
+                "validFrom": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "validTo": {
+                  "type": "string",
+                  "nullable": true
+                }
+              }
+            }
           }
         },
         "required": [
@@ -22499,6 +22860,73 @@
         "required": [
           "email",
           "password"
+        ]
+      },
+      "AssignmentResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "apiKeyId": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "object",
+            "nullable": true
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "system_admin",
+              "connect_admin",
+              "supervisor",
+              "team_leader",
+              "agent",
+              "quality_evaluator",
+              "campaign_manager",
+              "analyst"
+            ]
+          },
+          "scopeType": {
+            "type": "string",
+            "enum": [
+              "global",
+              "session",
+              "team",
+              "object"
+            ]
+          },
+          "scopeId": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string",
+            "description": "`local` for a grant made here; `alim` is reserved for the Fase 4 sync"
+          },
+          "validFrom": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "validTo": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "apiKeyId",
+          "role",
+          "scopeType",
+          "scopeId",
+          "source",
+          "createdAt"
         ]
       },
       "UserResponseDto": {
@@ -22543,6 +22971,27 @@
             "type": "string",
             "description": "Creation time",
             "format": "date-time"
+          },
+          "roles": {
+            "description": "Roles the account’s linked key holds (Fase 1, additive).",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "permissions": {
+            "description": "Permissions the account’s linked key currently holds (Fase 1, additive).",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "assignments": {
+            "description": "Role assignments of the account’s linked key (Fase 1, additive).",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AssignmentResponseDto"
+            }
           }
         },
         "required": [
@@ -22673,9 +23122,66 @@
           "newPassword"
         ]
       },
+      "AssignmentInputDto": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "string",
+            "description": "Role granted by this assignment",
+            "enum": [
+              "system_admin",
+              "connect_admin",
+              "supervisor",
+              "team_leader",
+              "agent",
+              "quality_evaluator",
+              "campaign_manager",
+              "analyst"
+            ],
+            "example": "agent"
+          },
+          "scopeType": {
+            "type": "string",
+            "description": "Scope of the grant: `global`, `session`, `team` or `object`. `unit` is reserved for Fase 4 and is refused.",
+            "enum": [
+              "global",
+              "session",
+              "team",
+              "object"
+            ],
+            "example": "team"
+          },
+          "scopeId": {
+            "type": "string",
+            "description": "Session id, division id or chat id the grant is bounded to. Omit (or send empty) for `global`.",
+            "example": "0a941dac-a965-45e7-b318-74ae8be134f0"
+          },
+          "validFrom": {
+            "type": "string",
+            "description": "Start of the validity window (ISO 8601). Omit for \"effective immediately\".",
+            "example": "2026-11-21T00:00:00Z"
+          },
+          "validTo": {
+            "type": "string",
+            "description": "End of the validity window (ISO 8601). Omit for \"no expiry\".",
+            "example": "2027-12-31T23:59:59Z"
+          }
+        },
+        "required": [
+          "role",
+          "scopeType"
+        ]
+      },
       "CreateUserDto": {
         "type": "object",
         "properties": {
+          "assignments": {
+            "description": "Grants the new account receives. At least one; a new account never gets global access implicitly.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AssignmentInputDto"
+            }
+          },
           "email": {
             "type": "string",
             "description": "Email address, stored lowercased; must be unique",
@@ -22688,13 +23194,12 @@
           },
           "role": {
             "type": "string",
-            "description": "Role the account and its linked key receive",
+            "description": "Legacy role of the account and its linked key. Optional: derived from `assignments` when omitted. It no longer decides what the account may do once it has assignments.",
             "enum": [
               "admin",
               "operator",
               "viewer"
-            ],
-            "default": "operator"
+            ]
           },
           "password": {
             "type": "string",
@@ -22704,6 +23209,7 @@
           }
         },
         "required": [
+          "assignments",
           "email",
           "name",
           "password"
@@ -22745,6 +23251,101 @@
         "required": [
           "password"
         ]
+      },
+      "CreateAssignmentDto": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "string",
+            "description": "Role granted by this assignment",
+            "enum": [
+              "system_admin",
+              "connect_admin",
+              "supervisor",
+              "team_leader",
+              "agent",
+              "quality_evaluator",
+              "campaign_manager",
+              "analyst"
+            ],
+            "example": "agent"
+          },
+          "scopeType": {
+            "type": "string",
+            "description": "Scope of the grant: `global`, `session`, `team` or `object`. `unit` is reserved for Fase 4 and is refused.",
+            "enum": [
+              "global",
+              "session",
+              "team",
+              "object"
+            ],
+            "example": "team"
+          },
+          "scopeId": {
+            "type": "string",
+            "description": "Session id, division id or chat id the grant is bounded to. Omit (or send empty) for `global`.",
+            "example": "0a941dac-a965-45e7-b318-74ae8be134f0"
+          },
+          "validFrom": {
+            "type": "string",
+            "description": "Start of the validity window (ISO 8601). Omit for \"effective immediately\".",
+            "example": "2026-11-21T00:00:00Z"
+          },
+          "validTo": {
+            "type": "string",
+            "description": "End of the validity window (ISO 8601). Omit for \"no expiry\".",
+            "example": "2027-12-31T23:59:59Z"
+          },
+          "apiKeyId": {
+            "type": "string",
+            "description": "Id of the API key (or the account’s linked key) receiving the grant"
+          }
+        },
+        "required": [
+          "role",
+          "scopeType",
+          "apiKeyId"
+        ]
+      },
+      "UpdateAssignmentDto": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "system_admin",
+              "connect_admin",
+              "supervisor",
+              "team_leader",
+              "agent",
+              "quality_evaluator",
+              "campaign_manager",
+              "analyst"
+            ]
+          },
+          "scopeType": {
+            "type": "string",
+            "enum": [
+              "global",
+              "session",
+              "team",
+              "object"
+            ]
+          },
+          "scopeId": {
+            "type": "string"
+          },
+          "validFrom": {
+            "type": "string",
+            "nullable": true,
+            "description": "Start of the validity window (ISO 8601)"
+          },
+          "validTo": {
+            "type": "string",
+            "nullable": true,
+            "description": "End of the validity window (ISO 8601)"
+          }
+        }
       },
       "CreateSessionDto": {
         "type": "object",

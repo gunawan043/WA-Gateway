@@ -1826,7 +1826,15 @@
     "divisionsFailed": "Abteilungen konnten nicht aktualisiert werden",
     "divisionsLoadError": "Abteilungen konnten nicht geladen werden",
     "noDivisions": "Diese Sitzung hat noch keine Abteilung. Lege eine auf der Seite Abteilungen an.",
-    "filteredEmpty": "Kein Benutzer passt zu diesem Filter."
+    "filteredEmpty": "Kein Benutzer passt zu diesem Filter.",
+    "scope": "Geltungsbereich",
+    "scope_global": "Global (alle Sitzungen)",
+    "scope_session": "Eine Sitzung",
+    "scope_team": "Ein Team",
+    "scope_object": "Ein Chat",
+    "scopeTarget": "Ziel des Geltungsbereichs",
+    "scopeTargetPlaceholder": "Ziel auswählen",
+    "scopeHint": "Das Konto darf nur innerhalb dieses Geltungsbereichs handeln. Global nur für einen Administrator, der die gesamte Installation verwaltet."
   },
   "divisions": {
     "title": "Abteilungen",

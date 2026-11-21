@@ -23,7 +23,17 @@ describe('apiKeyAuthorizationFingerprint', () => {
   it('tells an unparseable expiry from no expiry', () => {
     const open = apiKeyAuthorizationFingerprint({ ...unscoped, expiresAt: null });
     const broken = apiKeyAuthorizationFingerprint({ ...unscoped, expiresAt: new Date('not-a-date') });
-    expect(open).toBe('["operator",null,null,null,null]');
-    expect(broken).toBe('["operator",null,null,null,0]');
+    expect(open).toBe('["operator",null,null,null,null,0]');
+    expect(broken).toBe('["operator",null,null,null,0,0]');
+  });
+
+  it('moves when authzVersion moves, so an assignment change evicts the socket', () => {
+    const before = apiKeyAuthorizationFingerprint({ ...unscoped, expiresAt: null, authzVersion: 3 });
+    const after = apiKeyAuthorizationFingerprint({ ...unscoped, expiresAt: null, authzVersion: 4 });
+    expect(before).not.toBe(after);
+    // A row read before the column existed must fingerprint like version 0, not like null.
+    expect(apiKeyAuthorizationFingerprint({ ...unscoped, expiresAt: null })).toBe(
+      apiKeyAuthorizationFingerprint({ ...unscoped, expiresAt: null, authzVersion: 0 }),
+    );
   });
 });

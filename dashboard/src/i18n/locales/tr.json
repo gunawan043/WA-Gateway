@@ -1826,7 +1826,15 @@
     "divisionsFailed": "Bölümler güncellenemedi",
     "divisionsLoadError": "Bölümler yüklenemedi",
     "noDivisions": "Bu oturumda henüz bölüm yok. Bölümler sayfasından bir tane oluştur.",
-    "filteredEmpty": "Bu filtreyle eşleşen kullanıcı yok."
+    "filteredEmpty": "Bu filtreyle eşleşen kullanıcı yok.",
+    "scope": "Kapsam",
+    "scope_global": "Genel (tüm oturumlar)",
+    "scope_session": "Tek oturum",
+    "scope_team": "Tek ekip",
+    "scope_object": "Tek sohbet",
+    "scopeTarget": "Kapsam hedefi",
+    "scopeTargetPlaceholder": "Bir hedef seçin",
+    "scopeHint": "Hesap yalnızca bu kapsam içinde işlem yapabilir. Genel seçeneğini yalnızca tüm kurulumu yöneten bir yönetici için seçin."
   },
   "divisions": {
     "title": "Bölümler",

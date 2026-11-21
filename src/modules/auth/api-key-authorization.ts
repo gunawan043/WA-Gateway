@@ -34,15 +34,22 @@ export function apiKeyExpiryTime(value: Date | string | null | undefined): numbe
 export type ApiKeyAuthorization = Pick<
   ApiKey,
   'role' | 'allowedIps' | 'allowedSessions' | 'allowedChats' | 'expiresAt'
->;
+> & {
+  /** Optional so a caller holding a pre-Fase-1 snapshot still type-checks; absent reads as 0. */
+  authzVersion?: number;
+};
 
 /**
  * A stable string for what a key is AUTHORIZED to do: role, IP allowlist, session scope, chat
- * scope, expiry.
+ * scope, expiry, and the authorization version.
  * Two rows sharing a fingerprint authorize identically, so any other column moving must leave it
  * untouched, in particular `lastUsedAt`/`usageCount`/`updatedAt`, which the usage tracker rewrites
  * for every key in active use. A fingerprint that moved with them would disconnect every live
  * WebSocket client on the next windowed statistics write.
+ *
+ * `authzVersion` is the one column that carries an assignment change: `role_assignments` is a
+ * different table, so a revoked team grant moves nothing above, and the version is what tells the
+ * gateway's sweep to cut the socket (docs/35 §35.5.4).
  *
  * Membership, not order: both allowlists are enforced with `.includes()`, so a reorder authorizes
  * exactly the same and is sorted away here. `''`, `[]` and NULL all mean "unscoped" at every
@@ -59,5 +66,6 @@ export function apiKeyAuthorizationFingerprint(key: ApiKeyAuthorization): string
     scope(key.allowedSessions),
     scope(normalizeChatAllowList(key.allowedChats)),
     apiKeyExpiryTime(key.expiresAt),
+    key.authzVersion ?? 0,
   ]);
 }

@@ -1863,7 +1863,15 @@
     "divisionsFailed": "تعذّر تحديث الأقسام",
     "divisionsLoadError": "تعذّر تحميل الأقسام",
     "noDivisions": "لا توجد أقسام في هذه الجلسة بعد. أنشئ قسمًا من صفحة الأقسام.",
-    "filteredEmpty": "لا يوجد مستخدم يطابق هذا التصفية."
+    "filteredEmpty": "لا يوجد مستخدم يطابق هذا التصفية.",
+    "scope": "النطاق",
+    "scope_global": "عام (كل الجلسات)",
+    "scope_session": "جلسة واحدة",
+    "scope_team": "فريق واحد",
+    "scope_object": "محادثة واحدة",
+    "scopeTarget": "هدف النطاق",
+    "scopeTargetPlaceholder": "اختر هدفًا",
+    "scopeHint": "يمكن للحساب العمل داخل هذا النطاق فقط. اختر «عام» فقط لمسؤول يدير النشر بأكمله."
   },
   "divisions": {
     "title": "الأقسام",

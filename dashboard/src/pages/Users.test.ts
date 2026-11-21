@@ -188,6 +188,11 @@ async function renderUsers(): Promise<void> {
     ),
   );
   await rtl.waitFor(() => assert.ok(document.querySelector('.users-table, .users-empty')));
+  // The create form's default grant names the session the page is showing, so wait for the session
+  // list before any test opens the dialog.
+  await rtl.waitFor(() =>
+    assert.equal((document.querySelector('#users-session') as HTMLSelectElement).disabled, false),
+  );
 }
 
 const lastCall = (method: string, pattern: RegExp) =>
@@ -232,7 +237,7 @@ test('a refused read is reported as a failure, not as an empty list', async () =
   assert.doesNotMatch(empty?.textContent ?? '', /No users yet/);
 });
 
-test('creating an account sends the trimmed address, the name, the role and the password', async () => {
+test('creating an account sends the trimmed address, the name, the role and the scoped grant', async () => {
   await renderUsers();
   rtl.fireEvent.click(rtl.screen.getByRole('button', { name: 'Add user' }));
 
@@ -245,13 +250,37 @@ test('creating an account sends the trimmed address, the name, the role and the 
   rtl.fireEvent.click(rtl.screen.getByRole('button', { name: 'Create' }));
 
   await rtl.waitFor(() => assert.ok(lastCall('POST', /^\/api\/auth\/users$/)));
+  // The grant is required by the gateway; the form defaults to the session it is showing.
   assert.deepEqual(lastCall('POST', /^\/api\/auth\/users$/)?.body, {
     email: 'lin@example.com',
     name: 'Lin',
     password: 'correct horse battery',
     role: 'operator',
+    assignments: [{ role: 'agent', scopeType: 'session', scopeId: 's1' }],
   });
   await rtl.waitFor(() => assert.equal(rtl.screen.queryByRole('dialog'), null));
+});
+
+test('a non-global scope without a target keeps the create button disabled', async () => {
+  await renderUsers();
+  rtl.fireEvent.click(rtl.screen.getByRole('button', { name: 'Add user' }));
+  rtl.fireEvent.change(rtl.screen.getByLabelText('Email'), { target: { value: 'lin@example.com' } });
+  rtl.fireEvent.change(rtl.screen.getByLabelText('Name'), { target: { value: 'Lin' } });
+  rtl.fireEvent.change(rtl.screen.getByLabelText('Password'), { target: { value: 'correct horse battery' } });
+  rtl.fireEvent.change(rtl.screen.getByLabelText('Confirm password'), {
+    target: { value: 'correct horse battery' },
+  });
+
+  const create = () => rtl.screen.getByRole('button', { name: 'Create' }) as HTMLButtonElement;
+  rtl.fireEvent.change(rtl.screen.getByLabelText('Scope'), { target: { value: 'team' } });
+  assert.equal(create().disabled, true, 'a team scope with no team was accepted');
+
+  rtl.fireEvent.change(rtl.screen.getByLabelText('Scope target'), { target: { value: 'd1' } });
+  assert.equal(create().disabled, false);
+
+  // Global has no target, so it is submittable at once.
+  rtl.fireEvent.change(rtl.screen.getByLabelText('Scope'), { target: { value: 'global' } });
+  assert.equal(create().disabled, false);
 });
 
 test('a short password or a mismatch keeps the create button disabled', async () => {
