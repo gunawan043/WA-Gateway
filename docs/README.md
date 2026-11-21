@@ -66,6 +66,7 @@
 | 32  | [Laravel Integration](./32-laravel-integration.md)                       | Sending from Laravel and receiving inbound messages with a verified webhook       |
 | 33  | [Division Routing](./33-division-routing.md)                             | One shared number, several teams: menu, keywords, CS assignment and the inbox tag |
 | 34  | [ALIM Connect Audit](./34-alim-connect-audit.md)                         | Repository audit against the ALIM Connect PRD: modules, identity, RBAC, phases    |
+| 35  | [RBAC and Teams Design](./35-rbac-and-teams-design.md)                   | Roles, guards and divisions as they are, with the Fase 1 RBAC and team design     |
 
 **Examples**
 
