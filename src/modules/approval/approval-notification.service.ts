@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { createLogger } from '../../common/services/logger.service';
+import { recordApprovalNotification } from '../../common/metrics/approval-metrics';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { MessageService } from '../message/message.service';
@@ -54,15 +55,29 @@ export class ApprovalNotificationService {
   async notify(request: ApprovalRequest): Promise<{ messageId: string | null }> {
     if (!request.sessionId || !request.targetIdentity) {
       this.logger.warn(`Permohonan ${request.reference} belum memiliki sesi atau tujuan; notifikasi dilewati.`);
+      recordApprovalNotification('skipped');
 
       return { messageId: null };
     }
 
     const text = this.buildText(request);
-    const response = await this.messages.sendText(request.sessionId, {
-      chatId: this.toChatId(request.targetIdentity),
-      text,
-    });
+
+    let response: { messageId: string };
+
+    try {
+      response = await this.messages.sendText(request.sessionId, {
+        chatId: this.toChatId(request.targetIdentity),
+        text,
+      });
+    } catch (error) {
+      recordApprovalNotification('failed');
+
+      throw error;
+    }
+
+    // Counted as sent before persisting: the message has left the gateway, and a failed save must
+    // not make the metric claim nothing was delivered.
+    recordApprovalNotification('sent');
 
     request.notificationMessageId = response.messageId;
     request.notificationSentAt = new Date();

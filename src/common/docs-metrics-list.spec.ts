@@ -25,6 +25,7 @@ describe('docs/10 metric table matches MetricsService', () => {
   const RENDER_SOURCES = [
     ['src', 'modules', 'metrics', 'metrics.service.ts'],
     ['src', 'common', 'metrics', 'request-metrics.ts'],
+    ['src', 'common', 'metrics', 'approval-metrics.ts'],
   ];
 
   /**

@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { createLogger } from '../../common/services/logger.service';
+import { recordApprovalCommand } from '../../common/metrics/approval-metrics';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
@@ -302,6 +303,7 @@ export class ApprovalProcessorService {
       command.resolvedAt = now;
       command.nextAttemptAt = null;
       command.lastError = null;
+      recordApprovalCommand(result.outcome);
 
       request.status = statusForApplied(result, command.decision);
       request.coreStatus = result.coreStatus ?? command.decision;
@@ -349,6 +351,7 @@ export class ApprovalProcessorService {
       command.status = exhausted ? 'FAILED' : 'UNKNOWN';
       command.lastError = result.message.slice(0, 500);
       command.nextAttemptAt = exhausted ? null : nextAttemptAt(command.attempts, now, policy);
+      recordApprovalCommand(exhausted ? 'failed' : 'unknown');
       await this.commands.save(command);
 
       // Pesan "belum dapat dipastikan" bukan konfirmasi sukses/gagal; pada retry
@@ -364,6 +367,7 @@ export class ApprovalProcessorService {
     command.resolvedAt = now;
     command.nextAttemptAt = null;
     command.lastError = result.message.slice(0, 500);
+    recordApprovalCommand('rejected');
     await this.commands.save(command);
 
     request.status = this.statusForCoreRejection(result);

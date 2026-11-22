@@ -6,6 +6,8 @@ import { WhatsAppIdentityService } from './whatsapp-identity.service';
 import type { AuditService } from '../audit/audit.service';
 import { AuditAction, AuditSeverity } from '../audit/entities/audit-log.entity';
 import type { ApiKey } from '../auth/entities/api-key.entity';
+import { ApiKeyRole } from '../auth/entities/api-key.entity';
+import { PUBLIC_KEY, REQUIRED_ROLE_KEY, UNSCOPED_KEY } from '../auth/decorators/auth.decorators';
 import type { ApprovalRequest } from './entities/approval-request.entity';
 import type { WhatsAppIdentity } from './entities/whatsapp-identity.entity';
 
@@ -21,6 +23,7 @@ describe('ApprovalController', () => {
     list: jest.fn(),
     get: jest.fn(),
     notify: jest.fn(),
+    listCommands: jest.fn(),
   };
   const identities = { upsert: jest.fn() };
   const audit = { logInfo: jest.fn(), logWarn: jest.fn() };
@@ -116,7 +119,7 @@ describe('ApprovalController', () => {
     approvals.get.mockResolvedValue(request());
 
     const list = await controller.list({ status: 'PENDING_APPROVAL', limit: 10 });
-    const one = await controller.get('req-1');
+    const one = await controller.get('req-1', {});
 
     expect(approvals.list).toHaveBeenCalledWith({ status: 'PENDING_APPROVAL', limit: 10 });
     expect(approvals.get).toHaveBeenCalledWith('req-1');
@@ -242,5 +245,90 @@ describe('ApprovalController', () => {
 
     expect(audit.logWarn).not.toHaveBeenCalled();
     expect(audit.logInfo).not.toHaveBeenCalled();
+  });
+
+  it('menyertakan riwayat command hanya bila include=commands diminta', async () => {
+    approvals.get.mockResolvedValue(request());
+    approvals.listCommands.mockResolvedValue([
+      {
+        id: 'cmd-row-1',
+        commandId: 'cmd-1',
+        approvalRequestId: 'req-1',
+        externalMessageId: 'wamid.in',
+        decision: 'approved',
+        durationDays: 2,
+        status: 'FAILED',
+        attempts: 5,
+        coreResponseCode: 503,
+        coreResponseBody: { secret: 'internal' },
+        errorCode: 'core_unreachable',
+        lastError: 'timeout',
+        lastAttemptAt: null,
+        nextAttemptAt: null,
+        sentAt: null,
+        resolvedAt: null,
+        createdAt: new Date('2026-11-22T02:00:00.000Z'),
+        updatedAt: new Date('2026-11-22T02:00:00.000Z'),
+      },
+    ]);
+
+    const detail = await controller.get('req-1', { include: 'commands' });
+
+    expect(approvals.listCommands).toHaveBeenCalledWith('req-1');
+    expect(detail.commands).toHaveLength(1);
+    expect(detail.commands?.[0]).not.toHaveProperty('coreResponseBody');
+    expect(detail.commands?.[0]).not.toHaveProperty('externalMessageId');
+    expect(detail.commands?.[0]).toMatchObject({ commandId: 'cmd-1', status: 'FAILED', attempts: 5 });
+  });
+
+  it('menyamarkan isi pesan Core sebelum keluar lewat API', async () => {
+    approvals.get.mockResolvedValue(request());
+    approvals.listCommands.mockResolvedValue([
+      {
+        id: 'cmd-row-2',
+        commandId: 'cmd-2',
+        approvalRequestId: 'req-1',
+        externalMessageId: 'wamid.in',
+        decision: 'approved',
+        durationDays: 2,
+        status: 'FAILED',
+        attempts: 5,
+        coreResponseCode: 500,
+        coreResponseBody: null,
+        errorCode: 'core_error',
+        lastError: 'gagal menghubungi https://core.internal untuk 6281234567890 (admin@alim.sch.id)',
+        lastAttemptAt: null,
+        nextAttemptAt: null,
+        sentAt: null,
+        resolvedAt: null,
+        createdAt: new Date('2026-11-22T02:00:00.000Z'),
+        updatedAt: new Date('2026-11-22T02:00:00.000Z'),
+      },
+    ]);
+
+    const detail = await controller.get('req-1', { include: 'commands' });
+    const lastError = detail.commands?.[0]?.lastError ?? '';
+
+    expect(lastError).not.toContain('core.internal');
+    expect(lastError).not.toContain('6281234567890');
+    expect(lastError).not.toContain('admin@alim.sch.id');
+  });
+
+  it('menjaga detail permohonan dengan key tak ber-scope dan peran VIEWER', () => {
+    const handler = Object.getOwnPropertyDescriptor(ApprovalController.prototype, 'get')?.value as object | undefined;
+
+    expect(handler).toBeDefined();
+    expect(Reflect.getMetadata(UNSCOPED_KEY, ApprovalController)).toBe(true);
+    expect(Reflect.getMetadata(PUBLIC_KEY, ApprovalController)).toBeUndefined();
+    expect(Reflect.getMetadata(REQUIRED_ROLE_KEY, handler as object)).toBe(ApiKeyRole.VIEWER);
+  });
+
+  it('tidak membaca command saat detail diminta tanpa include', async () => {
+    approvals.get.mockResolvedValue(request());
+
+    const detail = await controller.get('req-1', {});
+
+    expect(detail).not.toHaveProperty('commands');
+    expect(approvals.listCommands).not.toHaveBeenCalled();
   });
 });

@@ -3,6 +3,7 @@ import { BadRequestException, ConflictException, ForbiddenException, NotFoundExc
 import { DataSource, Repository } from 'typeorm';
 import { ApprovalService } from './approval.service';
 import { ApprovalRequest } from './entities/approval-request.entity';
+import { ApprovalCommand } from './entities/approval-command.entity';
 import { WhatsAppIdentity } from './entities/whatsapp-identity.entity';
 import { ApprovalNotificationService } from './approval-notification.service';
 import { WhatsAppIdentityService } from './whatsapp-identity.service';
@@ -43,7 +44,7 @@ describe('ApprovalService', () => {
     ds = new DataSource({
       type: 'better-sqlite3',
       database: ':memory:',
-      entities: [ApprovalRequest, WhatsAppIdentity],
+      entities: [ApprovalRequest, WhatsAppIdentity, ApprovalCommand],
       synchronize: true,
     });
     await ds.initialize();
@@ -55,10 +56,12 @@ describe('ApprovalService', () => {
 
   beforeEach(async () => {
     await ds.getRepository(ApprovalRequest).clear();
+    await ds.getRepository(ApprovalCommand).clear();
     requests = ds.getRepository(ApprovalRequest);
     notification = { notify: jest.fn() };
     service = new ApprovalService(
       requests,
+      ds.getRepository(ApprovalCommand),
       notification as unknown as ApprovalNotificationService,
       new WhatsAppIdentityService(ds.getRepository(WhatsAppIdentity)),
     );
@@ -269,6 +272,47 @@ describe('ApprovalService', () => {
       ).rejects.toBeInstanceOf(BadRequestException);
 
       expect(await requests.findOneBy({ coreRequestId })).toBeNull();
+    });
+  });
+
+  describe('riwayat command satu permohonan', () => {
+    const seedCommand = async (overrides: Partial<ApprovalCommand> = {}): Promise<ApprovalCommand> =>
+      ds.getRepository(ApprovalCommand).save(
+        ds.getRepository(ApprovalCommand).create({
+          commandId: randomUUID(),
+          approvalRequestId: randomUUID(),
+          externalMessageId: randomUUID(),
+          decision: 'approved',
+          durationDays: 2,
+          status: 'FAILED',
+          attempts: 5,
+          ...overrides,
+        }),
+      );
+
+    it('mengembalikan command permohonan itu saja, terbaru lebih dulu', async () => {
+      const requestId = randomUUID();
+      const older = await seedCommand({ approvalRequestId: requestId, createdAt: new Date('2026-01-01T00:00:00Z') });
+      const newer = await seedCommand({ approvalRequestId: requestId, createdAt: new Date('2026-02-01T00:00:00Z') });
+      await seedCommand({ createdAt: new Date('2026-03-01T00:00:00Z') });
+
+      const rows = await service.listCommands(requestId);
+
+      expect(rows.map(row => row.id)).toEqual([newer.id, older.id]);
+    });
+
+    it('menghormati limit', async () => {
+      const requestId = randomUUID();
+      await seedCommand({ approvalRequestId: requestId, createdAt: new Date('2026-01-01T00:00:00Z') });
+      const newer = await seedCommand({ approvalRequestId: requestId, createdAt: new Date('2026-02-01T00:00:00Z') });
+
+      const rows = await service.listCommands(requestId, 1);
+
+      expect(rows.map(row => row.id)).toEqual([newer.id]);
+    });
+
+    it('mengembalikan daftar kosong saat permohonan belum punya command', async () => {
+      expect(await service.listCommands(randomUUID())).toEqual([]);
     });
   });
 });

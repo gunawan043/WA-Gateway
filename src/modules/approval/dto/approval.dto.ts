@@ -144,6 +144,16 @@ export class ListApprovalRequestsQueryDto {
   limit?: number;
 }
 
+export class GetApprovalRequestQueryDto {
+  @ApiPropertyOptional({
+    enum: ['commands'],
+    description: 'Sertakan riwayat command ke Core (untuk pemeriksaan manual)',
+  })
+  @IsOptional()
+  @IsIn(['commands'])
+  include?: 'commands';
+}
+
 export class UpsertWhatsAppIdentityDto {
   @ApiProperty({ description: 'Nomor WhatsApp / JID', example: '6281234567890' })
   @ToStrictString()

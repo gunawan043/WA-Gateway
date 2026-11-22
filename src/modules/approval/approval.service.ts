@@ -8,6 +8,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ApprovalRequest, ApprovalRequestStatus } from './entities/approval-request.entity';
+import { ApprovalCommand } from './entities/approval-command.entity';
 import { ApprovalNotificationService } from './approval-notification.service';
 import { WhatsAppIdentityService } from './whatsapp-identity.service';
 import { IngestApprovalRequestDto } from './dto/approval.dto';
@@ -30,6 +31,8 @@ export class ApprovalService {
   constructor(
     @InjectRepository(ApprovalRequest, 'data')
     private readonly requests: Repository<ApprovalRequest>,
+    @InjectRepository(ApprovalCommand, 'data')
+    private readonly commands: Repository<ApprovalCommand>,
     private readonly notification: ApprovalNotificationService,
     private readonly identities: WhatsAppIdentityService,
   ) {}
@@ -97,6 +100,21 @@ export class ApprovalService {
       where: filter.status ? { status: filter.status } : {},
       order: { createdAt: 'DESC' },
       take: Math.min(Math.max(filter.limit ?? 50, 1), 200),
+    });
+  }
+
+  /**
+   * Riwayat command satu permohonan, terbaru lebih dulu.
+   *
+   * Tanpa ini, satu-satunya cara menemukan command `FAILED` adalah membuka basis data, padahal
+   * "menunggu pemeriksaan manual" adalah bagian dari desain retry. `coreResponseBody` tetap tidak
+   * dikembalikan — lihat `ApprovalCommandView`.
+   */
+  async listCommands(requestId: string, limit = 50): Promise<ApprovalCommand[]> {
+    return this.commands.find({
+      where: { approvalRequestId: requestId },
+      order: { createdAt: 'DESC' },
+      take: Math.min(Math.max(limit, 1), 200),
     });
   }
 

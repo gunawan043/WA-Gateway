@@ -302,6 +302,27 @@ tetap dapat dibaca ADMIN lewat basis data/audit, bukan lewat API permohonan.
 permohonan yang tersimpan, bukan hanya unitnya. Ini dicatat sebagai keterbatasan, bukan dipalsukan
 dengan nama peran; penambahan scope unit memerlukan kolom dan aturan otorisasi baru di Core.
 
+`GET /approval/requests/:id?include=commands` menyertakan riwayat command permohonan itu: status,
+jumlah percobaan, kode HTTP dan kode error Core, pesan kegagalan terakhir, serta jadwal retry
+berikutnya. Tanpa ini satu-satunya cara menemukan command `FAILED` adalah membuka basis data,
+padahal parkir untuk pemeriksaan manual adalah bagian dari desain retry. Body respons mentah Core
+(`coreResponseBody`) tidak pernah dikembalikan. Rute ini tetap `VIEWER`; tidak ada rute baru dan
+gate `@RequireRole` tidak bertambah.
+
+**Metrik operasional.** `/api/metrics` kini memuat empat keluarga khusus approval, sehingga worker
+retry dapat diawasi tanpa sesi basis data:
+
+| Metrik                                      | Label    | Arti                                                                                                                               |
+| ------------------------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `openwa_approval_command_transitions_total` | `status` | Transisi status command (`applied`, `duplicate`, `rejected`, `unknown`, `failed`); `unknown` per percobaan, status terminal sekali |
+| `openwa_approval_retry_attempts_total`      | —        | Percobaan retry yang diklaim worker untuk dikirim                                                                                  |
+| `openwa_approval_ingest_rejected_total`     | `reason` | Ingest ditolak (`credential`, `not_configured`, `subject_immutable`, `invalid`)                                                    |
+| `openwa_approval_notifications_total`       | `result` | Notifikasi (`sent`, `skipped`, `failed`)                                                                                           |
+
+Ambang alert yang disarankan: `increase(openwa_approval_command_transitions_total{status="failed"}[15m]) > 0`
+(ada command menunggu pemeriksaan manual) dan `increase(openwa_approval_ingest_rejected_total{reason="credential"}[5m]) > 0`
+(Core memakai kredensial salah atau ada yang mencoba memalsukan ingest).
+
 Subjek otorisasi bersifat tetap: `targetIdentity` hanya boleh diikat saat permohonan masih
 `PENDING_APPROVAL`, dan perubahan subjek setelah itu — termasuk pada `PROCESSING` atau status final —
 ditolak `409` (`approval_subject_immutable`). Ingest ulang dengan nilai yang sama tetap diterima,
@@ -338,7 +359,8 @@ Lane: `npm run test:contracts` (kedua spec). Mock meniru envelope Core sebenarny
 | `php artisan test tests/Feature/Dormitory tests/Feature/Sarpras …`      | 247 lulus, 3 gagal (pre-existing, §6.7)                                                                                                                                                                                                                                                                                                  |
 | `php artisan test tests/Feature/DashboardJabatanTest.php`               | 6 lulus, 2 gagal (pre-existing, §6.7)                                                                                                                                                                                                                                                                                                    |
 | `php artisan test tests/Feature/Authorization tests/Unit/Authorization` | 45 lulus, 97 assertion                                                                                                                                                                                                                                                                                                                   |
-| `npx jest src/modules/approval`                                         | 152 lulus, 7 dilewati (suite PostgreSQL tanpa server) — 16 suite: parser, processor, service, controller, hook, resolver, klien HTTP, retry worker, pemulihan `PENDING`, konfirmasi, backup, batas keamanan identitas, kebijakan klien Core, mock Core, penjaga ingest, DTO respons                                                      |
+| `npx jest src/modules/approval`                                         | 161 lulus, 7 dilewati (suite PostgreSQL tanpa server) — 16 suite: parser, processor, service, controller, hook, resolver, klien HTTP, retry worker, pemulihan `PENDING`, konfirmasi, backup, batas keamanan identitas, kebijakan klien Core, mock Core, penjaga ingest, DTO respons, DTO command                                         |
+| `npx jest src/common/metrics/approval-metrics.spec.ts`                  | 4 lulus: keempat keluarga metrik, label per nilai, dan deklarasi `# TYPE ... counter`                                                                                                                                                                                                                                                    |
 | `npm run test:pg-approval` (PostgreSQL nyata)                           | 7 lulus di database sementara sendiri: `gen_random_uuid()` ketiga tabel, replay `UNKNOWN` dengan `commandId` sama, pemulihan `PENDING` setelah lease habis, lease yang masih berjalan tidak disentuh, hanya satu dari dua worker mengklaim baris, status final tidak tertimpa, parkir manual; `down()` kedua migration ikut diverifikasi |
 | `npm run test:contracts`                                                | 84 lulus (2 suite)                                                                                                                                                                                                                                                                                                                       |
 | `npm run test:docs`                                                     | 967 lulus (39 suite)                                                                                                                                                                                                                                                                                                                     |
@@ -465,11 +487,195 @@ pada kasus terakhir.
 
 ---
 
-## 7. Langkah berikutnya
+## 7. Menuju produksi
 
-1. Sepakati §6.1 dengan pemilik sistem Core (kewenangan command vs policy web).
-2. Pasang key `connect_approval` di lingkungan non-produksi, jalankan migrasi aditif, lalu uji
-   end-to-end dengan `ALIM_CONNECT_CORE_CLIENT=http`. Ini belum dilakukan: tanpa key dan Core
-   non-produksi, integrasi lintas proses belum dapat dinyatakan berhasil.
-3. Aktifkan feature flag lifecycle GTK hanya setelah Batch 1 selesai diverifikasi terpisah.
-4. Putuskan lima kegagalan test Core yang pre-existing (§6.7) bersama pemilik Core.
+Bagian ini adalah runbook. Isinya bukan fitur, melainkan urutan yang harus ditempuh sebelum
+integrasi dinyatakan hidup, beserta cara membatalkannya.
+
+### 7.1 Prasyarat di ALIM Core
+
+Tiga hal ini tidak dapat dikerjakan dari repository Connect:
+
+1. **Kredensial layanan pada ingest.** Core harus mengirim header `X-Alim-Connect-Ingest-Key`
+   dengan nilai yang sama seperti `ALIM_CONNECT_INGEST_KEY` di Connect. Tanpa itu setiap ingest
+   dijawab `401`, dan selama nilainya kosong dijawab `503`. Kontrak Core saat ini belum punya
+   mekanisme kredensial layanan; ini prasyarat, bukan bug Connect.
+2. **Endpoint `POST /api/connect/v1/approval-commands` aktif** dan memakai `command_id` sebagai
+   kunci idempotensi, termasuk menjawab `duplicate` untuk replay.
+3. **Resolusi aktor dari nomor WhatsApp** di Core: hanya pemetaan yang aktif dan terverifikasi yang
+   boleh mewakili seseorang, dan aktor harus Kepala Asrama yang berwenang untuk asrama izin itu.
+
+### 7.2 Checklist konfigurasi
+
+| Variabel                         | Nilai produksi                    | Catatan                                                                            |
+| -------------------------------- | --------------------------------- | ---------------------------------------------------------------------------------- |
+| `NODE_ENV`                       | `production`                      | Boot gagal bila klien Core `mock` atau konfigurasi `http` tidak lengkap            |
+| `ALIM_CONNECT_CORE_CLIENT`       | `http`                            | Satu-satunya nilai yang diterima di produksi                                       |
+| `ALIM_CORE_BASE_URL`             | URL Core tanpa garis miring akhir | Wajib                                                                              |
+| `ALIM_CORE_APPROVAL_API_KEY`     | key ber-scope `approval:command`  | Simpan di secret manager, bukan di image                                           |
+| `ALIM_CONNECT_INGEST_KEY`        | kredensial layanan Core           | Berbeda dari key ADMIN Connect; kosong = integrasi mati                            |
+| `ALIM_CORE_TIMEOUT_MS`           | `5000` (default)                  | Naikkan hanya bila Core lambat dan terbukti                                        |
+| `ALIM_CONNECT_RETRY_INTERVAL_MS` | `60000` (default)                 | `0` menonaktifkan worker                                                           |
+| `ALIM_CONNECT_RETRY_LEASE_MS`    | `60000` (default)                 | Harus lebih besar dari waktu respons Core terburuk                                 |
+| `TZ`                             | tidak wajib                       | Kolom data dipin UTC oleh koneksi; `TZ` hanya memengaruhi log dan `Date` di memori |
+
+**Timezone.** Kolom waktu approval bertipe `timestamp` (tanpa zona), jadi nilai tersimpannya hanya
+bermakna bila semua penulis memakai konvensi yang sama. Koneksi data sudah menyematkan konvensi itu
+(lihat `src/database/postgres-utc.ts`), bukan menyerahkannya pada zona proses:
+
+- `pgDefaults.parseInputDatesAsUTC = true` — `Date` yang diikat aplikasi ditulis sebagai UTC, bukan
+  jam dinding proses.
+- Parser tipe `1114` membaca `timestamp` tanpa zona sebagai UTC, bukan waktu lokal proses.
+- `onConnect` menjalankan `SET TIME ZONE 'UTC'` pada setiap koneksi pool. `DEFAULT now()` — yang
+  mengisi `createdAt`/`updatedAt` ketika TypeORM tidak mengikat nilainya sendiri — ikut menulis UTC.
+- `assertDataConnectionUtc` membaca offset sesi pada dua titik enam bulan terpisah dan
+  **menggagalkan boot** bila bukan `+00`; boot juga memeriksanya pada koneksi runtime, bukan hanya
+  pada koneksi migrasi.
+
+Karena itu `TZ` proses tidak menentukan isi kolom, dan dua instance dengan `TZ` berbeda tetap
+menulis nilai yang sama. Yang harus dijaga bukan `TZ`, melainkan agar pin itu benar-benar sampai ke
+server: pooler harus meneruskan `SET TIME ZONE` (kalau tidak, boot gagal dengan pesan yang
+menyebutnya), dan tidak ada penulis lain — skrip, `psql`, alat backup — yang menyentuh tabel ini
+tanpa pin. Jangan mengubah zona server di tengah jalan. Rekomendasi jangka panjang: migration ke
+`timestamptz` agar nilainya tidak lagi bergantung pada konvensi penulis; itu perubahan skema dan
+diputuskan terpisah, bukan bagian dari runbook ini.
+
+### 7.3 Migrasi
+
+1. Backup database data sebelum menyentuh apa pun.
+2. Pastikan PostgreSQL target ≥ 13 ( `gen_random_uuid()` tersedia tanpa ekstensi tambahan).
+3. Jalankan migrasi di staging lebih dulu, lalu verifikasi tiga tabel dan indeksnya:
+   `whatsapp_identities`, `approval_requests`, `approval_commands`, plus indeks
+   `IDX_approval_commands_retry`.
+4. Uji `down()` kedua migrasi **hanya di staging**, pada database yang boleh dibuang. Langkah ini
+   membuktikan rollback bekerja; ia bukan prosedur rollback produksi (§7.5).
+5. Ulangi `up` di produksi pada jendela perubahan, lalu nyalakan aplikasi.
+
+Migrasi ini aditif: tiga tabel baru, tanpa foreign key, tanpa perubahan pada tabel lama. Karena itu
+versi aplikasi sebelumnya tetap dapat berjalan di atas skema yang sudah dimigrasikan (lihat §7.5.1).
+
+### 7.4 Aktivasi bertahap
+
+| Tahap | Tindakan                                                                                             | Yang harus terlihat                                                              |
+| ----- | ---------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| 1     | `ALIM_CONNECT_RETRY_INTERVAL_MS=0`, isi kredensial, kirim satu permohonan uji dengan `notify: false` | `201`, baris tersimpan, `openwa_approval_ingest_rejected_total` tetap 0          |
+| 2     | Kirim ulang dengan `notify: true`                                                                    | Pesan WhatsApp sampai, `openwa_approval_notifications_total{result="sent"}` naik |
+| 3     | Balas dari nomor Kepala Asrama                                                                       | Command `APPLIED`, status lokal mengikuti Core, konfirmasi terkirim              |
+| 4     | Nyalakan worker (`intervalMs` default)                                                               | `openwa_approval_retry_attempts_total` hanya naik bila ada command `UNKNOWN`     |
+
+Jangan menyalakan tahap berikutnya sebelum tahap sebelumnya terbukti di staging.
+
+### 7.5 Rollback
+
+Empat hal berbeda, dengan risiko yang berbeda. Jangan mencampurnya.
+
+#### 7.5.1 Rollback versi aplikasi
+
+Deploy versi Connect sebelumnya, tanpa menyentuh skema. Ini aman karena migrasi approval aditif:
+tiga tabel baru, tanpa foreign key, tanpa perubahan pada tabel yang sudah ada. Versi lama tidak
+membaca tabel itu, dan TypeORM mengabaikan baris ledger migrasi yang tidak dikenalnya. Data approval
+tetap utuh dan dipakai lagi saat versi baru dikembalikan.
+
+Catatan: aplikasi versi lama **tidak** memvalidasi kredensial ingest, karena rute itu belum ada di
+versinya. Karena itu hentikan ingest lebih dulu (§7.5.2) sebelum rollback versi.
+
+#### 7.5.2 Hentikan worker dan ingest
+
+1. `ALIM_CONNECT_RETRY_INTERVAL_MS=0` — worker berhenti pada pass berikutnya; command yang sedang
+   dikirim diselesaikan atau ditinggalkan dengan lease yang habis sendiri.
+2. Kosongkan `ALIM_CONNECT_INGEST_KEY` — endpoint menjawab `503`, bukan terbuka.
+
+Keduanya tidak menghapus data dan dapat dibalik kapan saja.
+
+#### 7.5.3 Pemulihan database dari backup
+
+Dipakai bila data rusak, bukan bila aplikasi perlu dikembalikan. Restore mengembalikan seluruh
+database ke titik backup, termasuk sesi dan tabel lain. Command yang masih `UNKNOWN` pada backup
+akan dikirim ulang oleh worker setelah dinyalakan — putuskan apakah itu diinginkan sebelum restore,
+dan pastikan backup sudah divalidasi (bisa di-restore ke instance lain) sebelum menimpa produksi.
+
+#### 7.5.4 Migration `down()`
+
+**Bukan prosedur rollback produksi.** `down()` menghapus `approval_commands`, `approval_requests`,
+dan `whatsapp_identities` beserta isinya: pemetaan nomor, riwayat keputusan, dan ledger idempotensi
+hilang. Setelah itu Core tidak dapat lagi mengenali replay sebagai duplikat, dan nomor Kepala Asrama
+kehilangan personel Core-nya sampai dipetakan ulang.
+
+Penghapusan tabel hanya boleh dilakukan bila **semuanya** terpenuhi:
+
+1. ada keputusan eksplisit pemilik sistem bahwa data approval boleh hilang;
+2. backup sudah dibuat dan **diuji restore**, bukan sekadar ada;
+3. worker dan ingest sudah dihentikan (§7.5.2);
+4. jendela perubahan disetujui, dan Core diberi tahu bahwa replay tidak lagi idempoten.
+
+Tanpa keempatnya, rollback berhenti di §7.5.1 dan skema dibiarkan apa adanya.
+
+### 7.6 Rotasi kredensial
+
+- **Ingest key** hanya punya satu nilai yang berlaku; tidak ada dukungan dua kunci berdampingan.
+  Rotasi berarti jendela singkat `401`: perbarui Connect dan Core pada jendela yang sama, lalu
+  pastikan `openwa_approval_ingest_rejected_total{reason="credential"}` berhenti bertambah.
+- **Core API key** dirotasi di Core lebih dulu, lalu di Connect. Selama berbeda, command dijawab
+  `401` dan berakhir `REJECTED`/`FAILED` — lakukan di luar jam pengajuan izin.
+
+### 7.7 Uji E2E staging
+
+Yang harus dibuktikan, bukan diasumsikan:
+
+1. Ingest tanpa header → `401`; dengan header salah → `401`; header benar → `201`.
+2. Ingest ulang dengan `coreRequestId` sama → tidak membuat baris kedua, tidak mengirim notifikasi
+   kedua bila `notify: false`.
+3. Balasan `SETUJU 2 HARI <referensi>` → command `APPLIED` dan status lokal `APPROVED`.
+4. Balasan `TOLAK <referensi>` → status `REJECTED`.
+5. Core timeout → command `UNKNOWN`, pesan "belum dapat dipastikan", lalu worker mengirim ulang
+   dengan `commandId` yang sama dan Core menjawab `duplicate` → `DUPLICATE`, bukan keputusan kedua.
+6. Aktor tidak berwenang di Core → `403` dari Core, command `REJECTED`, status lokal tidak berubah
+   menjadi disetujui.
+7. Perubahan `targetCorePersonId` pada permohonan `PROCESSING` → `409 approval_subject_immutable`.
+
+### 7.8 Soak test
+
+Jalankan dua instance dengan worker aktif selama 24–72 jam terhadap staging:
+
+- Beban sintetis: command `UNKNOWN` dan `PENDING` yang saling tumpang tindih.
+- Yang diperiksa: tidak ada command terkirim dua kali, lease pulih setelah satu instance dimatikan,
+  `openwa_approval_command_transitions_total{status="failed"}` tidak naik tanpa sebab, dan tidak ada
+  penumpukan baris `PENDING` yang tidak pernah diproses.
+
+### 7.9 Keputusan yang masih terbuka
+
+1. Gate `@RequireRole` 191: tetap, atau approval mendapat permission sendiri (perubahan RBAC).
+2. Scoping `VIEWER` per asrama/unit: butuh kolom dan aturan otorisasi baru.
+3. Verifikasi nomor WhatsApp: tetap pernyataan operator, atau alur verifikasi baru.
+4. Retensi data pribadi (§7.9.1).
+5. Kewenangan command vs policy web (§6.1).
+6. Lima kegagalan test Core yang pre-existing (§6.7).
+
+#### 7.9.1 Retensi data
+
+Belum ada pekerjaan pembersihan. Masa retensi **belum ditetapkan** dan tetap menjadi prasyarat
+produksi sampai pemilik sistem memutuskan.
+
+| Data                                                                                                | Kategori                                | Dipakai untuk                                                | Bila dihapus                                                                            |
+| --------------------------------------------------------------------------------------------------- | --------------------------------------- | ------------------------------------------------------------ | --------------------------------------------------------------------------------------- |
+| `whatsapp_identities.externalIdentity`, `corePersonId`, `displayName`                               | Nomor pribadi + identitas personel      | Menentukan siapa yang berhak menjawab                        | Balasan dari nomor itu berhenti dikenali; harus dipetakan ulang                         |
+| `approval_requests.studentName`, `studentClass`, `dormitoryName`, `departureAt`, `expectedReturnAt` | Data pribadi santri                     | Menyusun notifikasi dan menampilkan permohonan               | Riwayat permohonan hilang; audit keputusan tidak lagi dapat direkonstruksi dari Connect |
+| `approval_requests.reference`, `coreRequestId`                                                      | Kunci idempotensi + referensi keputusan | Mencegah permohonan ganda; menghubungkan ke Core             | Ingest ulang dari Core akan membuat baris baru                                          |
+| `approval_commands.commandId`, `externalMessageId`                                                  | Kunci idempotensi                       | Membuat replay aman dan mencegah dua command dari satu pesan | Replay dapat menghasilkan keputusan kedua                                               |
+| `approval_commands.coreResponseBody`, `lastError`                                                   | Respons mentah Core                     | Diagnosis kegagalan                                          | Tidak dapat ditelusuri setelah dihapus                                                  |
+| `approval_commands.decision`, `resolvedAt`, `attempts`                                              | Jejak keputusan                         | Audit siapa memutuskan apa dan kapan                         | Riwayat keputusan hilang                                                                |
+
+Rekomendasi untuk diputuskan (bukan ditetapkan di sini):
+
+- **Minimum:** pertahankan `approval_requests` dan `approval_commands` selama masa audit yang
+  berlaku untuk keputusan izin, karena keduanya adalah bukti keputusan.
+- **Kandidat pembersihan pertama:** `approval_commands.coreResponseBody` dan `lastError` pada baris
+  berstatus final yang lebih tua dari jendela diagnosis — keduanya paling besar dan paling jarang
+  dibutuhkan setelah command selesai.
+- **Jangan** memangkas baris `approval_requests`/`approval_commands` yang masih `PENDING`/`UNKNOWN`,
+  dan jangan memangkas `whatsapp_identities` yang masih aktif: keduanya memutus idempotensi dan
+  otorisasi.
+- Setiap pekerjaan pembersihan harus mencatat jumlah baris yang dihapus dan tidak boleh menyentuh
+  baris yang lebih muda dari jendela retensi yang diputuskan.
+
+Feature flag lifecycle GTK tetap OFF dan tidak terkait alur ini.

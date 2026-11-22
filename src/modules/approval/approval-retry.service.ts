@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, IsNull, LessThanOrEqual, Repository } from 'typeorm';
 import { createLogger } from '../../common/services/logger.service';
+import { recordApprovalCommand, recordApprovalRetryAttempt } from '../../common/metrics/approval-metrics';
 import { DateTransformer } from '../../common/transformers/date.transformer';
 import { startGuardedInterval } from '../../common/utils/guarded-interval';
 import { ApprovalProcessorService } from './approval-processor.service';
@@ -124,6 +125,7 @@ export class ApprovalRetryService implements OnModuleInit, OnModuleDestroy {
       }
 
       stats.retried += 1;
+      recordApprovalRetryAttempt();
 
       try {
         const outcome = await this.processor.retryUnknown(command.commandId);
@@ -177,6 +179,10 @@ export class ApprovalRetryService implements OnModuleInit, OnModuleDestroy {
       .where('id = :id', { id: command.id })
       .andWhere('status IN (:...statuses)', { statuses: [...RECOVERABLE] })
       .execute();
+
+    if (parked.affected === 1) {
+      recordApprovalCommand('failed');
+    }
 
     return parked.affected === 1;
   }

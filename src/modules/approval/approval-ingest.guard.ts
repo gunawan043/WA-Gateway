@@ -8,6 +8,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { timingSafeEqual } from 'crypto';
 import type { Request } from 'express';
+import { recordApprovalIngestRejection } from '../../common/metrics/approval-metrics';
 
 /** Header yang membawa kredensial layanan Core untuk ingest permohonan. */
 export const APPROVAL_INGEST_HEADER = 'x-alim-connect-ingest-key';
@@ -31,6 +32,8 @@ export class ApprovalIngestGuard implements CanActivate {
     const expected = (this.config.get<string>('connect.approval.ingestKey') ?? '').trim();
 
     if (expected === '') {
+      recordApprovalIngestRejection('not_configured');
+
       throw new ServiceUnavailableException(
         'Ingest permohonan belum dikonfigurasi: ALIM_CONNECT_INGEST_KEY kosong, integrasi Core tidak aktif.',
       );
@@ -40,6 +43,8 @@ export class ApprovalIngestGuard implements CanActivate {
     const provided = headerValue(request);
 
     if (provided === null || !constantTimeEquals(provided, expected)) {
+      recordApprovalIngestRejection('credential');
+
       throw new UnauthorizedException('Kredensial layanan Core tidak sah.');
     }
 

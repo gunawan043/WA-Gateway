@@ -8121,8 +8121,14 @@ default 50). **Auth:** API key (VIEWER) · **Response** `200`, an array of permi
 
 #### GET /api/approval/requests/:id
 
-One permit with its internal status and the Core status it last reported. **Auth:** API key
-(VIEWER) · **Response** `200` (permit view) or `404`.
+One permit with its internal status and the Core status it last reported. `?include=commands` adds
+the command ledger for this permit — status, attempts, the Core HTTP code, the error code, the last
+error and the next retry time — which is what makes a command parked as `FAILED` reviewable without
+a database session. The raw Core response body and the WhatsApp message id are never returned, and
+`lastError` is sanitised before it leaves the service: URLs, e-mail addresses, long digit runs
+(phone numbers) and `key=value` credential pairs are redacted, control characters stripped, and the
+text capped. **Auth:** API key (VIEWER) · **Response** `200` (permit view, plus `commands` when
+requested) or `404`.
 
 #### POST /api/approval/requests/:id/notify
 

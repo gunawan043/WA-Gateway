@@ -1,5 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import type { ApprovalRequest, ApprovalRequestStatus } from '../entities/approval-request.entity';
+// Value import: the decorator below references the class at runtime for the OpenAPI schema.
+import { ApprovalCommandView } from './approval-command-response.dto';
 
 /**
  * Bentuk permohonan yang boleh dibaca lewat API.
@@ -34,19 +36,19 @@ export class ApprovalRequestView {
   @ApiProperty({ description: 'Nama santri' })
   readonly studentName: string;
 
-  @ApiPropertyOptional({ description: 'Kelas santri', nullable: true })
+  @ApiPropertyOptional({ description: 'Kelas santri', type: String, nullable: true })
   readonly studentClass: string | null;
 
-  @ApiPropertyOptional({ description: 'UUID asrama di Core', format: 'uuid', nullable: true })
+  @ApiPropertyOptional({ description: 'UUID asrama di Core', type: String, format: 'uuid', nullable: true })
   readonly dormitoryCoreId: string | null;
 
-  @ApiPropertyOptional({ description: 'Nama asrama', nullable: true })
+  @ApiPropertyOptional({ description: 'Nama asrama', type: String, nullable: true })
   readonly dormitoryName: string | null;
 
   @ApiProperty({ description: 'Jenis izin Core' })
   readonly permitType: string;
 
-  @ApiPropertyOptional({ description: 'Durasi yang diminta (hari)', nullable: true })
+  @ApiPropertyOptional({ description: 'Durasi yang diminta (hari)', type: Number, nullable: true })
   readonly requestedDurationDays: number | null;
 
   @ApiPropertyOptional({ description: 'Waktu keberangkatan', type: String, format: 'date-time', nullable: true })
@@ -58,7 +60,11 @@ export class ApprovalRequestView {
   @ApiProperty({ description: 'Status internal Connect' })
   readonly status: ApprovalRequestStatus;
 
-  @ApiPropertyOptional({ description: 'Status izin versi Core pada sinkronisasi terakhir', nullable: true })
+  @ApiPropertyOptional({
+    description: 'Status izin versi Core pada sinkronisasi terakhir',
+    type: String,
+    nullable: true,
+  })
   readonly coreStatus: string | null;
 
   @ApiProperty({ description: 'Berapa kali klarifikasi diminta' })
@@ -67,7 +73,7 @@ export class ApprovalRequestView {
   @ApiPropertyOptional({ description: 'Waktu keputusan final', type: String, format: 'date-time', nullable: true })
   readonly decidedAt: Date | null;
 
-  @ApiPropertyOptional({ description: 'Sumber keputusan final (`whatsapp` atau `core`)', nullable: true })
+  @ApiPropertyOptional({ description: 'Sumber keputusan final (`whatsapp` atau `core`)', type: String, nullable: true })
   readonly decisionSource: string | null;
 
   @ApiPropertyOptional({
@@ -109,4 +115,18 @@ export class ApprovalRequestView {
 
 export function toApprovalRequestView(request: ApprovalRequest): ApprovalRequestView {
   return new ApprovalRequestView(request);
+}
+
+/**
+ * Detail satu permohonan, dengan riwayat command bila `include=commands` diminta.
+ *
+ * Riwayat ini yang membuat "menunggu pemeriksaan manual" dapat dikerjakan tanpa membuka basis
+ * data: status command, jumlah percobaan, kode HTTP/error, dan jadwal retry berikutnya.
+ */
+export class ApprovalRequestDetailView extends ApprovalRequestView {
+  @ApiPropertyOptional({
+    type: () => [ApprovalCommandView],
+    description: 'Riwayat command ke Core, hanya bila diminta dengan `include=commands`',
+  })
+  readonly commands?: ApprovalCommandView[];
 }

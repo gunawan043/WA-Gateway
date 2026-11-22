@@ -19678,11 +19678,30 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "include",
+            "required": false,
+            "in": "query",
+            "description": "Sertakan riwayat command ke Core (untuk pemeriksaan manual)",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "commands"
+              ]
+            }
           }
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApprovalRequestDetailView"
+                }
+              }
+            }
           },
           "401": {
             "description": "The API key is missing, unknown, revoked, or expired",
@@ -19705,7 +19724,7 @@
             }
           }
         },
-        "summary": "Detail satu permohonan izin",
+        "summary": "Detail satu permohonan izin, opsional dengan riwayat command",
         "tags": [
           "approval"
         ]
@@ -32122,6 +32141,224 @@
           "reference",
           "studentName",
           "permitType"
+        ]
+      },
+      "ApprovalCommandView": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "commandId": {
+            "type": "string"
+          },
+          "approvalRequestId": {
+            "type": "string"
+          },
+          "decision": {
+            "type": "string",
+            "enum": [
+              "approved",
+              "rejected",
+              "needs_clarification",
+              "expired",
+              "cancelled"
+            ]
+          },
+          "durationDays": {
+            "type": "integer",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "SENT",
+              "APPLIED",
+              "DUPLICATE",
+              "REJECTED",
+              "FAILED",
+              "UNKNOWN"
+            ]
+          },
+          "attempts": {
+            "type": "number"
+          },
+          "coreResponseCode": {
+            "type": "integer",
+            "nullable": true
+          },
+          "errorCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastError": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastAttemptAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "nextAttemptAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "sentAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "resolvedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "commandId",
+          "approvalRequestId",
+          "decision",
+          "durationDays",
+          "status",
+          "attempts",
+          "coreResponseCode",
+          "errorCode",
+          "lastError",
+          "lastAttemptAt",
+          "nextAttemptAt",
+          "sentAt",
+          "resolvedAt",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "ApprovalRequestDetailView": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Approval request id (Connect)"
+          },
+          "coreRequestId": {
+            "type": "string",
+            "description": "UUID permohonan izin di ALIM Core",
+            "format": "uuid"
+          },
+          "reference": {
+            "type": "string",
+            "description": "Referensi unik yang dikutip di WhatsApp"
+          },
+          "studentName": {
+            "type": "string",
+            "description": "Nama santri"
+          },
+          "studentClass": {
+            "type": "string",
+            "description": "Kelas santri",
+            "nullable": true
+          },
+          "dormitoryCoreId": {
+            "type": "string",
+            "description": "UUID asrama di Core",
+            "format": "uuid",
+            "nullable": true
+          },
+          "dormitoryName": {
+            "type": "string",
+            "description": "Nama asrama",
+            "nullable": true
+          },
+          "permitType": {
+            "type": "string",
+            "description": "Jenis izin Core"
+          },
+          "requestedDurationDays": {
+            "type": "number",
+            "description": "Durasi yang diminta (hari)",
+            "nullable": true
+          },
+          "departureAt": {
+            "type": "string",
+            "description": "Waktu keberangkatan",
+            "format": "date-time",
+            "nullable": true
+          },
+          "expectedReturnAt": {
+            "type": "string",
+            "description": "Perkiraan waktu kembali",
+            "format": "date-time",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "description": "Status internal Connect"
+          },
+          "coreStatus": {
+            "type": "string",
+            "description": "Status izin versi Core pada sinkronisasi terakhir",
+            "nullable": true
+          },
+          "clarificationCount": {
+            "type": "number",
+            "description": "Berapa kali klarifikasi diminta"
+          },
+          "decidedAt": {
+            "type": "string",
+            "description": "Waktu keputusan final",
+            "format": "date-time",
+            "nullable": true
+          },
+          "decisionSource": {
+            "type": "string",
+            "description": "Sumber keputusan final (`whatsapp` atau `core`)",
+            "nullable": true
+          },
+          "notificationSentAt": {
+            "type": "string",
+            "description": "Waktu notifikasi terakhir terkirim",
+            "format": "date-time",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "Waktu permohonan diterima Connect",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "Waktu perubahan terakhir",
+            "format": "date-time"
+          },
+          "commands": {
+            "description": "Riwayat command ke Core, hanya bila diminta dengan `include=commands`",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ApprovalCommandView"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "coreRequestId",
+          "reference",
+          "studentName",
+          "permitType",
+          "status",
+          "clarificationCount",
+          "createdAt",
+          "updatedAt"
         ]
       },
       "UpsertWhatsAppIdentityDto": {

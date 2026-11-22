@@ -18,6 +18,7 @@ import { limiterKeyForIp, resolveClientIp, type RequestLike } from '../../common
 import { SlidingWindowLimiter } from '../events/ws-rate-limit';
 import { StatsService, type OverviewStats } from '../stats/stats.service';
 import { getWebhookDeliveryFailuresTotal } from '../../common/metrics/webhook-delivery-metrics';
+import { approvalMetricLines } from '../../common/metrics/approval-metrics';
 import { getIngressDedupBodyMismatchesTotal } from '../../common/metrics/ingress-metrics';
 import {
   getSessionReconnectAttemptsTotal,
@@ -251,6 +252,7 @@ export class MetricsService implements OnModuleDestroy {
     );
     lines.push('# TYPE openwa_ingress_dedup_body_mismatches_total counter');
     lines.push(`openwa_ingress_dedup_body_mismatches_total ${getIngressDedupBodyMismatchesTotal()}`);
+    lines.push(...approvalMetricLines());
 
     lines.push(
       '# HELP openwa_session_reconnect_attempts_total Reconnect attempts scheduled across all sessions since process start.',

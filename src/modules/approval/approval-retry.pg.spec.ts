@@ -150,6 +150,28 @@ interface RegclassRow {
     }
   });
 
+  /**
+   * Semantik waktu harus disengaja, bukan kebetulan.
+   *
+   * Kolom waktu approval adalah `timestamp` (tanpa zona). Driver menuliskan `Date` memakai waktu
+   * lokal proses dan PostgreSQL mengabaikan offset pada kolom `timestamp`, sedangkan `DEFAULT
+   * (NOW())` — `timestamptz` yang di-cast — memakai zona sesi. Dua sumber jam ini hanya konsisten
+   * bila proses dan sesi memakai zona yang sama. Test ini mengunci tipe kolomnya supaya perubahan
+   * ke `timestamptz` (yang menghapus ketergantungan itu) harus disengaja dan disertai migration.
+   */
+  it('menyimpan waktu approval sebagai timestamp tanpa zona', async () => {
+    const rows = await scratch.query<{ table_name: string; column_name: string; data_type: string }[]>(
+      `SELECT table_name, column_name, data_type
+         FROM information_schema.columns
+        WHERE table_name IN ('whatsapp_identities', 'approval_requests', 'approval_commands')
+          AND data_type LIKE 'timestamp%'
+        ORDER BY table_name, column_name`,
+    );
+
+    expect(rows.length).toBeGreaterThan(10);
+    expect([...new Set(rows.map(row => row.data_type))]).toEqual(['timestamp without time zone']);
+  });
+
   it('mengirim ulang command UNKNOWN dengan commandId yang sama', async () => {
     const command = await seed();
 

@@ -1,15 +1,33 @@
-import { Body, ConflictException, Controller, Get, Optional, Param, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  ConflictException,
+  Controller,
+  Get,
+  Optional,
+  Param,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { AuditService } from '../audit/audit.service';
 import { AuditAction } from '../audit/entities/audit-log.entity';
+import { recordApprovalIngestRejection } from '../../common/metrics/approval-metrics';
 import { CurrentApiKey, RequireRole, RequireUnscopedKey } from '../auth/decorators/auth.decorators';
 import { ApiKey, ApiKeyRole } from '../auth/entities/api-key.entity';
 import { ApprovalIngestGuard } from './approval-ingest.guard';
 import { ApprovalService } from './approval.service';
 import { WhatsAppIdentityService, snapshotOf } from './whatsapp-identity.service';
 import type { WhatsAppIdentityUpsertResult } from './whatsapp-identity.service';
-import { IngestApprovalRequestDto, ListApprovalRequestsQueryDto, UpsertWhatsAppIdentityDto } from './dto/approval.dto';
-import { ApprovalRequestView, toApprovalRequestView } from './dto/approval-response.dto';
+import {
+  GetApprovalRequestQueryDto,
+  IngestApprovalRequestDto,
+  ListApprovalRequestsQueryDto,
+  UpsertWhatsAppIdentityDto,
+} from './dto/approval.dto';
+import { ApprovalRequestDetailView, ApprovalRequestView, toApprovalRequestView } from './dto/approval-response.dto';
+import { toApprovalCommandView } from './dto/approval-command-response.dto';
 import { WhatsAppIdentity } from './entities/whatsapp-identity.entity';
 
 /**
@@ -46,9 +64,21 @@ export class ApprovalController {
   })
   @ApiResponse({ status: 503, description: 'Ingest belum dikonfigurasi (ALIM_CONNECT_INGEST_KEY kosong).' })
   async ingest(@Body() dto: IngestApprovalRequestDto, @CurrentApiKey() apiKey?: ApiKey): Promise<ApprovalRequestView> {
-    const request = await this.approvals.ingest(dto, apiKey?.allowedSessions ?? null);
+    try {
+      const request = await this.approvals.ingest(dto, apiKey?.allowedSessions ?? null);
 
-    return toApprovalRequestView(request);
+      return toApprovalRequestView(request);
+    } catch (error) {
+      // Refusals are counted here rather than in the service: the service also answers a scoped key
+      // with 403, which is an authorisation answer, not a rejected ingest contract.
+      if (error instanceof ConflictException) {
+        recordApprovalIngestRejection('subject_immutable');
+      } else if (error instanceof BadRequestException) {
+        recordApprovalIngestRejection('invalid');
+      }
+
+      throw error;
+    }
   }
 
   @Get('requests')
@@ -62,10 +92,19 @@ export class ApprovalController {
 
   @Get('requests/:id')
   @RequireRole(ApiKeyRole.VIEWER)
-  @ApiOperation({ summary: 'Detail satu permohonan izin' })
+  @ApiOperation({ summary: 'Detail satu permohonan izin, opsional dengan riwayat command' })
   @ApiParam({ name: 'id', description: 'Approval request id' })
-  async get(@Param('id') id: string): Promise<ApprovalRequestView> {
-    return toApprovalRequestView(await this.approvals.get(id));
+  @ApiResponse({ status: 200, type: ApprovalRequestDetailView })
+  async get(@Param('id') id: string, @Query() query: GetApprovalRequestQueryDto): Promise<ApprovalRequestDetailView> {
+    const request = toApprovalRequestView(await this.approvals.get(id));
+
+    if (query.include !== 'commands') {
+      return request;
+    }
+
+    const commands = await this.approvals.listCommands(id);
+
+    return { ...request, commands: commands.map(toApprovalCommandView) };
   }
 
   @Post('requests/:id/notify')
