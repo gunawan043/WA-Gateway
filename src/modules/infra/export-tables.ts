@@ -393,6 +393,15 @@ export const EXPORT_TABLES: AnyExportTable[] = [
   defineExportTable({ key: 'campaigns', table: 'campaigns', optional: true }),
   defineExportTable({ key: 'campaignRecipients', table: 'campaign_recipients', optional: true }),
   defineExportTable({ key: 'campaignSegments', table: 'campaign_segments', optional: true }),
+
+  // WhatsApp approval workflow. None of the three tables carries a FK to sessions (a sessionId is
+  // provenance), so nothing cascades and every one must be restored explicitly. Identities come
+  // first: without the mapping a restored request can no longer be authorized, and the approver's
+  // number would silently lose its Core person. Requests precede commands because a command's
+  // `approvalRequestId` points at a request row.
+  defineExportTable({ key: 'whatsappIdentities', table: 'whatsapp_identities', optional: true }),
+  defineExportTable({ key: 'approvalRequests', table: 'approval_requests', optional: true }),
+  defineExportTable({ key: 'approvalCommands', table: 'approval_commands', optional: true }),
 ];
 
 /**

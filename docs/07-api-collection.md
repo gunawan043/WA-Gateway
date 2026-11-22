@@ -1537,7 +1537,10 @@ curl -X POST "$BASE/api/infra/import-data" \
       "crmDealActivities": [],
     "campaigns": [],
     "campaignRecipients": [],
-    "campaignSegments": []
+    "campaignSegments": [],
+    "whatsappIdentities": [],
+    "approvalRequests": [],
+    "approvalCommands": []
     }
   }'
 ```

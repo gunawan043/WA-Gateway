@@ -42,6 +42,7 @@ import { InboxModule } from './modules/inbox/inbox.module';
 import { CrmModule } from './modules/crm/crm.module';
 import { CampaignModule } from './modules/campaign/campaign.module';
 import { DivisionModule } from './modules/division/division.module';
+import { ApprovalModule } from './modules/approval/approval.module';
 import { TakeoverModule } from './modules/takeover/takeover.module';
 import { CatalogModule } from './modules/catalog/catalog.module';
 import { HooksModule } from './core/hooks';
@@ -168,6 +169,7 @@ if (dashboardServingEnabled && dashboardBuildPresent) {
             __dirname + '/modules/crm/**/*.entity{.ts,.js}',
             __dirname + '/modules/campaign/**/*.entity{.ts,.js}',
             __dirname + '/modules/division/**/*.entity{.ts,.js}',
+            __dirname + '/modules/approval/**/*.entity{.ts,.js}',
           ],
           migrations: [__dirname + '/database/migrations/*{.ts,.js}'],
           logging: configService.get<boolean>('dataDatabase.logging', false),
@@ -316,6 +318,7 @@ if (dashboardServingEnabled && dashboardBuildPresent) {
     CrmModule, // Sales pipeline: stages, deals and per-deal activity history
     CampaignModule, // Broadcast campaigns: audience resolution, chunks and per-recipient results
     DivisionModule, // Division routing: one number, several teams, an automatic handover
+    ApprovalModule, // WhatsApp approval workflow for dormitory permits (Core stays authoritative)
     TakeoverModule, // adopts sessions whose holder's lease lapsed (crashed peer / recreated node)
     CatalogModule, // Phase 3: Catalog API (WhatsApp Business)
     PluginsApiModule, // Phase 5: Plugins API

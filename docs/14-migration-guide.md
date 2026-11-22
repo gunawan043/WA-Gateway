@@ -197,7 +197,10 @@ curl -X POST 'http://localhost:2785/api/infra/import-data' \
     "crmDealActivities": [...],
     "campaigns": [...],
     "campaignRecipients": [...],
-    "campaignSegments": [...]
+    "campaignSegments": [...],
+    "whatsappIdentities": [...],
+    "approvalRequests": [...],
+    "approvalCommands": [...]
   },
   "counts": {
     "sessions": 5,
@@ -226,7 +229,10 @@ curl -X POST 'http://localhost:2785/api/infra/import-data' \
     "crmDealActivities": 0,
     "campaigns": 0,
     "campaignRecipients": 0,
-    "campaignSegments": 0
+    "campaignSegments": 0,
+    "whatsappIdentities": 0,
+    "approvalRequests": 0,
+    "approvalCommands": 0
   },
   "skippedTables": []
 }

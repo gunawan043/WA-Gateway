@@ -32,6 +32,9 @@ import { DivisionAgent } from '../division/entities/division-agent.entity';
 import { DivisionSettings } from '../division/entities/division-settings.entity';
 import { DivisionChatState } from '../division/entities/division-chat-state.entity';
 import { CrmStage } from '../crm/entities/crm-stage.entity';
+import { WhatsAppIdentity } from '../approval/entities/whatsapp-identity.entity';
+import { ApprovalRequest } from '../approval/entities/approval-request.entity';
+import { ApprovalCommand } from '../approval/entities/approval-command.entity';
 
 /**
  * What docs/14 (Timestamps travel as UTC) says a SQLite-made archive holds, checked against an export from
@@ -87,6 +90,9 @@ describe('a SQLite-made export archive', () => {
         DivisionSettings,
         DivisionChatState,
         SendIdempotencyKey,
+        WhatsAppIdentity,
+        ApprovalRequest,
+        ApprovalCommand,
       ],
       migrations: migrations as never,
     });

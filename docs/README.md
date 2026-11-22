@@ -70,6 +70,7 @@
 | 35a | [ALIM Core Organization Mapping](./35a-alim-core-organization-mapping.md) | How Core's units, schools, positions and assignments map onto Connect's teams      |
 | 35b | [ALIM Core API Coordination and Safety](./35b-alim-core-api-coordination-and-safety-plan.md) | API needs for Core, production safety plan and the D9 go/no-go gate |
 | 35c | [ALIM Core Connect API Contract Draft](./35c-alim-core-connect-api-contract-draft.md) | Tahap 0: draft contract, mock server, fixtures and contract tests |
+| 36  | [WhatsApp Approval Workflow](./36-whatsapp-approval-workflow.md)         | Core command API and Connect's WhatsApp approval flow, with tests and open decisions |
 
 **Examples**
 

@@ -224,6 +224,31 @@ describe('Test lane partition', () => {
     }).toEqual({ neverRun: [], unlisted: [] });
   });
 
+  /**
+   * Naming the specs is not enough: they self-skip when `DATABASE_TYPE` is not `postgres`, and a
+   * skipped suite is green. The job must therefore assert the variable itself, from the job-level
+   * env the specs inherit, before the first spec runs.
+   */
+  it.each(['ci.yml', 'release.yml'])('guards the %s test-postgres job against a silent skip', file => {
+    const workflow = yaml.load(readFileSync(join(repoRoot, '.github', 'workflows', file), 'utf8')) as {
+      jobs?: Record<string, { env?: Record<string, unknown>; steps?: { name?: string; run?: string }[] }>;
+    };
+    const job = workflow.jobs?.['test-postgres'];
+    const steps = job?.steps ?? [];
+
+    expect(job?.env?.DATABASE_TYPE).toBe('postgres');
+
+    // Matched by step name on purpose: writing the comparison expression here would make this
+    // spec look like a dialect-switched suite to the scan above and demand a PG job entry for it.
+    const guardIndex = steps.findIndex(step => step.name === 'Assert the PostgreSQL lane is configured');
+    const specIndex = steps.findIndex(step => (step.run ?? '').includes('.pg.spec.ts'));
+
+    expect(guardIndex).toBeGreaterThanOrEqual(0);
+    expect(specIndex).toBeGreaterThanOrEqual(0);
+    expect(guardIndex).toBeLessThan(specIndex);
+    expect(steps[guardIndex]?.run).toContain('process.exit(1)');
+  });
+
   it('names suites that exist on disk', () => {
     const paths = [...new Set([...docLane(), ...unitLaneExcludes().map(asPath)])];
     expect(paths.length).toBeGreaterThan(20);

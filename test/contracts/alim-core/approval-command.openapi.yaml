@@ -1,0 +1,398 @@
+openapi: 3.1.0
+info:
+  title: ALIM Core — Approval Command API (ALIM Connect)
+  version: 0.1.0-draft
+  x-contract-status: provisional
+  description: |
+    Kontrak **terpisah** untuk satu-satunya endpoint tulis yang dipakai ALIM Connect:
+    `POST /api/connect/v1/approval-commands`.
+
+    Dokumen ini sengaja tidak menyentuh `connect-v1.openapi.yaml` (kontrak master
+    read-only). Operasi baca master tetap hanya `GET`, dan endpoint command tidak
+    pernah muncul di sana.
+
+    Sifat kontrak:
+
+    - Bukan API tulis generik. Hanya keputusan izin asrama yang sudah ada.
+    - Aktor tidak pernah diambil dari payload. `actor_core_person_id` hanya
+      referensi audit; otorisasi memakai pemetaan identitas WhatsApp terverifikasi
+      di Core.
+    - Kewenangan divalidasi Core (Kepala Asrama aktif pada asrama permohonan).
+    - Idempoten terhadap `command_id` dan `external_message_id`.
+    - Status izin yang sah tetap milik Core; Connect tidak menyimpan keputusan final.
+
+    Bentuk respons di bawah diambil dari implementasi Core
+    (`ApprovalCommandController`, `ApprovalCommandService`,
+    `VerifyConnectApprovalApiKey`, `ApprovalCommandRequest`), bukan dari asumsi.
+servers:
+  - url: /api/connect/v1
+security:
+  - connectApprovalKey: []
+paths:
+  /approval-commands:
+    post:
+      operationId: createApprovalCommand
+      summary: Terapkan satu keputusan izin dari ALIM Connect
+      x-contract-status: provisional
+      x-needs-core-confirmation:
+        - Apakah Core ingin menambah `Idempotency-Key` HTTP di samping `command_id`.
+        - Apakah `X-ALIM-API-Version` akan dipasang juga pada endpoint command.
+      x-aligned-with-core-contract: docs/integration/alim-connect-approval-command-api.md (version 1)
+      parameters:
+        - name: X-ALIM-CONNECT-APPROVAL-KEY
+          in: header
+          required: true
+          description: |
+            API key service-to-service khusus Connect. Middleware Core juga menerima
+            `Authorization: Bearer <key>` sebagai cadangan, tetapi Connect selalu
+            memakai header ini.
+          schema:
+            type: string
+            minLength: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApprovalCommandRequest'
+      responses:
+        '200':
+          description: Command diterapkan atau sudah pernah diterapkan.
+          headers:
+            Cache-Control:
+              $ref: '#/components/headers/CacheControl'
+            Pragma:
+              $ref: '#/components/headers/Pragma'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApprovalCommandSuccess'
+        '401':
+          description: API key tidak dikirim atau tidak valid.
+          headers:
+            Cache-Control:
+              $ref: '#/components/headers/CacheControl'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApprovalCommandError'
+        '403':
+          description: Key tanpa cakupan, IP tidak diizinkan, atau aktor tidak berwenang.
+          headers:
+            Cache-Control:
+              $ref: '#/components/headers/CacheControl'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApprovalCommandError'
+        '404':
+          description: Permohonan izin tidak ditemukan.
+          headers:
+            Cache-Control:
+              $ref: '#/components/headers/CacheControl'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApprovalCommandError'
+        '409':
+          description: Permohonan tidak dapat diputuskan, atau command/pesan sudah dipakai.
+          headers:
+            Cache-Control:
+              $ref: '#/components/headers/CacheControl'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApprovalCommandError'
+        '422':
+          description: Payload tidak valid, atau durasi tidak sah.
+          headers:
+            Cache-Control:
+              $ref: '#/components/headers/CacheControl'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApprovalCommandError'
+        '429':
+          description: Terlalu banyak percobaan autentikasi atau permintaan.
+          headers:
+            Cache-Control:
+              $ref: '#/components/headers/CacheControl'
+            Retry-After:
+              $ref: '#/components/headers/RetryAfter'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApprovalCommandError'
+        '503':
+          description: Integrasi dinonaktifkan atau key belum dikonfigurasi pada server.
+          headers:
+            Cache-Control:
+              $ref: '#/components/headers/CacheControl'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApprovalCommandError'
+components:
+  securitySchemes:
+    connectApprovalKey:
+      type: apiKey
+      in: header
+      name: X-ALIM-CONNECT-APPROVAL-KEY
+  headers:
+    CacheControl:
+      description: Selalu `no-store, private`.
+      schema:
+        type: string
+        const: no-store, private
+    Pragma:
+      schema:
+        type: string
+        const: no-cache
+    RetryAfter:
+      schema:
+        type: string
+  schemas:
+    ApprovalCommandRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - command_id
+        - request_id
+        - decision
+        - actor_external_id
+        - source
+        - external_message_id
+      properties:
+        command_id:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Kunci idempotensi utama. Command dengan id sama tidak pernah diterapkan dua kali.
+        request_id:
+          type: string
+          format: uuid
+          description: ID permohonan izin Core (`dormitory_permits.id`).
+        decision:
+          type: string
+          enum:
+            - approved
+            - rejected
+            - needs_clarification
+            - expired
+            - cancelled
+          description: >-
+            Lima nilai kontrak final Core. Hanya `approved` dan `rejected` yang boleh berasal dari
+            balasan Kepala Asrama; `needs_clarification`, `expired`, dan `cancelled` hanya boleh
+            dikirim proses internal yang berwenang.
+        approved_duration_days:
+          type:
+            - integer
+            - 'null'
+          minimum: 1
+          maximum: 365
+          description: Wajib untuk `approved`; dilarang untuk `rejected`. Tidak pernah di-default.
+        actor_external_id:
+          type: string
+          minLength: 1
+          maxLength: 191
+          description: Identitas WhatsApp pengirim, dinormalkan Core (mis. `628…`).
+        actor_core_person_id:
+          type:
+            - string
+            - 'null'
+          format: uuid
+          description: Hanya referensi audit. Tidak dipakai untuk otorisasi.
+        source:
+          type: string
+          enum:
+            - whatsapp
+        external_message_id:
+          type: string
+          minLength: 1
+          maxLength: 191
+          description: Kunci idempotensi kedua. Satu pesan tidak boleh menjadi dua command.
+        message_text:
+          type:
+            - string
+            - 'null'
+          maxLength: 2000
+        notes:
+          type:
+            - string
+            - 'null'
+          maxLength: 1000
+    ApprovalCommandSuccess:
+      type: object
+      additionalProperties: false
+      required:
+        - success
+        - message
+        - data
+        - meta
+        - errors
+      properties:
+        success:
+          const: true
+        message:
+          type: string
+        data:
+          $ref: '#/components/schemas/ApprovalCommandResult'
+        meta:
+          $ref: '#/components/schemas/Meta'
+        errors:
+          type: 'null'
+    ApprovalCommandResult:
+      type: object
+      additionalProperties: false
+      required:
+        - outcome
+        - duplicate
+        - command_id
+        - request_id
+        - decision
+        - status
+        - secondary_status
+        - approved_duration_days
+        - departure_datetime
+        - expected_return_datetime
+        - decided_at
+        - actor
+        - source
+        - external_message_id
+        - message_text
+      properties:
+        outcome:
+          type: string
+          enum:
+            - applied
+            - duplicate
+            - needs_clarification
+            - expired
+            - cancelled
+        duplicate:
+          type: boolean
+        command_id:
+          type: string
+        request_id:
+          type: string
+          format: uuid
+        decision:
+          type: string
+          enum:
+            - approved
+            - rejected
+            - needs_clarification
+            - expired
+            - cancelled
+        status:
+          type: string
+          enum:
+            - pending
+            - approved
+            - rejected
+            - picked_up
+            - returned
+        secondary_status:
+          type:
+            - string
+            - 'null'
+        approved_duration_days:
+          type:
+            - integer
+            - 'null'
+        departure_datetime:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        expected_return_datetime:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        decided_at:
+          type: string
+          format: date-time
+        actor:
+          $ref: '#/components/schemas/Actor'
+        source:
+          type: string
+          enum:
+            - whatsapp
+        external_message_id:
+          type: string
+        message_text:
+          type:
+            - string
+            - 'null'
+    Actor:
+      type: object
+      additionalProperties: false
+      required:
+        - core_person_id
+        - name
+      properties:
+        core_person_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+    Meta:
+      type: object
+      additionalProperties: false
+      required:
+        - timestamp
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+    ApprovalCommandError:
+      type: object
+      additionalProperties: false
+      required:
+        - success
+        - message
+        - data
+        - meta
+        - errors
+      properties:
+        success:
+          const: false
+        message:
+          type: string
+        data:
+          type:
+            - object
+            - 'null'
+        meta:
+          $ref: '#/components/schemas/Meta'
+        errors:
+          type:
+            - object
+            - 'null'
+          additionalProperties: false
+          required:
+            - code
+          properties:
+            code:
+              type: string
+              enum:
+                - validation_failed
+                - insufficient_scope
+                - actor_identity_missing
+                - actor_identity_unmapped
+                - actor_inactive
+                - actor_not_authorized
+                - permit_not_found
+                - permit_not_decidable
+                - permit_not_actionable
+                - permit_expired
+                - permit_not_expired
+                - duration_invalid
+                - duration_out_of_range
+                - permit_missing_departure
+                - command_id_reused
+                - external_message_replayed
+                - quota_exceeded
+            context:
+              type: object

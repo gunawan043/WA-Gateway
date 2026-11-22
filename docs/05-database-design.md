@@ -1115,7 +1115,9 @@ src/database/migrations/           # data connection (pluggable)
 ├── 1792000000000-CreateCrmTables.ts   # crm_stages (seeded) + crm_deals + crm_deal_activities (sales pipeline)
 ├── 1792100000000-CreateCampaignTables.ts   # campaigns + campaign_recipients + campaign_segments (broadcast)
 ├── 1792200000000-CreateDivisionTables.ts   # divisions + division_agents + division_settings + division_chat_states, and inbox_conversations.divisionId/divisionName (shared-number routing)
-└── 1792300000000-AddInboxSla.ts   # divisions.slaMinutes and the inbox_conversations first-response clock (started, due, breached, first response)
+├── 1792300000000-AddInboxSla.ts   # divisions.slaMinutes and the inbox_conversations first-response clock (started, due, breached, first response)
+├── 1792400000000-CreateApprovalWorkflow.ts   # whatsapp_identities + approval_requests + approval_commands (WhatsApp approval workflow, docs/36)
+└── 1792500000000-AddApprovalCommandRetry.ts   # approval_commands retry columns (lastError, lastAttemptAt, nextAttemptAt) + (status, nextAttemptAt) index
 ```
 
 > [!NOTE]

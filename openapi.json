@@ -74,6 +74,7 @@
                 "role_assignment_created",
                 "role_assignment_updated",
                 "role_assignment_revoked",
+                "approval_identity_changed",
                 "rate_limit_exceeded",
                 "queue_board_mutated",
                 "session_created",
@@ -19529,6 +19530,294 @@
         ]
       }
     },
+    "/api/approval/requests": {
+      "post": {
+        "operationId": "ApprovalController_ingest",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IngestApprovalRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Permohonan tersimpan (idempoten berdasarkan coreRequestId)."
+          },
+          "400": {
+            "description": "The body is malformed, fails validation, or carries a field the DTO does not declare",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Kredensial layanan Core tidak sah.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key's role, session or chat scope, or IP allow-list does not allow this operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Subjek otorisasi berubah setelah permohonan diproses (approval_subject_immutable).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Ingest belum dikonfigurasi (ALIM_CONNECT_INGEST_KEY kosong).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Terima permohonan izin dari ALIM Core dan kirim notifikasi WhatsApp",
+        "tags": [
+          "approval"
+        ]
+      },
+      "get": {
+        "operationId": "ApprovalController_list",
+        "parameters": [
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PENDING_APPROVAL",
+                "PROCESSING",
+                "APPROVED",
+                "REJECTED",
+                "NEEDS_CLARIFICATION",
+                "EXPIRED",
+                "CANCELLED"
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Maksimum baris (1–200)",
+            "schema": {
+              "default": 50,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          },
+          "401": {
+            "description": "The API key is missing, unknown, revoked, or expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key's role, session or chat scope, or IP allow-list does not allow this operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Daftar permohonan izin beserta status internal Connect",
+        "tags": [
+          "approval"
+        ]
+      }
+    },
+    "/api/approval/requests/{id}": {
+      "get": {
+        "operationId": "ApprovalController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Approval request id",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          },
+          "401": {
+            "description": "The API key is missing, unknown, revoked, or expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key's role, session or chat scope, or IP allow-list does not allow this operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Detail satu permohonan izin",
+        "tags": [
+          "approval"
+        ]
+      }
+    },
+    "/api/approval/requests/{id}/notify": {
+      "post": {
+        "operationId": "ApprovalController_notify",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Approval request id",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          },
+          "401": {
+            "description": "The API key is missing, unknown, revoked, or expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key's role, session or chat scope, or IP allow-list does not allow this operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Kirim ulang notifikasi WhatsApp untuk permohonan ini",
+        "tags": [
+          "approval"
+        ]
+      }
+    },
+    "/api/approval/identities": {
+      "post": {
+        "operationId": "ApprovalController_upsertIdentity",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertWhatsAppIdentityDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "400": {
+            "description": "The body is malformed, fails validation, or carries a field the DTO does not declare",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API key is missing, unknown, revoked, or expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key's role, session or chat scope, or IP allow-list does not allow this operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Nomor sudah dipetakan ke personel Core lain tanpa `reassign: true` (identity_reassign_requires_flag).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Petakan nomor WhatsApp ke personel Core",
+        "tags": [
+          "approval"
+        ]
+      }
+    },
     "/api/sessions/{sessionId}/catalog": {
       "get": {
         "operationId": "CatalogController_getCatalog",
@@ -22327,6 +22616,10 @@
     {
       "name": "crm",
       "description": "Sales pipeline (stages, deals and activity history)"
+    },
+    {
+      "name": "approval",
+      "description": "WhatsApp approval workflow: permits from ALIM Core and WhatsApp identity mapping"
     },
     {
       "name": "campaigns",
@@ -27985,6 +28278,24 @@
             "items": {
               "type": "object"
             }
+          },
+          "whatsappIdentities": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "approvalRequests": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "approvalCommands": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
           }
         },
         "required": [
@@ -28014,7 +28325,10 @@
           "crmDealActivities",
           "campaigns",
           "campaignRecipients",
-          "campaignSegments"
+          "campaignSegments",
+          "whatsappIdentities",
+          "approvalRequests",
+          "approvalCommands"
         ]
       },
       "TableCountsDto": {
@@ -28127,6 +28441,18 @@
           "campaignSegments": {
             "type": "number",
             "example": 0
+          },
+          "whatsappIdentities": {
+            "type": "number",
+            "example": 0
+          },
+          "approvalRequests": {
+            "type": "number",
+            "example": 0
+          },
+          "approvalCommands": {
+            "type": "number",
+            "example": 0
           }
         },
         "required": [
@@ -28156,7 +28482,10 @@
           "crmDealActivities",
           "campaigns",
           "campaignRecipients",
-          "campaignSegments"
+          "campaignSegments",
+          "whatsappIdentities",
+          "approvalRequests",
+          "approvalCommands"
         ]
       },
       "OmittedInlineMediaDto": {
@@ -28233,7 +28562,7 @@
         "properties": {
           "tables": {
             "type": "object",
-            "description": "Every one of the 27 migration tables is emptied before the restore runs, so a key omitted here is restored EMPTY rather than left untouched. Post the whole GET /api/infra/export-data payload, not a hand-built subset.",
+            "description": "Every one of the 30 migration tables is emptied before the restore runs, so a key omitted here is restored EMPTY rather than left untouched. Post the whole GET /api/infra/export-data payload, not a hand-built subset.",
             "properties": {
               "sessions": {
                 "type": "array"
@@ -28314,6 +28643,15 @@
                 "type": "array"
               },
               "campaignSegments": {
+                "type": "array"
+              },
+              "whatsappIdentities": {
+                "type": "array"
+              },
+              "approvalRequests": {
+                "type": "array"
+              },
+              "approvalCommands": {
                 "type": "array"
               }
             }
@@ -31696,6 +32034,134 @@
             "description": "Schedule (or clear, with null) the start time of a draft."
           }
         }
+      },
+      "IngestApprovalRequestDto": {
+        "type": "object",
+        "properties": {
+          "coreRequestId": {
+            "type": "string",
+            "description": "UUID permohonan izin di ALIM Core",
+            "format": "uuid"
+          },
+          "reference": {
+            "type": "string",
+            "description": "Referensi unik yang dikutip di WhatsApp",
+            "example": "IZN-2026-00125",
+            "maxLength": 64
+          },
+          "studentName": {
+            "type": "string",
+            "description": "Nama santri",
+            "example": "Ahmad Fauzi",
+            "maxLength": 191
+          },
+          "studentClass": {
+            "type": "string",
+            "description": "Kelas santri",
+            "example": "7A",
+            "maxLength": 100
+          },
+          "dormitoryCoreId": {
+            "type": "string",
+            "description": "UUID asrama di Core",
+            "format": "uuid"
+          },
+          "dormitoryName": {
+            "type": "string",
+            "description": "Nama asrama",
+            "example": "Asrama Putra 1",
+            "maxLength": 191
+          },
+          "permitType": {
+            "type": "string",
+            "description": "Jenis izin Core",
+            "example": "pulang",
+            "maxLength": 64
+          },
+          "requestedDurationDays": {
+            "type": "integer",
+            "description": "Durasi yang diminta (hari)",
+            "minimum": 1,
+            "maximum": 365
+          },
+          "departureAt": {
+            "type": "string",
+            "description": "Waktu keberangkatan (ISO 8601)"
+          },
+          "expectedReturnAt": {
+            "type": "string",
+            "description": "Perkiraan waktu kembali (ISO 8601)"
+          },
+          "targetCorePersonId": {
+            "type": "string",
+            "description": "UUID user Core Kepala Asrama yang dituju",
+            "format": "uuid"
+          },
+          "targetIdentity": {
+            "type": "string",
+            "description": "Nomor WhatsApp tujuan (JID atau digit)",
+            "example": "6281234567890"
+          },
+          "sessionId": {
+            "type": "string",
+            "description": "Sesi WhatsApp yang dipakai mengirim notifikasi"
+          },
+          "coreStatus": {
+            "type": "string",
+            "description": "Status izin di Core",
+            "example": "pending",
+            "maxLength": 32
+          },
+          "notify": {
+            "type": "boolean",
+            "description": "Kirim notifikasi WhatsApp sekarang (default true)"
+          }
+        },
+        "required": [
+          "coreRequestId",
+          "reference",
+          "studentName",
+          "permitType"
+        ]
+      },
+      "UpsertWhatsAppIdentityDto": {
+        "type": "object",
+        "properties": {
+          "externalIdentity": {
+            "type": "string",
+            "description": "Nomor WhatsApp / JID",
+            "example": "6281234567890"
+          },
+          "corePersonId": {
+            "type": "string",
+            "description": "UUID user Core",
+            "format": "uuid"
+          },
+          "displayName": {
+            "type": "string",
+            "description": "Nama tampilan",
+            "maxLength": 191
+          },
+          "isVerified": {
+            "type": "boolean",
+            "description": "Tandai sudah diverifikasi operator (tanpa default)",
+            "default": false
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "Pemetaan masih berlaku",
+            "default": true
+          },
+          "reassign": {
+            "type": "boolean",
+            "description": "Setujui pemindahan nomor ke personel Core lain",
+            "default": false
+          }
+        },
+        "required": [
+          "externalIdentity",
+          "corePersonId"
+        ]
       },
       "CatalogDto": {
         "type": "object",

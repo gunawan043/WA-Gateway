@@ -24,6 +24,12 @@ export enum AuditAction {
   ROLE_ASSIGNMENT_UPDATED = 'role_assignment_updated',
   ROLE_ASSIGNMENT_REVOKED = 'role_assignment_revoked',
 
+  // WhatsApp approval workflow: the identity mapping decides which number may answer a permit, so
+  // every create/update/reassign/verify/deactivate carries the acting API key and the before/after
+  // values. A rejected reassignment is recorded too — an attempt to move a number to another Core
+  // person is exactly what an audit trail exists to show.
+  APPROVAL_IDENTITY_CHANGED = 'approval_identity_changed',
+
   // Rate-limit enforcement (sampled: at most one row per subject+kind per minute — see
   // EventsGateway — so enforcing a limit never becomes an audit-write flood of its own).
   RATE_LIMIT_EXCEEDED = 'rate_limit_exceeded',

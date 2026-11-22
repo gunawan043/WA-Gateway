@@ -39,7 +39,7 @@
     "openapi:export": "ts-node scripts/export-openapi.ts openapi.json",
     "openapi:check": "ts-node scripts/export-openapi.ts /tmp/openapi.generated.json && diff -u openapi.json /tmp/openapi.generated.json",
     "rbac:verify": "ts-node scripts/rbac-verify.ts",
-    "test:contracts": "jest --config ./test/contracts/jest.config.js test/contracts/alim-core/contract.spec.ts",
+    "test:contracts": "jest --config ./test/contracts/jest.config.js test/contracts/alim-core/contract.spec.ts test/contracts/alim-core/approval-command.spec.ts",
     "mock:alim-core": "ts-node test/contracts/alim-core/mock-server.ts",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\"",
     "lint:fix": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
@@ -51,6 +51,7 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "test:pg-smoke": "node scripts/pg-uuid-smoke.js",
+    "test:pg-approval": "node -e \"if(process.env.DATABASE_TYPE!=='postgres')throw new Error('DATABASE_TYPE=postgres wajib diisi')\" && jest src/modules/approval/approval-retry.pg.spec.ts",
     "test:engine-real": "node --test test/engine-real/baileys-inbound.spec.mjs test/engine-real/baileys-outbound.spec.mjs test/engine-real/baileys-dropped-content-unread.spec.mjs test/engine-real/baileys-non-content-chat-update.spec.mjs test/engine-real/baileys-read-undo-echo.spec.mjs",
     "typeorm": "typeorm-ts-node-commonjs",
     "typeorm:prod": "typeorm",
@@ -296,6 +297,12 @@
         "functions": 93,
         "lines": 95,
         "statements": 93
+      },
+      "./src/modules/approval/": {
+        "branches": 72,
+        "functions": 85,
+        "lines": 86,
+        "statements": 86
       },
       "./src/modules/audit/": {
         "branches": 75,

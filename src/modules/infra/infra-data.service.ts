@@ -921,6 +921,14 @@ export class InfraDataService {
         await clearTable('campaign_recipients');
         await clearTable('campaigns');
         await clearTable('campaign_segments');
+        // WhatsApp approval workflow: none of the three tables carries a FK to sessions, so the
+        // sessions DELETE below never reaches them. Clear commands before requests and identities
+        // last (the reverse of the insert order) so a restore onto the source instance cannot collide
+        // on a primary key, and an interrupted restore never leaves a command pointing at a request
+        // that is already gone.
+        await clearTable('approval_commands');
+        await clearTable('approval_requests');
+        await clearTable('whatsapp_identities');
         // Session ownership is CLUSTER RUNTIME STATE, not backup payload: which process currently holds
         // a session's engine, and until when. The replace below deletes it along with everything else,
         // and the sessions importer does not restore it (deliberately — see below), so without this the

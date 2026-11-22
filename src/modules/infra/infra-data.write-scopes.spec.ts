@@ -31,6 +31,9 @@ import { DivisionAgent } from '../division/entities/division-agent.entity';
 import { DivisionSettings } from '../division/entities/division-settings.entity';
 import { DivisionChatState } from '../division/entities/division-chat-state.entity';
 import { CrmStage } from '../crm/entities/crm-stage.entity';
+import { WhatsAppIdentity } from '../approval/entities/whatsapp-identity.entity';
+import { ApprovalRequest } from '../approval/entities/approval-request.entity';
+import { ApprovalCommand } from '../approval/entities/approval-command.entity';
 import { EngineRegistry } from '../../engine/engine-registry.service';
 import type { IWhatsAppEngine } from '../../engine/interfaces/whatsapp-engine.interface';
 import { HookManager } from '../../core/hooks';
@@ -172,6 +175,9 @@ describe('import-data and the writes of the sessions it removes', () => {
         DivisionSettings,
         DivisionChatState,
         SendIdempotencyKey,
+        WhatsAppIdentity,
+        ApprovalRequest,
+        ApprovalCommand,
       ],
       synchronize: true,
     });

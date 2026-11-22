@@ -188,6 +188,14 @@ jobs:
     name: Test (PostgreSQL migrations)
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # Same as ci.yml: one job-level value shared by the guard step and every spec.
+    env:
+      DATABASE_TYPE: postgres
+      DATABASE_HOST: localhost
+      DATABASE_PORT: '5432'
+      DATABASE_USERNAME: openwa
+      DATABASE_PASSWORD: openwa
+      DATABASE_NAME: openwa
     services:
       postgres:
         image: postgres:16-alpine
@@ -224,13 +232,12 @@ jobs:
       # has a DB DEFAULT — the dialect gap SQLite-only tests can't see.
       - name: Migrate + uuid-default smoke against PostgreSQL
         run: npm run test:pg-smoke
-        env:
-          DATABASE_TYPE: postgres
-          DATABASE_HOST: localhost
-          DATABASE_PORT: '5432'
-          DATABASE_USERNAME: openwa
-          DATABASE_PASSWORD: openwa
-          DATABASE_NAME: openwa
+
+      # Same guard as ci.yml: without DATABASE_TYPE the PG specs self-skip and the tag path would
+      # publish on a suite it never ran.
+      - name: Assert the PostgreSQL lane is configured
+        run: |
+          node -e "if (process.env.DATABASE_TYPE !== 'postgres') { console.error('DATABASE_TYPE must be postgres; the PostgreSQL specs would self-skip and this job would pass without running them.'); process.exit(1); }"
 
       # Runtime-proves BuiltInFtsProvider on Postgres (websearch_to_tsquery + ts_headline against the
       # STORED body_ts tsvector), the boot-migration advisory lock (two concurrent migrators on one
@@ -253,15 +260,9 @@ jobs:
         # tree CI had passed minutes earlier). The lock spec's own two-migrator race is in-file
         # (Promise.all) and unaffected by runInBand. The synchronize spec additionally CREATEs and
         # DROPs a scratch database of its own, which is only safe serialized.
-        run: npx jest --runInBand src/database/migrations/__tests__/1782400000000-AddMessagesFts.pg.spec.ts src/modules/search/providers/builtin-fts.provider.contains.pg.spec.ts src/database/migrations/__tests__/pg-boot-migrations.pg.spec.ts src/modules/message/message-list-ordering.pg.spec.ts src/database/migrations/__tests__/pg-entity-synchronize.pg.spec.ts src/database/postgres-utc.pg.spec.ts src/modules/webhook/webhook-recovery.pg.spec.ts src/modules/message/idempotency/send-idempotency.service.pg.spec.ts src/modules/infra/infra-data.import.pg.spec.ts src/modules/infra/infra-data.optional-tables.pg.spec.ts src/modules/message/message-selection-restore.pg.spec.ts src/database/migrations/__tests__/scoped-backup-schema-owner.pg.spec.ts src/modules/session/session-content-lifetime.spec.ts src/modules/session/session-delete-claim.spec.ts src/modules/takeover/session-takeover-failed-adoption.spec.ts src/engine/identity/lid-mapping-store.spec.ts src/modules/chat-media/chat-media-retention-marker.spec.ts src/modules/session/message-edit-persisted.spec.ts src/modules/session/ack-foreign-chat.spec.ts src/modules/message/outgoing-row-sender.spec.ts src/modules/search/search-own-sender.spec.ts src/database/migrations/__tests__/1791400000000-AddLidMappingReportSource.spec.ts src/modules/session/message-projector.merged-ack.spec.ts src/engine/adapters/baileys.adapter.spec.ts src/engine/adapters/whatsapp-web-js.adapter.spec.ts src/engine/adapters/baileys-stored-chat-previews.service.spec.ts src/modules/message/send-pacing-lid-twins.spec.ts
+        run: npx jest --runInBand src/database/migrations/__tests__/1782400000000-AddMessagesFts.pg.spec.ts src/modules/search/providers/builtin-fts.provider.contains.pg.spec.ts src/database/migrations/__tests__/pg-boot-migrations.pg.spec.ts src/modules/message/message-list-ordering.pg.spec.ts src/database/migrations/__tests__/pg-entity-synchronize.pg.spec.ts src/database/postgres-utc.pg.spec.ts src/modules/webhook/webhook-recovery.pg.spec.ts src/modules/message/idempotency/send-idempotency.service.pg.spec.ts src/modules/infra/infra-data.import.pg.spec.ts src/modules/infra/infra-data.optional-tables.pg.spec.ts src/modules/message/message-selection-restore.pg.spec.ts src/database/migrations/__tests__/scoped-backup-schema-owner.pg.spec.ts src/modules/session/session-content-lifetime.spec.ts src/modules/session/session-delete-claim.spec.ts src/modules/takeover/session-takeover-failed-adoption.spec.ts src/engine/identity/lid-mapping-store.spec.ts src/modules/chat-media/chat-media-retention-marker.spec.ts src/modules/session/message-edit-persisted.spec.ts src/modules/session/ack-foreign-chat.spec.ts src/modules/message/outgoing-row-sender.spec.ts src/modules/search/search-own-sender.spec.ts src/database/migrations/__tests__/1791400000000-AddLidMappingReportSource.spec.ts src/modules/session/message-projector.merged-ack.spec.ts src/engine/adapters/baileys.adapter.spec.ts src/engine/adapters/whatsapp-web-js.adapter.spec.ts src/engine/adapters/baileys-stored-chat-previews.service.spec.ts src/modules/message/send-pacing-lid-twins.spec.ts src/modules/approval/approval-retry.pg.spec.ts
         env:
           TZ: Asia/Jakarta
-          DATABASE_TYPE: postgres
-          DATABASE_HOST: localhost
-          DATABASE_PORT: '5432'
-          DATABASE_USERNAME: openwa
-          DATABASE_PASSWORD: openwa
-          DATABASE_NAME: openwa
 
   dashboard:
     name: Dashboard

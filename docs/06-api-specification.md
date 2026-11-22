@@ -6091,7 +6091,7 @@ Export every row of the 16 migration tables from the Data DB as JSON. Read-only,
 >
 > This bounds the media, not the export — a large enough text-only history still exceeds the import limit, because every row costs a few hundred bytes of scaffolding whatever was said. For a backup that keeps everything, use `scripts/backup.sh`: it snapshots the database file itself (and `pg_dump`s Postgres), so inline media rides along regardless of this budget.
 
-The migration set (`MigrationTables`) is, in payload-key order: `sessions`, `webhooks`, `messages`, `messageBatches`, `templates`, `baileysStoredMessages`, `lidMappings`, `chatStates`, `pluginInstances`, `conversationMappings`, `ingressEvents`, `webhookDeliveryFailures`, `webhookOutboxEvents`, `integrationDeliveryFailures`, `statusUpdates`, `automationRules`, `inboxConversations`, `inboxNotes`, `crmDeals`, `crmDealActivities`, `campaigns`, `campaignRecipients`, `campaignSegments`.
+The migration set (`MigrationTables`) is, in payload-key order: `sessions`, `webhooks`, `messages`, `messageBatches`, `templates`, `baileysStoredMessages`, `lidMappings`, `chatStates`, `pluginInstances`, `conversationMappings`, `ingressEvents`, `webhookDeliveryFailures`, `webhookOutboxEvents`, `integrationDeliveryFailures`, `statusUpdates`, `automationRules`, `inboxConversations`, `inboxNotes`, `crmDeals`, `crmDealActivities`, `campaigns`, `campaignRecipients`, `campaignSegments`, `whatsappIdentities`, `approvalRequests`, `approvalCommands`.
 
 **Response** `200`
 
@@ -6141,7 +6141,10 @@ The migration set (`MigrationTables`) is, in payload-key order: `sessions`, `web
     "crmDealActivities": [],
     "campaigns": [],
     "campaignRecipients": [],
-    "campaignSegments": []
+    "campaignSegments": [],
+    "whatsappIdentities": [],
+    "approvalRequests": [],
+    "approvalCommands": []
   },
   "counts": {
     "sessions": 1,
@@ -6170,7 +6173,10 @@ The migration set (`MigrationTables`) is, in payload-key order: `sessions`, `web
     "crmDealActivities": 0,
     "campaigns": 0,
     "campaignRecipients": 0,
-    "campaignSegments": 0
+    "campaignSegments": 0,
+    "whatsappIdentities": 0,
+    "approvalRequests": 0,
+    "approvalCommands": 0
   },
   "skippedTables": [],
   "omittedInlineMedia": { "messages": 0, "messageBatches": 0 }
@@ -6251,7 +6257,10 @@ Replace all Data DB rows with the supplied export. **Destructive and transaction
     "crmDealActivities": [],
     "campaigns": [],
     "campaignRecipients": [],
-    "campaignSegments": []
+    "campaignSegments": [],
+    "whatsappIdentities": [],
+    "approvalRequests": [],
+    "approvalCommands": []
   },
   "stopOrphans": true
 }
@@ -6289,7 +6298,10 @@ Replace all Data DB rows with the supplied export. **Destructive and transaction
     "crmDealActivities": 0,
     "campaigns": 0,
     "campaignRecipients": 0,
-    "campaignSegments": 0
+    "campaignSegments": 0,
+    "whatsappIdentities": 0,
+    "approvalRequests": 0,
+    "approvalCommands": 0
   },
   "warnings": [],
   "notices": [],
@@ -8060,6 +8072,82 @@ first-response target (`slaMinutes`). An empty update answers `400`. **Auth:** A
 
 Deletes a division. Conversations already routed to it keep their CS; only the tag is removed.
 **Auth:** API key (ADMIN) · **Response** `204` or `404`.
+
+### 6.4.23 WhatsApp approval workflow (ALIM Core permits)
+
+ALIM Core owns the permit. When a dormitory permit is created there, Connect receives a copy, sends
+a WhatsApp notification to the dormitory head, and turns that head's reply (`SETUJU 2 HARI
+IZN-2026-00125`, `TOLAK IZN-2026-00125`) into a command Core applies. Connect never decides a
+permit itself: the local `status` tracks the message flow (`PENDING_APPROVAL`, `PROCESSING`,
+`APPROVED`, `REJECTED`, `NEEDS_CLARIFICATION`, `EXPIRED`, `CANCELLED`), while `coreStatus` is what
+Core reports. These routes are deployment-global (no `:sessionId`), fenced to unscoped keys, reads
+require `VIEWER` and writes require `ADMIN`. See [36 - WhatsApp Approval Workflow](./36-whatsapp-approval-workflow.md).
+
+Permit responses use a fixed view, not the database row: `id`, `coreRequestId`, `reference`,
+`studentName`, `studentClass`, `dormitoryCoreId`, `dormitoryName`, `permitType`,
+`requestedDurationDays`, `departureAt`, `expectedReturnAt`, `status`, `coreStatus`,
+`clarificationCount`, `decidedAt`, `decisionSource`, `notificationSentAt`, `createdAt`,
+`updatedAt`. The recipient's number (`targetIdentity`), the authorising Core person
+(`targetCorePersonId`), `sessionId`, `notificationMessageId`, `lastCommandId` and `metadata` are
+internal and never returned. There is no per-dormitory scoping: Connect does not store a unit
+scope, so any `VIEWER` key sees every dormitory.
+
+#### POST /api/approval/requests
+
+Upserts a permit by `coreRequestId` (the Core permit id) and, unless `notify` is `false`, sends the
+WhatsApp notification. This is the Core-to-Connect call, so it needs a **service credential in
+addition to** the API key: the `X-ALIM-CONNECT-INGEST-KEY` header must match
+`ALIM_CONNECT_INGEST_KEY`. Without it the route answers `401`; when `ALIM_CONNECT_INGEST_KEY` is
+unset the route answers `503` and the integration stays inactive — an ADMIN key alone can never
+speak as Core.
+
+A permit already decided in Connect keeps its decision; only display fields and `coreStatus` are
+refreshed. `targetCorePersonId`, `targetIdentity` and `sessionId` are fixed once the permit leaves
+`PENDING_APPROVAL`: a re-sync may bind them while the permit is still pending (and may always
+repeat the same value), but changing one afterwards answers `409 approval_subject_immutable` and
+nothing is written. `targetIdentity` is stored normalised, and `sessionId` must fall inside the
+calling key's session scope.
+
+**Auth:** API key (ADMIN) + ingest key · **Response** `201` with the permit view.
+
+**Errors:** `400` an invalid duration, timestamp, UUID or WhatsApp number · `401` a missing or wrong
+ingest key · `403` a `sessionId` outside the key scope · `409` a changed authorisation subject ·
+`503` ingest not configured.
+
+#### GET /api/approval/requests
+
+Permits, newest first. Optional `status` (one of the seven internal statuses) and `limit` (1-200,
+default 50). **Auth:** API key (VIEWER) · **Response** `200`, an array of permit views.
+
+#### GET /api/approval/requests/:id
+
+One permit with its internal status and the Core status it last reported. **Auth:** API key
+(VIEWER) · **Response** `200` (permit view) or `404`.
+
+#### POST /api/approval/requests/:id/notify
+
+Resends the WhatsApp notification for this permit, including its reference and reply instructions.
+**Auth:** API key (ADMIN) · **Response** `200` with the permit view, or `404`.
+
+#### POST /api/approval/identities
+
+Maps a WhatsApp number to a Core person. `externalIdentity` is normalised to digits (`0812…`,
+`+62 …` and `628…@s.whatsapp.net` all become `628…`), and Core only honours a mapping that is
+active and verified — the mapping, not the payload, decides who approved.
+
+`isVerified` has **no default**: Connect has no proof-of-ownership process, so `true` is an
+operator's assertion, recorded with the acting key on the audit trail rather than inferred.
+`isActive` defaults to `true`; `false` revokes the mapping without deleting its history. Moving a
+number to a different `corePersonId` requires `reassign: true` and answers `409
+identity_reassign_requires_flag` otherwise; a moved mapping starts unverified unless the same
+request sets `isVerified: true`. Every accepted change (create, update, reassign, verify,
+deactivate) and every rejected reassignment writes an `approval_identity_changed` audit row with
+the actor, the change kind, and the before/after values.
+
+**Auth:** API key (ADMIN) · **Response** `201` with the mapping.
+
+**Errors:** `400` a number that does not normalise to 8–15 digits, or a malformed UUID · `409` a
+reassignment without `reassign: true`.
 
 ## 6.5 Real-time API (WebSocket)
 

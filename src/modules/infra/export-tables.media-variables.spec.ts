@@ -32,6 +32,9 @@ import { DivisionAgent } from '../division/entities/division-agent.entity';
 import { DivisionSettings } from '../division/entities/division-settings.entity';
 import { DivisionChatState } from '../division/entities/division-chat-state.entity';
 import { CrmStage } from '../crm/entities/crm-stage.entity';
+import { WhatsAppIdentity } from '../approval/entities/whatsapp-identity.entity';
+import { ApprovalRequest } from '../approval/entities/approval-request.entity';
+import { ApprovalCommand } from '../approval/entities/approval-command.entity';
 import * as templateRender from '../../common/utils/template-render';
 import { renderTemplate } from '../../common/utils/template-render';
 
@@ -69,6 +72,9 @@ const entities = [
   DivisionSettings,
   DivisionChatState,
   SendIdempotencyKey,
+  WhatsAppIdentity,
+  ApprovalRequest,
+  ApprovalCommand,
 ];
 
 async function seedSession(ds: DataSource): Promise<string> {

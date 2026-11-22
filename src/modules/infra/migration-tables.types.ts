@@ -439,6 +439,78 @@ export interface DivisionChatStateRow {
   updatedAt: string | Date;
 }
 
+/**
+ * WhatsApp approval workflow rows.
+ *
+ * None of the three tables has a FK to sessions, so the sessions DELETE never reaches them and the
+ * import must clear them explicitly. JSON columns (`metadata`, `coreResponseBody`) arrive as TEXT
+ * from the export's raw `SELECT *`, exactly like the campaign columns above.
+ *
+ * Restore order is identities → requests → commands: a command's `approvalRequestId` points at a
+ * request, and a request's authorization depends on the identity mapping.
+ */
+export interface WhatsAppIdentityRow {
+  id: string;
+  externalIdentity: string;
+  corePersonId: string;
+  displayName: string | null;
+  isVerified: boolean | number;
+  isActive: boolean | number;
+  verifiedAt: string | Date | null;
+  lastSeenAt: string | Date | null;
+  createdAt: string | Date;
+  updatedAt: string | Date;
+}
+
+export interface ApprovalRequestRow {
+  id: string;
+  coreRequestId: string;
+  reference: string;
+  studentName: string;
+  studentClass: string | null;
+  dormitoryCoreId: string | null;
+  dormitoryName: string | null;
+  permitType: string;
+  requestedDurationDays: number | null;
+  departureAt: string | Date | null;
+  expectedReturnAt: string | Date | null;
+  status: string;
+  coreStatus: string | null;
+  targetCorePersonId: string | null;
+  targetIdentity: string | null;
+  sessionId: string | null;
+  notificationMessageId: string | null;
+  notificationSentAt: string | Date | null;
+  clarificationCount: number;
+  decidedAt: string | Date | null;
+  decisionSource: string | null;
+  lastCommandId: string | null;
+  metadata: string | null;
+  createdAt: string | Date;
+  updatedAt: string | Date;
+}
+
+export interface ApprovalCommandRow {
+  id: string;
+  commandId: string;
+  approvalRequestId: string;
+  externalMessageId: string;
+  decision: string;
+  durationDays: number | null;
+  status: string;
+  attempts: number;
+  coreResponseCode: number | null;
+  coreResponseBody: string | null;
+  errorCode: string | null;
+  lastError: string | null;
+  lastAttemptAt: string | Date | null;
+  nextAttemptAt: string | Date | null;
+  sentAt: string | Date | null;
+  resolvedAt: string | Date | null;
+  createdAt: string | Date;
+  updatedAt: string | Date;
+}
+
 export interface MigrationTables {
   sessions: SessionRow[];
   webhooks: WebhookRow[];
@@ -467,6 +539,9 @@ export interface MigrationTables {
   campaigns: CampaignRow[];
   campaignRecipients: CampaignRecipientRow[];
   campaignSegments: CampaignSegmentRow[];
+  whatsappIdentities: WhatsAppIdentityRow[];
+  approvalRequests: ApprovalRequestRow[];
+  approvalCommands: ApprovalCommandRow[];
 }
 
 export type TableCounts = { [K in keyof MigrationTables]: number };

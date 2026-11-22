@@ -52,6 +52,9 @@ import { DivisionAgent } from '../division/entities/division-agent.entity';
 import { DivisionSettings } from '../division/entities/division-settings.entity';
 import { DivisionChatState } from '../division/entities/division-chat-state.entity';
 import { CrmStage } from '../crm/entities/crm-stage.entity';
+import { WhatsAppIdentity } from '../approval/entities/whatsapp-identity.entity';
+import { ApprovalRequest } from '../approval/entities/approval-request.entity';
+import { ApprovalCommand } from '../approval/entities/approval-command.entity';
 import { AuditAction } from '../audit/entities/audit-log.entity';
 import { ScopeBindingService } from '../integration/scope-binding.service';
 import { PluginInstanceService } from '../integration/plugin-instance.service';
@@ -106,6 +109,9 @@ describe('InfraDataController.importData round-trips export-data (no silent mess
         DivisionSettings,
         DivisionChatState,
         SendIdempotencyKey,
+        WhatsAppIdentity,
+        ApprovalRequest,
+        ApprovalCommand,
       ],
       synchronize: true,
     });
@@ -1615,6 +1621,9 @@ describe('InfraDataController.import/export preserves every data-DB table', () =
         DivisionAgent,
         DivisionSettings,
         DivisionChatState,
+        WhatsAppIdentity,
+        ApprovalRequest,
+        ApprovalCommand,
       ],
       synchronize: true,
     });
@@ -2106,6 +2115,9 @@ describe('InfraDataController audit trail — import emits only on a committed r
         DivisionAgent,
         DivisionSettings,
         DivisionChatState,
+        WhatsAppIdentity,
+        ApprovalRequest,
+        ApprovalCommand,
       ],
       synchronize: true,
     });
@@ -2440,6 +2452,9 @@ describe('InfraDataController.importData status_updates + runtime reconciliation
         DivisionAgent,
         DivisionSettings,
         DivisionChatState,
+        WhatsAppIdentity,
+        ApprovalRequest,
+        ApprovalCommand,
       ],
       synchronize: true,
     });
@@ -3246,6 +3261,9 @@ describe('InfraDataController.importData re-syncs plugin instance bindings', () 
         DivisionAgent,
         DivisionSettings,
         DivisionChatState,
+        WhatsAppIdentity,
+        ApprovalRequest,
+        ApprovalCommand,
       ],
       synchronize: true,
     });

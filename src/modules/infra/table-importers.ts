@@ -31,6 +31,9 @@ import type {
   CampaignRow,
   CampaignRecipientRow,
   CampaignSegmentRow,
+  WhatsAppIdentityRow,
+  ApprovalRequestRow,
+  ApprovalCommandRow,
 } from './migration-tables.types';
 
 // A per-table restore step for importData: which backup key to read, the exact INSERT text (kept in
@@ -824,6 +827,90 @@ export const TABLE_IMPORTERS: AnyTableImporter[] = [
       row.updatedAt,
     ],
   }),
+  // WhatsApp approval workflow. None of these tables has a FK to sessions, so nothing cascades and
+  // each is restored from the archive. Identities first: the mapping is what authorizes a reply, and
+  // losing it would leave every restored request without an approver. Requests precede commands
+  // because a command's `approvalRequestId` references a request row.
+  defineTableImporter({
+    key: 'whatsappIdentities',
+    label: 'WhatsApp identity',
+    sql: `INSERT INTO whatsapp_identities (id, "externalIdentity", "corePersonId", "displayName", "isVerified", "isActive", "verifiedAt", "lastSeenAt", "createdAt", "updatedAt")
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+    id: (row: WhatsAppIdentityRow) => row.id,
+    map: (row: WhatsAppIdentityRow) => [
+      row.id,
+      row.externalIdentity,
+      row.corePersonId,
+      nulFree(row.displayName),
+      row.isVerified ?? false,
+      row.isActive ?? true,
+      row.verifiedAt ?? null,
+      row.lastSeenAt ?? null,
+      row.createdAt,
+      row.updatedAt,
+    ],
+  }),
+  defineTableImporter({
+    key: 'approvalRequests',
+    label: 'approval request',
+    sql: `INSERT INTO approval_requests (id, "coreRequestId", reference, "studentName", "studentClass", "dormitoryCoreId", "dormitoryName", "permitType", "requestedDurationDays", "departureAt", "expectedReturnAt", status, "coreStatus", "targetCorePersonId", "targetIdentity", "sessionId", "notificationMessageId", "notificationSentAt", "clarificationCount", "decidedAt", "decisionSource", "lastCommandId", metadata, "createdAt", "updatedAt")
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25)`,
+    id: (row: ApprovalRequestRow) => row.id,
+    map: (row: ApprovalRequestRow) => [
+      row.id,
+      row.coreRequestId,
+      row.reference,
+      row.studentName,
+      nulFree(row.studentClass),
+      nulFree(row.dormitoryCoreId),
+      nulFree(row.dormitoryName),
+      row.permitType,
+      row.requestedDurationDays ?? null,
+      row.departureAt ?? null,
+      row.expectedReturnAt ?? null,
+      row.status,
+      nulFree(row.coreStatus),
+      nulFree(row.targetCorePersonId),
+      nulFree(row.targetIdentity),
+      nulFree(row.sessionId),
+      nulFree(row.notificationMessageId),
+      row.notificationSentAt ?? null,
+      row.clarificationCount ?? 0,
+      row.decidedAt ?? null,
+      nulFree(row.decisionSource),
+      nulFree(row.lastCommandId),
+      jsonText(row.metadata),
+      row.createdAt,
+      row.updatedAt,
+    ],
+  }),
+  defineTableImporter({
+    key: 'approvalCommands',
+    label: 'approval command',
+    sql: `INSERT INTO approval_commands (id, "commandId", "approvalRequestId", "externalMessageId", decision, "durationDays", status, attempts, "coreResponseCode", "coreResponseBody", "errorCode", "lastError", "lastAttemptAt", "nextAttemptAt", "sentAt", "resolvedAt", "createdAt", "updatedAt")
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)`,
+    id: (row: ApprovalCommandRow) => row.id,
+    map: (row: ApprovalCommandRow) => [
+      row.id,
+      row.commandId,
+      row.approvalRequestId,
+      row.externalMessageId,
+      row.decision,
+      row.durationDays ?? null,
+      row.status,
+      row.attempts ?? 0,
+      row.coreResponseCode ?? null,
+      jsonText(row.coreResponseBody),
+      nulFree(row.errorCode),
+      nulFree(row.lastError),
+      row.lastAttemptAt ?? null,
+      row.nextAttemptAt ?? null,
+      row.sentAt ?? null,
+      row.resolvedAt ?? null,
+      row.createdAt,
+      row.updatedAt,
+    ],
+  }),
 ];
 
 // The `as TableCounts` cast in importData means a dropped or mis-keyed descriptor is invisible to
@@ -857,6 +944,9 @@ const EXPECTED_TABLE_KEYS: ReadonlyArray<keyof MigrationTables> = [
   'campaigns',
   'campaignRecipients',
   'campaignSegments',
+  'whatsappIdentities',
+  'approvalRequests',
+  'approvalCommands',
 ];
 const importerKeys = TABLE_IMPORTERS.map(importer => importer.key);
 for (const key of EXPECTED_TABLE_KEYS) {

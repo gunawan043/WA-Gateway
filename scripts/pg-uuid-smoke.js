@@ -20,6 +20,11 @@ async function main() {
   // search_path so the raw, unqualified migration DDL + the typeorm_migrations ledger land in it.
   const schema = process.env.POSTGRES_SCHEMA || 'public';
   const useCustomSearchPath = schema !== 'public';
+  // Managed Postgres (Supabase, Render, Railway) requires TLS and usually presents a chain the
+  // Node trust store does not carry. Mirror the app's DATABASE_SSL switches instead of hardcoding
+  // one, so this smoke can run against the same server the deployment uses.
+  const sslEnabled = process.env.DATABASE_SSL === 'true';
+  const sslRejectUnauthorized = process.env.DATABASE_SSL_REJECT_UNAUTHORIZED !== 'false';
   const ds = new DataSource({
     type: 'postgres',
     schema,
@@ -29,6 +34,7 @@ async function main() {
     password: process.env.DATABASE_PASSWORD || 'openwa',
     database: process.env.DATABASE_NAME || 'openwa',
     migrations: [path.join(__dirname, '..', 'dist', 'database', 'migrations', '*.js')],
+    ...(sslEnabled ? { ssl: { rejectUnauthorized: sslRejectUnauthorized } } : {}),
     ...(useCustomSearchPath ? { extra: { options: `-c search_path=${schema},public` } } : {}),
   });
 

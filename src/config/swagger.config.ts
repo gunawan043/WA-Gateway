@@ -275,6 +275,7 @@ export function createSwaggerConfig(): Omit<OpenAPIObject, 'paths'> {
       .addTag('inbox', 'Team inbox (per-chat assignment, status and notes)')
       .addTag('divisions', 'Division routing on a shared number (menu, keywords and CS assignment)')
       .addTag('crm', 'Sales pipeline (stages, deals and activity history)')
+      .addTag('approval', 'WhatsApp approval workflow: permits from ALIM Core and WhatsApp identity mapping')
       .addTag('campaigns', 'Broadcast campaigns (audience, chunks and per-recipient results)')
       .addTag('media', 'Media conversion')
       // ORDER MATTERS. Swagger UI resolves "Try it" against servers[0], substituting the variable

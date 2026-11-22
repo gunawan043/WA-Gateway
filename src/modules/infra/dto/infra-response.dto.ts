@@ -503,6 +503,9 @@ export class MigrationTablesDto {
   @ApiProperty({ type: [Object] }) campaigns!: object[];
   @ApiProperty({ type: [Object] }) campaignRecipients!: object[];
   @ApiProperty({ type: [Object] }) campaignSegments!: object[];
+  @ApiProperty({ type: [Object] }) whatsappIdentities!: object[];
+  @ApiProperty({ type: [Object] }) approvalRequests!: object[];
+  @ApiProperty({ type: [Object] }) approvalCommands!: object[];
 }
 
 /** Row count per table, with the same keys as {@link MigrationTablesDto}. */
@@ -534,6 +537,9 @@ export class TableCountsDto {
   @ApiProperty({ example: 0 }) campaigns!: number;
   @ApiProperty({ example: 0 }) campaignRecipients!: number;
   @ApiProperty({ example: 0 }) campaignSegments!: number;
+  @ApiProperty({ example: 0 }) whatsappIdentities!: number;
+  @ApiProperty({ example: 0 }) approvalRequests!: number;
+  @ApiProperty({ example: 0 }) approvalCommands!: number;
 }
 
 export class OmittedInlineMediaDto {

@@ -40,6 +40,7 @@ npm --prefix dashboard run test:unit
 | `npm run test:e2e`                                               | Run smoke-level e2e tests from `test/`                                                                       |
 | `npm run test:docs`                                              | Run the docs and manifest drift gates that `npm test` excludes                                               |
 | `npm run test:pg-smoke`                                          | Run the PostgreSQL migration and UUID-default smoke test                                                     |
+| `npm run test:pg-approval`                                       | Run the PostgreSQL-only approval retry suite; needs `DATABASE_TYPE=postgres` plus `DATABASE_*` exported      |
 | `npm run test:scripts`                                           | Run the repo-level script tests on the Node test runner                                                      |
 | `npm run build && npm run test:engine-real`                      | Exercise inbound messages, chat updates, and outbound recipient preparation through the real Baileys library |
 | `OPENWA_SMOKE_IMAGE=<image> ./scripts/smoke-test-engine-libs.sh` | Import Baileys, launch the browser, check the image has no TypeScript toolchain and run the migration CLI    |
@@ -192,6 +193,7 @@ authoritative gate. Current policy:
 | `src/database/`             | 73%      | 81%       | 82%   | 80%        |
 | `src/engine/adapters/`      | 84%      | 89%       | 91%   | 90%        |
 | `src/engine/identity/`      | 88%      | 93%       | 95%   | 93%        |
+| `src/modules/approval/`     | 72%      | 85%       | 86%   | 86%        |
 | `src/modules/audit/`        | 75%      | 63%       | 85%   | 85%        |
 | `src/modules/auth/`         | 83%      | 92%       | 92%   | 91%        |
 | `src/modules/automation/`   | 78%      | 93%       | 93%   | 92%        |

@@ -256,6 +256,21 @@ export const BLANK_SHADOWED_ENV_KEYS: string[] = [
   'LOG_FORMAT',
   'BASE_URL',
   'DASHBOARD_URL',
+  // WhatsApp approval workflow (ALIM Core). Blank-forwarded so an operator who sets nothing keeps
+  // the mock client and the documented retry defaults instead of an empty string pinning them off.
+  'ALIM_CONNECT_CORE_CLIENT',
+  'ALIM_CORE_BASE_URL',
+  'ALIM_CORE_APPROVAL_API_KEY',
+  'ALIM_CORE_APPROVAL_API_HEADER',
+  'ALIM_CONNECT_INGEST_KEY',
+  'ALIM_CORE_TIMEOUT_MS',
+  'ALIM_CONNECT_REPLY_UNKNOWN',
+  'ALIM_CONNECT_RETRY_INTERVAL_MS',
+  'ALIM_CONNECT_RETRY_BATCH_SIZE',
+  'ALIM_CONNECT_RETRY_MAX_ATTEMPTS',
+  'ALIM_CONNECT_RETRY_BASE_DELAY_MS',
+  'ALIM_CONNECT_RETRY_MAX_DELAY_MS',
+  'ALIM_CONNECT_RETRY_LEASE_MS',
 ];
 
 export function clearBlankEnv(env: NodeJS.ProcessEnv, keys: string[]): void {

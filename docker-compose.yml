@@ -408,6 +408,21 @@ services:
       - LOG_FORMAT=${LOG_FORMAT:-}
       - BASE_URL=${BASE_URL:-}
       - DASHBOARD_URL=${DASHBOARD_URL:-}
+      # WhatsApp approval workflow (ALIM Core). Empty keeps the mock client and no Core call is
+      # made; a real key is supplied by the operator and never bundled in the image.
+      - ALIM_CONNECT_CORE_CLIENT=${ALIM_CONNECT_CORE_CLIENT:-}
+      - ALIM_CORE_BASE_URL=${ALIM_CORE_BASE_URL:-}
+      - ALIM_CORE_APPROVAL_API_KEY=${ALIM_CORE_APPROVAL_API_KEY:-}
+      - ALIM_CORE_APPROVAL_API_HEADER=${ALIM_CORE_APPROVAL_API_HEADER:-}
+      - ALIM_CONNECT_INGEST_KEY=${ALIM_CONNECT_INGEST_KEY:-}
+      - ALIM_CORE_TIMEOUT_MS=${ALIM_CORE_TIMEOUT_MS:-}
+      - ALIM_CONNECT_REPLY_UNKNOWN=${ALIM_CONNECT_REPLY_UNKNOWN:-}
+      - ALIM_CONNECT_RETRY_INTERVAL_MS=${ALIM_CONNECT_RETRY_INTERVAL_MS:-}
+      - ALIM_CONNECT_RETRY_BATCH_SIZE=${ALIM_CONNECT_RETRY_BATCH_SIZE:-}
+      - ALIM_CONNECT_RETRY_MAX_ATTEMPTS=${ALIM_CONNECT_RETRY_MAX_ATTEMPTS:-}
+      - ALIM_CONNECT_RETRY_BASE_DELAY_MS=${ALIM_CONNECT_RETRY_BASE_DELAY_MS:-}
+      - ALIM_CONNECT_RETRY_MAX_DELAY_MS=${ALIM_CONNECT_RETRY_MAX_DELAY_MS:-}
+      - ALIM_CONNECT_RETRY_LEASE_MS=${ALIM_CONNECT_RETRY_LEASE_MS:-}
       # Docker socket proxy (openwa-api never touches /var/run/docker.sock directly)
       - DOCKER_HOST=tcp://docker-proxy:2375
     volumes:

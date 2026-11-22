@@ -563,6 +563,35 @@ export default () => ({
     })(),
   },
 
+  // ALIM Core integration. The approval workflow talks to Core through a
+  // dedicated command endpoint; `coreClient` selects the mock contract client
+  // (development/tests) or the real HTTP client. No Core endpoint is created
+  // here — Connect is only a caller.
+  connect: {
+    approval: {
+      coreClient: process.env.ALIM_CONNECT_CORE_CLIENT === 'http' ? 'http' : 'mock',
+      coreBaseUrl: (process.env.ALIM_CORE_BASE_URL ?? '').replace(/\/+$/, ''),
+      coreApiKey: process.env.ALIM_CORE_APPROVAL_API_KEY ?? '',
+      coreApiHeader: process.env.ALIM_CORE_APPROVAL_API_HEADER ?? 'X-ALIM-CONNECT-APPROVAL-KEY',
+      // Kredensial layanan Core untuk `POST /approval/requests`. Kosong berarti ingest tidak
+      // aktif (503), bukan terbuka: key ADMIN Connect tidak boleh dianggap sebagai Core.
+      ingestKey: process.env.ALIM_CONNECT_INGEST_KEY ?? '',
+      timeoutMs: positiveIntFromEnv('ALIM_CORE_TIMEOUT_MS', 5000),
+      // Nomor tak dikenal tidak dibalas secara default: membalas sembarang
+      // nomor membocorkan bahwa nomor itu terdaftar di gateway.
+      replyToUnknownSender: process.env.ALIM_CONNECT_REPLY_UNKNOWN === 'true',
+      retry: {
+        // 0 menonaktifkan worker retry sepenuhnya.
+        intervalMs: resolveNonNegativeIntEnv(process.env.ALIM_CONNECT_RETRY_INTERVAL_MS, 60_000),
+        batchSize: positiveIntFromEnv('ALIM_CONNECT_RETRY_BATCH_SIZE', 20),
+        maxAttempts: positiveIntFromEnv('ALIM_CONNECT_RETRY_MAX_ATTEMPTS', 5),
+        baseDelayMs: positiveIntFromEnv('ALIM_CONNECT_RETRY_BASE_DELAY_MS', 30_000),
+        maxDelayMs: positiveIntFromEnv('ALIM_CONNECT_RETRY_MAX_DELAY_MS', 900_000),
+        leaseMs: positiveIntFromEnv('ALIM_CONNECT_RETRY_LEASE_MS', 60_000),
+      },
+    },
+  },
+
   // Storage configuration
   storage: {
     type: process.env.STORAGE_TYPE || 'local',
