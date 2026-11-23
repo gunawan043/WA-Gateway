@@ -15,6 +15,8 @@ import { assertApprovalCoreClientAllowed } from '../src/modules/approval/core-cl
 import { HttpAlimCoreApprovalClient } from '../src/modules/approval/core-client/http-alim-core-approval.client';
 import { ApprovalRetryService } from '../src/modules/approval/approval-retry.service';
 import { ApprovalCommand } from '../src/modules/approval/entities/approval-command.entity';
+import { ApprovalRequest } from '../src/modules/approval/entities/approval-request.entity';
+import { WhatsAppIdentity } from '../src/modules/approval/entities/whatsapp-identity.entity';
 import { AuditAction, AuditLog } from '../src/modules/audit/entities/audit-log.entity';
 import { MetricsService } from '../src/modules/metrics/metrics.service';
 import { AuthService } from '../src/modules/auth/auth.service';
@@ -677,6 +679,12 @@ describe('Approval over HTTP with a mock Core at the HTTP boundary (e2e)', () =>
       expect(coreCalls[1].body.command_id).toBe(firstCommandId);
       expect(coreCalls[1].body.external_message_id).toBe('wamid-e2e-123');
 
+      // Kontrak Core: percobaan ulang harus identik, bukan sekadar mirip, dan header
+      // `Idempotency-Key` harus mengulang `command_id` — Core menolak (422) bila berbeda.
+      expect(coreCalls[1].body).toEqual(coreCalls[0].body);
+      expect(coreCalls[1].headers['idempotency-key']).toBe(firstCommandId);
+      expect(coreCalls[1].headers['x-alim-api-version']).toBe(coreCalls[0].headers['x-alim-api-version']);
+
       const recovered = await detail(request.id);
 
       expect(recovered.status).toBe('APPROVED');
@@ -839,9 +847,12 @@ describe('Approval over HTTP with a mock Core at the HTTP boundary (e2e)', () =>
     (real ? it : it.skip)(
       'mengirim satu command dan mencatat jawaban Core yang sebenarnya',
       async () => {
-        const marker = `PROBE-C5-${randomUUID()}`;
+        // Referensi harus berbentuk `PREFIX-TAHUN-NOMOR` agar parser mengenalinya sebagai referensi.
+        const marker = `IZN-2026-${randomUUID().replace(/\D/g, '').slice(0, 8)}`;
         coreCalls = [];
 
+        // Lokal dan idempoten: pemetaan ulang yang sah (suite B memetakan nomor yang sama ke
+        // personel lain) tidak boleh membuat section ini gagal, jadi `reassign` dikirim eksplisit.
         await supertest(app.getHttpServer())
           .post('/api/approval/identities')
           .set('x-api-key', adminKey)
@@ -850,18 +861,40 @@ describe('Approval over HTTP with a mock Core at the HTTP boundary (e2e)', () =>
             corePersonId: targetCorePersonId,
             displayName: 'Probe staging',
             isVerified: true,
+            reassign: true,
           })
-          .expect(201);
+          .expect(res => {
+            if (res.status !== 200 && res.status !== 201) {
+              throw new Error(`identity mapping rejected: ${res.status} ${JSON.stringify(res.body)}`);
+            }
+          });
 
         const ingested = await ingestApproval({
           coreRequestId: randomUUID(),
           reference: marker,
           requestedDurationDays: 1,
+          targetCorePersonId: targetCorePersonId,
           notify: false,
         }).expect(201);
         const request = ingested.body as ApprovalRequestBody;
+        // Lokal: identitas pengirim harus terverifikasi, dan itulah yang diperiksa processor.
+        const identity = await app
+          .get<Repository<WhatsAppIdentity>>(getRepositoryToken(WhatsAppIdentity, 'data'))
+          .findOne({ where: { externalIdentity: TARGET_NUMBER } });
 
-        await reply(`SETUJU 1 HARI ${marker}`, `wamid-real-${randomUUID()}`);
+        // Pemetaan identitas bersifat global (`UQ_whatsapp_identities_external`), jadi nomor uji
+        // dapat saja masih terpetakan ke personel lain dari suite B. Deskripsi publik sengaja
+        // menyembunyikan `targetCorePersonId`, sehingga yang diperiksa adalah databasenya.
+        const stored = await app
+          .get<Repository<ApprovalRequest>>(getRepositoryToken(ApprovalRequest, 'data'))
+          .findOne({ where: { id: request.id } });
+
+        expect(identity).not.toBeNull();
+        expect(stored?.targetCorePersonId).toBe(identity?.corePersonId);
+
+        // Referensi pada teks balasan harus menyebut `reference` yang benar-benar di-ingest; coretan
+        // lama memakai `IZN-2026-…` sehingga balasannya tidak pernah dikenali sebagai keputusan.
+        await reply(`SETUJU 1 HARI ${request.reference}`, `wamid-real-${randomUUID()}`);
 
         const after = await detail(request.id);
         const [command] = after.commands ?? [];
@@ -880,9 +913,16 @@ describe('Approval over HTTP with a mock Core at the HTTP boundary (e2e)', () =>
             }),
         );
 
-        expect(command).toBeDefined();
-        expect([200, 201, 202]).toContain(command?.coreResponseCode);
-        expect(['APPLIED', 'DUPLICATE']).toContain(command?.status);
+        // Dua kemungkinan yang keduanya sah: command terkirim, atau balasan berhenti di jalur
+        // yang tidak memanggil Core. Kasus kedua dibuktikan dengan tidak adanya request, bukan
+        // dengan menganggapnya lulus — dan sebabnya disebut agar keluar sebagai diagnosa.
+        if (!command) {
+          expect(coreCalls).toHaveLength(0);
+          throw new Error(`no command was created: request status ${after.status} did not produce one`);
+        }
+
+        expect([200, 201, 202]).toContain(command.coreResponseCode);
+        expect(['APPLIED', 'DUPLICATE']).toContain(command.status);
         expect(after.status).toBe('APPROVED');
       },
       60_000,
