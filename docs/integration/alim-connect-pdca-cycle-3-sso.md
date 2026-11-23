@@ -4,8 +4,9 @@
 **Repository:** `/Users/wawangunawan/OpenWA` (ALIM Connect)
 **Branch:** `feature/whatsapp-approval-finalization`
 **Lingkup:** ALIM Connect saja. Tidak ada perubahan pada repository ALIM Core.
-**Sifat:** siklus PDCA dengan hasil eksekusi. Tidak ada commit, push, merge, deploy, perubahan
-credential produksi, atau aktivasi integrasi produksi.
+**Sifat:** siklus PDCA dengan hasil eksekusi. Checkpoint lokal `12edf8f37` (parent `8c6c92510`)
+memuat seluruh pekerjaan SSO siklus ini. Tidak ada push, merge, deploy, perubahan credential
+produksi, atau aktivasi integrasi produksi.
 
 ---
 
@@ -166,10 +167,10 @@ waktu (heap 2–3 GB; tidak ada 6 GB).
 | Pemeriksaan                                                             | Hasil                                                                                      |
 | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
 | `npm run build`                                                         | lulus                                                                                      |
-| `npm run lint` (seluruh repo, `NODE_OPTIONS=--max-old-space-size=3072`) | lulus, 0 error (3 masalah awal diperbaiki: 2 prettier, 1 direktif usang)                   |
-| `npx tsc --noEmit` (termasuk spec)                                      | **0 error** (sebelumnya 6)                                                                 |
+| `npm run lint` (seluruh repo, `NODE_OPTIONS=--max-old-space-size=3072`) | lulus, 0 error. Diulang di siklus 4 setelah spec baru: 0 error                             |
+| `npx tsc --noEmit` (termasuk spec)                                      | **0 error** (sebelumnya 6); diulang di siklus 4: 0 error                                   |
 | `npm run openapi:check`                                                 | gagal dulu (1 hunk, `security: []` pada handoff), lalu **exit 0** setelah `openapi:export` |
-| Unit SSO (`src/modules/sso`)                                            | **55 lulus / 4 suite**                                                                     |
+| Unit SSO (`src/modules/sso`)                                            | **55 lulus / 4 suite**; 83 lulus / 5 suite setelah `sso-handoff.controller.spec.ts` (28)   |
 | `src/config/swagger.config.spec.ts` (allowlist publik)                  | **22 lulus**                                                                               |
 | `test/sso-handoff-http.e2e-spec.ts`                                     | **23 lulus / 1 suite**                                                                     |
 | Browser test Chrome (`scripts/sso-browser-test.js`)                     | **12/12 lulus**, Chrome 157.0.8103.80                                                      |
@@ -350,6 +351,29 @@ ada assertion, ambang cakupan, atau test keamanan yang dihapus untuk menghemat w
 | Dashboard dan API harus satu origin                   | Connect    | Deployment split-origin memerlukan desain handoff berbeda        |
 | Core sungguhan belum pernah dihubungi                 | Core       | Mock hanya membuktikan sisi Connect                              |
 | Retensi dan scoping `VIEWER` belum diputuskan         | Pemilik    | Tidak menghalangi staging SSO, tetapi menghalangi produksi       |
+
+### 5.2.1 Kesiapan siklus 4 (2026-11-23, setelah checkpoint `12edf8f37`)
+
+**Probe kesiapan.** `npm run probe:alim-core` (`scripts/alim-core-probe.ts`) memakai klien HTTP
+sungguhan, bukan mock, sehingga satu perintah menjawab: base URL terjangkau, kunci diterima, rute
+ada, dan bentuk respons sesuai. Ia tidak membuat sesi dan tidak memutuskan izin.
+
+| Kondisi Core                          | Verdict | Arti                                           |
+| ------------------------------------- | ------- | ---------------------------------------------- |
+| `code_not_found`/`code_expired`/…     | PASS    | rute dan kunci diterima; Core menolak kode uji |
+| `invalid_key`/`insufficient_scope`    | FAIL    | kredensial salah                               |
+| `ok: true` untuk kode yang direkayasa | FAIL    | semantik sekali-pakai tidak berlaku            |
+| command `applied`/`duplicate`         | FAIL    | Core menyetujui permohonan yang tidak ada      |
+
+Hasil lokal tanpa kredensial: `ALIM_CORE_BASE_URL`, `ALIM_CONNECT_SSO_KEY`, dan
+`ALIM_CORE_APPROVAL_API_KEY` **MISSING**, exit **2** ("nothing can be probed"). Artinya probe siap
+dipakai tetapi **integrasi nyata belum dapat dijalankan**: semua langkah staging di §5.4 tetap
+menunggu kredensial Core.
+
+**Celah cakupan yang ditutup di siklus 4.** Pemeriksaan ambang Jest tidak lagi merah
+(§4.2 siklus 4). Tiga hal yang sebelumnya hanya diuji di lane e2e sekarang juga diuji di `test:cov`:
+`sso-handoff.controller.ts` 9/9 fungsi, dua controller auth tanpa spec (`auth-agents`,
+`auth-assignments`), dan kontrak generik `table-importers` untuk ke-30 importer.
 
 ### 5.3 Rekomendasi
 
