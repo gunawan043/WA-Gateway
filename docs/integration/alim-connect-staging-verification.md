@@ -87,18 +87,33 @@ periksa base URL dan header sebelum menganggap kode uji salah.
 
 ## 5. SSO: jalur sukses (memakan satu kode)
 
-Minta kode baru ke Core, lalu dalam satu perintah:
+Minta kode baru ke Core, lalu jalankan dengan **dua** setelan berikut:
 
 ```bash
-npm run test:core-integration -- --sso-code='<kode baru>'
+export ALIM_CONNECT_SSO_TEST_CODE='<kode baru dari Core>'
+export ALIM_CONNECT_SSO_EXPECTED_CORE_USER='<core_user_id pemilik kode>'
+npm run test:core-integration -- --sso-code='<kode baru dari Core>'
 ```
 
-Yang harus terlihat pada bukti:
+`ALIM_CONNECT_SSO_TEST_CODE` dibaca suite (bukan aplikasi); guard menampilkannya sebagai baris
+`SSO success proof`. Tanpa keduanya, jalur sukses **di-skip** dan yang terbukti hanya jalur penolakan —
+itu akan terlihat jujur di laporan, bukan sebagai lulus.
 
-1. `PASS` dengan `core_user_id` yang **Anda kenali** sebagai orang yang meminta kode.
-2. Satu baris `[real-core]` (bila diaktifkan di suite) memuat `core_user_id` dan status.
-3. Sesi Connect dibuat untuk akun yang **sudah ada**; bila `core_user_id` belum terpetakan ke akun,
-   hasilnya penolakan `identity_not_mapped` — itu perilaku yang benar, bukan kegagalan.
+Bukti yang dihasilkan (siklus 8):
+
+| Asersi                                 | Arti bila gagal                                                       |
+| -------------------------------------- | --------------------------------------------------------------------- |
+| HTTP `200`, `ok: true`                 | Kode ditolak Core, atau pemetaan `core_user_id` tidak ada             |
+| Body JSON **tidak** memuat `owa_s\d_…` | Token sesi bocor ke body JSON — token hanya boleh di `sessionStorage` |
+| `user_sessions` bertambah tepat 1      | Sesi tidak dibuat, atau dibuat lebih dari sekali                      |
+| Akun terpetakan `findByCoreUserId` ada | Pemetaan berbeda dari `ALIM_CONNECT_SSO_EXPECTED_CORE_USER`           |
+| Pertukaran kedua → `409`/`410`         | Kode dapat dipakai dua kali                                           |
+| Baris `[real-core] sso exchange`       | Rekam status HTTP, `ok`, `reason`, dan identitas yang diharapkan      |
+
+Bila `core_user_id` belum terpetakan ke akun Connect, hasilnya `identity_not_mapped` — perilaku yang
+benar, bukan kegagalan, dan sekarang **tercatat** di audit (`user_login_failed`, metadata `reason`,
+`coreUserId`, `via: alim_core_sso`). Core yang menolak kode tidak dicatat: Core adalah pemilik catatan
+itu, dan kode salah lebih sering berasal dari tautan yang basi daripada dari serangan.
 
 Kode bersifat sekali-pakai dan dihabiskan oleh langkah ini, termasuk bila pertukaran gagal.
 
@@ -125,10 +140,24 @@ Yang harus terlihat:
 | `status` ∈ {APPLIED, DUPLICATE}    | Core menjawab bisnis lain; periksa `errorCode`              |
 | `requestStatus = APPROVED`         | Negara lokal tidak mengikuti Core                           |
 
+Bukti tambahan sejak siklus 8:
+
+| Asersi                                                                | Arti bila gagal                                                                      |
+| --------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| Tepat satu baris audit `approval_command` untuk `coreRequestId` ini   | Trail tidak ditulis, atau tertulis dua kali                                          |
+| Metadata audit memuat `coreResponseCode`, `commandStatus`, `decision` | Audit tidak dapat direkonsiliasi dengan jawaban Core                                 |
+| Metadata tidak memuat nomor tujuan, referensi, atau kunci             | Audit memuat data yang tidak diperlukan                                              |
+| Balasan kedua untuk keputusan yang sudah final → jumlah command tetap | Keputusan kedua dibuat untuk permohonan yang sudah selesai                           |
+| Baris `[real-core] approval retry`                                    | Worker retry mengirim ulang command yang sama; hasilnya dilaporkan, bukan disamarkan |
+
 **Bukti tidak ada pemrosesan ganda:** kirim ulang command yang sama (suite melakukannya) → Core harus
 menjawab `duplicate` dan status permit tidak berubah. Header `Idempotency-Key` memakai nilai yang sama
 dengan `command_id` di body pada setiap percobaan; ini keputusan kontrak yang disengaja (§9
-`alim-connect-core-integration-contract.md`) dan diverifikasi di batas HTTP oleh suite.
+`alim-connect-core-integration-contract.md`) dan diverifikasi di batas HTTP oleh suite. Untuk alur
+retry, suite memaksa satu command kembali ke `UNKNOWN` lalu menjalankan `runOnce()`; percobaan kedua
+membawa `command_id` yang sama, dan Core sendiri yang menentukan hasilnya (`DUPLICATE`, `APPLIED`,
+atau penolakan bisnis bila permit sudah final). Yang dinilai: `attempts` bertambah satu dan jumlah
+command tidak bertambah.
 
 ---
 
