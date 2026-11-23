@@ -43,6 +43,7 @@ import { CrmModule } from './modules/crm/crm.module';
 import { CampaignModule } from './modules/campaign/campaign.module';
 import { DivisionModule } from './modules/division/division.module';
 import { ApprovalModule } from './modules/approval/approval.module';
+import { SsoModule } from './modules/sso/sso.module';
 import { TakeoverModule } from './modules/takeover/takeover.module';
 import { CatalogModule } from './modules/catalog/catalog.module';
 import { HooksModule } from './core/hooks';
@@ -319,6 +320,7 @@ if (dashboardServingEnabled && dashboardBuildPresent) {
     CampaignModule, // Broadcast campaigns: audience resolution, chunks and per-recipient results
     DivisionModule, // Division routing: one number, several teams, an automatic handover
     ApprovalModule, // WhatsApp approval workflow for dormitory permits (Core stays authoritative)
+    SsoModule, // WhatsApp Connect SSO handoff from ALIM Core (one-time code → Connect session)
     TakeoverModule, // adopts sessions whose holder's lease lapsed (crashed peer / recreated node)
     CatalogModule, // Phase 3: Catalog API (WhatsApp Business)
     PluginsApiModule, // Phase 5: Plugins API

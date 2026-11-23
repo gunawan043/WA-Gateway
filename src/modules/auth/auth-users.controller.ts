@@ -106,6 +106,7 @@ export class AuthUsersController {
       password: dto.password,
       assignments: specs,
       grantedByKeyId: actor?.id ?? null,
+      coreUserId: dto.coreUserId ?? null,
     });
     await this.auditService.logInfo(AuditAction.USER_CREATED, {
       ...this.auditContext(request),
@@ -114,6 +115,7 @@ export class AuthUsersController {
         targetEmail: user.email,
         role: user.role,
         assignments: specs.map(spec => ({ role: spec.role, scopeType: spec.scopeType, scopeId: spec.scopeId })),
+        coreUserId: user.coreUserId ?? null,
       },
     });
     return toUserResponse(user);
@@ -137,6 +139,7 @@ export class AuthUsersController {
         role: user.role,
         isActive: user.isActive,
         name: user.name,
+        coreUserId: user.coreUserId ?? null,
       },
     });
     return toUserResponse(user);

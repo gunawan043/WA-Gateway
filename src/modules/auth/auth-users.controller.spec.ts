@@ -49,6 +49,7 @@ describe('AuthUsersController', () => {
     role: ApiKeyRole.OPERATOR,
     isActive: true,
     apiKeyId: 'k1',
+    coreUserId: null,
     lastLoginAt: null,
     createdAt: new Date('2026-01-01T00:00:00.000Z'),
     updatedAt: new Date('2026-01-01T00:00:00.000Z'),
@@ -101,6 +102,7 @@ describe('AuthUsersController', () => {
       password: 'a-long-password-1',
       assignments: [{ role: 'agent', scopeType: 'global', scopeId: '', validFrom: null, validTo: null }],
       grantedByKeyId: null,
+      coreUserId: null,
     });
     expect(result).toMatchObject({ id: 'u1', email: 'someone@example.com', role: ApiKeyRole.OPERATOR });
     const [action, payload] = audit.logInfo.mock.calls[0];

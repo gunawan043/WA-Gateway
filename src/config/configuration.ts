@@ -7,6 +7,7 @@ import { readWsRateLimitConfig } from '../modules/events/ws-rate-limit';
 import { DEFAULT_WEBHOOK_SHUTDOWN_DRAIN_MS, MAX_TIMER_MS } from '../common/services/shutdown-budget';
 import { parseTrustedProxies } from '../common/utils/ip';
 import { positiveIntFromEnv } from '../common/utils/env-int';
+import { parseCoreWebOrigin } from './core-web-origin';
 
 /**
  * Root of the host's persistent state. Relative on purpose: the image sets WORKDIR /app and mounts
@@ -178,6 +179,13 @@ export default () => ({
     // How long a session token stays valid. 168 h = 7 days, long enough that a daily user is not
     // asked to sign in again, short enough that a forgotten browser stops working within a week.
     sessionTtlHours: Number(process.env.AUTH_SESSION_TTL_HOURS) || 168,
+    // How long a session may sit unused before it stops working. 0 (the default) disables the
+    // check and leaves the absolute expiry above as the only bound. When set, a request whose
+    // `lastSeenAt` is older than this is refused AND the session is revoked; the touch interval is
+    // 5 minutes, so any value below 10 is effectively "every request" and is documented as such.
+    // Applies to every dashboard session, password and SSO alike, because the resolver cannot tell
+    // them apart without a second schema column.
+    sessionIdleTimeoutMinutes: resolveNonNegativeIntEnv(process.env.AUTH_SESSION_IDLE_TIMEOUT_MINUTES, 0),
     // Read once, on the boot that finds the users table empty (see UserSeedService). Both must be
     // set; ADMIN_PASSWORD is never read again afterwards and should be removed from the environment.
     adminEmail: process.env.ADMIN_EMAIL?.trim() || undefined,
@@ -573,6 +581,9 @@ export default () => ({
       coreBaseUrl: (process.env.ALIM_CORE_BASE_URL ?? '').replace(/\/+$/, ''),
       coreApiKey: process.env.ALIM_CORE_APPROVAL_API_KEY ?? '',
       coreApiHeader: process.env.ALIM_CORE_APPROVAL_API_HEADER ?? 'X-ALIM-CONNECT-APPROVAL-KEY',
+      // Versi kontrak command yang dikirim di `X-ALIM-API-Version`. String kosong berarti header
+      // tidak dikirim — dipakai bila Core menyatakan endpoint command tidak menerimanya.
+      apiVersion: process.env.ALIM_CORE_API_VERSION ?? '1',
       // Kredensial layanan Core untuk `POST /approval/requests`. Kosong berarti ingest tidak
       // aktif (503), bukan terbuka: key ADMIN Connect tidak boleh dianggap sebagai Core.
       ingestKey: process.env.ALIM_CONNECT_INGEST_KEY ?? '',
@@ -589,6 +600,29 @@ export default () => ({
         maxDelayMs: positiveIntFromEnv('ALIM_CONNECT_RETRY_MAX_DELAY_MS', 900_000),
         leaseMs: positiveIntFromEnv('ALIM_CONNECT_RETRY_LEASE_MS', 60_000),
       },
+    },
+
+    // WhatsApp Connect SSO handoff. The browser posts a one-time code from a page served by Core;
+    // Connect exchanges it server-to-server and then issues its own dashboard session. Nothing here
+    // is ever sent to the browser: the SSO key lives only on this server, and the handoff code is
+    // only ever in a POST body.
+    sso: {
+      // Same Core host as the approval integration; a separate key because Core scopes it to
+      // `sso:exchange` only.
+      coreBaseUrl: (process.env.ALIM_CORE_BASE_URL ?? '').replace(/\/+$/, ''),
+      apiKey: process.env.ALIM_CONNECT_SSO_KEY ?? '',
+      apiHeader: process.env.ALIM_CONNECT_SSO_API_HEADER ?? 'X-ALIM-CONNECT-SSO-KEY',
+      timeoutMs: positiveIntFromEnv('ALIM_CONNECT_SSO_TIMEOUT_MS', 5000),
+      // The browser origin allowed to embed Connect and to post the handoff. Invalid values resolve
+      // to null, which disables SSO instead of widening `frame-ancestors`.
+      coreWebOrigin: parseCoreWebOrigin(process.env.ALIM_CORE_WEB_ORIGIN),
+      // The two values Core's exchange requires. Kept in config so a future contract version is an
+      // environment change, not a code change.
+      audience: process.env.ALIM_CONNECT_SSO_AUDIENCE ?? 'connect',
+      scope: process.env.ALIM_CONNECT_SSO_SCOPE ?? 'whatsapp.embed',
+      // Absolute lifetime of a session minted by the handoff. 0 keeps the dashboard default above;
+      // an SSO session is often shorter because Core can re-issue a handoff on demand.
+      sessionTtlHours: resolveNonNegativeIntEnv(process.env.ALIM_CONNECT_SSO_SESSION_TTL_HOURS, 0),
     },
   },
 

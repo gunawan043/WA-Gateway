@@ -294,4 +294,68 @@ describe('SessionAuthService', () => {
       deleteSpy.mockRestore();
     });
   });
+
+  /**
+   * The idle bound and the per-session TTL are the two knobs the SSO handoff depends on: Core can
+   * re-issue a handoff, so a session minted from one may be shorter-lived than a password login, and
+   * an idle workspace must close rather than stay open on a forgotten tab.
+   */
+  describe('idle timeout and per-session TTL', () => {
+    const withIdle = (minutes: number): SessionAuthService => {
+      const authService = new AuthService(
+        keys,
+        { record: jest.fn(), forget: jest.fn() } as never,
+        { get: () => undefined } as never,
+      );
+      const config = {
+        get: (key: string, fallback?: unknown) =>
+          key === 'auth.sessionTtlHours' ? TTL_HOURS : key === 'auth.sessionIdleTimeoutMinutes' ? minutes : fallback,
+      };
+      return new SessionAuthService(users, sessions, keys, authService, config as never);
+    };
+
+    it('honours a per-session TTL instead of the configured one', async () => {
+      const { user } = await account();
+
+      const { session } = await service.issue(user, {}, { ttlMs: 60_000 });
+
+      const ttlMs = new Date(session.expiresAt).getTime() - Date.now();
+      expect(ttlMs).toBeGreaterThan(50_000);
+      expect(ttlMs).toBeLessThanOrEqual(60_000);
+    });
+
+    it('refuses an idle session and revokes it so it cannot come back', async () => {
+      const idle = withIdle(1);
+      const { user } = await account();
+      const { token, session } = await idle.issue(user);
+      await sessions.update({ id: session.id }, { lastSeenAt: new Date(Date.now() - 5 * 60_000) });
+
+      await expect(idle.resolve(token)).rejects.toBeInstanceOf(UnauthorizedException);
+      expect((await sessions.findOneByOrFail({ id: session.id })).revokedAt).not.toBeNull();
+    });
+
+    it('measures idleness from createdAt when the session was never touched', async () => {
+      const idle = withIdle(1);
+      const { user } = await account();
+      const { token, session } = await idle.issue(user);
+      await sessions.update({ id: session.id }, { lastSeenAt: null, createdAt: new Date(Date.now() - 5 * 60_000) });
+
+      await expect(idle.resolve(token)).rejects.toBeInstanceOf(UnauthorizedException);
+    });
+
+    it('leaves an old session alone when the idle bound is disabled', async () => {
+      const disabled = withIdle(0);
+      const { user } = await account();
+      const { token, session } = await disabled.issue(user);
+      await sessions.update({ id: session.id }, { lastSeenAt: new Date(Date.now() - 5 * 60_000) });
+
+      await expect(disabled.resolve(token)).resolves.toBeDefined();
+    });
+
+    it('stops cleanly on destroy even when no sweep was started', () => {
+      const fresh = withIdle(0);
+
+      expect(() => fresh.onModuleDestroy()).not.toThrow();
+    });
+  });
 });

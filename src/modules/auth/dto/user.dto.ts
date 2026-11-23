@@ -65,6 +65,18 @@ export class CreateUserDto extends AssignmentListDto {
   @MinLength(MIN_PASSWORD_LENGTH)
   @MaxCodePoints(MAX_PASSWORD_LENGTH)
   password!: string;
+
+  @ApiPropertyOptional({
+    description:
+      'ALIM Core `core_user_id` this account signs in as through the WhatsApp Connect SSO handoff. ' +
+      'Optional; an unmapped account can still sign in with its password.',
+    example: '9f1c2a44-3c55-4c1e-9c1f-2b7d8e6a5f03',
+  })
+  @IsOptional()
+  @ToStrictString()
+  @IsString()
+  @MaxCodePoints(64)
+  coreUserId?: string | null;
 }
 
 export class UpdateUserDto {
@@ -88,6 +100,19 @@ export class UpdateUserDto {
   @ToStrictBoolean()
   @IsBoolean()
   isActive?: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      'ALIM Core `core_user_id` mapped to this account for the SSO handoff. Send null (or an empty ' +
+      'string) to remove the mapping; the account then cannot be reached through SSO.',
+    nullable: true,
+    type: String,
+  })
+  @IsOptional()
+  @ToStrictString()
+  @IsString()
+  @MaxCodePoints(64)
+  coreUserId?: string | null;
 }
 
 export class ResetPasswordDto {
@@ -142,6 +167,13 @@ export class UserResponseDto {
   @ApiProperty({ description: 'The linked API key id (its plaintext is never issued)' })
   apiKeyId!: string;
 
+  @ApiPropertyOptional({
+    description: 'ALIM Core `core_user_id` mapped to this account, or null when unmapped',
+    nullable: true,
+    type: String,
+  })
+  coreUserId?: string | null;
+
   @ApiProperty({ description: 'Last successful sign-in', nullable: true, type: String, format: 'date-time' })
   lastLoginAt?: string | null;
 
@@ -179,6 +211,7 @@ export function toUserResponse(user: User): UserResponseDto {
     role: user.role,
     isActive: user.isActive,
     apiKeyId: user.apiKeyId,
+    coreUserId: user.coreUserId ?? null,
     lastLoginAt: user.lastLoginAt ? new Date(user.lastLoginAt).toISOString() : null,
     createdAt: new Date(user.createdAt).toISOString(),
   };

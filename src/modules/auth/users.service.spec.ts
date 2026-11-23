@@ -1,6 +1,6 @@
 import 'reflect-metadata';
 import { ConflictException, NotFoundException, UnauthorizedException } from '@nestjs/common';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, EntityManager, Repository } from 'typeorm';
 import { ApiKey, ApiKeyRole } from './entities/api-key.entity';
 import { User } from './entities/user.entity';
 import { UserSession } from './entities/user-session.entity';
@@ -107,7 +107,7 @@ describe('UsersService', () => {
       // Fail the second write of the transaction: the key is already inserted at that point, so this
       // asserts the rollback rather than the happy path's ordering.
       const realTransaction = ds.transaction.bind(ds);
-      jest.spyOn(ds, 'transaction').mockImplementationOnce(((run: (manager: unknown) => unknown) =>
+      jest.spyOn(ds, 'transaction').mockImplementationOnce(((run: (manager: EntityManager) => Promise<unknown>) =>
         realTransaction(manager => {
           const target = manager as { save: (...args: unknown[]) => unknown };
           const realSave = target.save.bind(manager);
@@ -311,6 +311,91 @@ describe('UsersService', () => {
 
     it('404s an unknown account', async () => {
       await expect(service.findOne('00000000-0000-0000-0000-000000000000')).rejects.toBeInstanceOf(NotFoundException);
+    });
+  });
+
+  /**
+   * The SSO handoff maps `core_user_id` to an existing account and refuses to guess. These tests pin
+   * the mapping rules the handoff relies on: one Core person to at most one account, no account
+   * created by an unmapped id, and a mapping that can be cleared but never silently stolen.
+   */
+  describe('ALIM Core identity mapping', () => {
+    it('finds the account by its Core id, trimming what Core sent', async () => {
+      const user = await service.create({
+        email: 'mapped@example.com',
+        name: 'Mapped',
+        role: ApiKeyRole.OPERATOR,
+        password: PASSWORD,
+        coreUserId: 'core-123',
+      });
+
+      await expect(service.findByCoreUserId('  core-123  ')).resolves.toMatchObject({ id: user.id });
+      await expect(service.findByCoreUserId('core-999')).resolves.toBeNull();
+    });
+
+    it('treats a blank or missing Core id as no mapping, without a query', async () => {
+      const findOne = jest.spyOn(users, 'findOne');
+
+      await expect(service.findByCoreUserId('   ')).resolves.toBeNull();
+      await expect(service.findByCoreUserId('')).resolves.toBeNull();
+      expect(findOne).not.toHaveBeenCalled();
+      findOne.mockRestore();
+    });
+
+    it('stores no mapping when the account is created without one', async () => {
+      const user = await makeUser('unmapped@example.com');
+      expect(user.coreUserId ?? null).toBeNull();
+      await expect(service.findByCoreUserId('core-123')).resolves.toBeNull();
+    });
+
+    it('refuses to map one Core person to a second account', async () => {
+      await service.create({
+        email: 'first@example.com',
+        name: 'First',
+        role: ApiKeyRole.OPERATOR,
+        password: PASSWORD,
+        coreUserId: 'core-shared',
+      });
+
+      await expect(
+        service.create({
+          email: 'second@example.com',
+          name: 'Second',
+          role: ApiKeyRole.OPERATOR,
+          password: PASSWORD,
+          coreUserId: 'core-shared',
+        }),
+      ).rejects.toBeInstanceOf(ConflictException);
+      await expect(users.count()).resolves.toBe(1);
+    });
+
+    it('moves a mapping, allows re-saving it, and clears it with null or a blank string', async () => {
+      const target = await service.create({
+        email: 'target@example.com',
+        name: 'Target',
+        role: ApiKeyRole.OPERATOR,
+        password: PASSWORD,
+      });
+      const other = await service.create({
+        email: 'other@example.com',
+        name: 'Other',
+        role: ApiKeyRole.OPERATOR,
+        password: PASSWORD,
+        coreUserId: 'core-other',
+      });
+
+      // A second account cannot claim a mapping that belongs to someone else.
+      await expect(service.update(target.id, { coreUserId: 'core-other' })).rejects.toBeInstanceOf(ConflictException);
+      // Re-saving the same value on the account that owns it is not a conflict.
+      await expect(service.update(other.id, { coreUserId: 'core-other' })).resolves.toMatchObject({
+        coreUserId: 'core-other',
+      });
+
+      await service.update(other.id, { coreUserId: null });
+      await expect(service.findByCoreUserId('core-other')).resolves.toBeNull();
+      await service.update(other.id, { coreUserId: 'core-again' });
+      await service.update(other.id, { coreUserId: '   ' });
+      await expect(service.findByCoreUserId('core-again')).resolves.toBeNull();
     });
   });
 });

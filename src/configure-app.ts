@@ -18,6 +18,7 @@ import { createLogger } from './common/services/logger.service';
 import { ShutdownService } from './common/services/shutdown.service';
 import { injectDashboardCspNonce } from './config/dashboard-csp';
 import { resolveCorsPolicy, isUpgradeInsecureRequestsEnabled, resolveBodyLimit } from './config/bootstrap-security';
+import { parseCoreWebOrigin, frameAncestorsFor } from './config/core-web-origin';
 import { resolveRequestTimeoutMs } from './config/http-timeouts';
 import { parseTrustedProxies } from './common/utils/ip';
 import {
@@ -70,6 +71,19 @@ export function configureApp(app: INestApplication, options: ConfigureAppOptions
     enabled: dashboardServingEnabled && dashboardBuildPresent,
   };
 
+  // The browser-facing `/sso/handoff` alias. The Core embed page posts a one-time code to
+  // `/sso/handoff` (the address documented for it), while the Nest route lives under the global
+  // `/api` prefix like every other endpoint — so the published contract and the served address
+  // agree. Rewriting the path here, BEFORE the metrics boundary and routing, keeps one handler:
+  // the guards, the throttler, the body parsers and the DTO pipe all still run exactly once.
+  // Only these two paths are rewritten; no other `/sso` surface exists.
+  app.use((req: Request, _res: Response, next: NextFunction) => {
+    if (req.path === '/sso/handoff') {
+      req.url = `/api${req.url}`;
+    }
+    next();
+  });
+
   // First, so the HTTP RED series count every API response, the ones the middleware below answers itself
   // included (the shutdown 503, the %00 refusal, the in-flight budget, parser and nesting errors).
   app.use('/api', requestMetricsBoundaryMiddleware);
@@ -86,6 +100,12 @@ export function configureApp(app: INestApplication, options: ConfigureAppOptions
   });
 
   // Enhanced Security Headers
+  //
+  // `frame-ancestors` is the only way the WhatsApp Connect workspace may be embedded, and only by
+  // the configured Core browser origin. It is read here (not at import time) so a suite and a
+  // restart both see the current environment. An unset or invalid value keeps the default
+  // `'self'`: SSO is then disabled rather than open to every embedder.
+  const coreWebOrigin = parseCoreWebOrigin(process.env.ALIM_CORE_WEB_ORIGIN);
   app.use(
     helmet({
       contentSecurityPolicy: {
@@ -106,6 +126,9 @@ export function configureApp(app: INestApplication, options: ConfigureAppOptions
           connectSrc: ["'self'"],
           fontSrc: ["'self'"],
           objectSrc: ["'none'"],
+          // A configured Core origin is added alongside 'self' — never a wildcard. Every other
+          // protection above stays exactly as it was.
+          frameAncestors: frameAncestorsFor(coreWebOrigin),
           // Auto-upgrade HTTP→HTTPS in production, unless CSP_UPGRADE_INSECURE_REQUESTS opts out for an
           // HTTP-only private-network deployment (otherwise the browser forces the dashboard to https). (#611)
           upgradeInsecureRequests: isUpgradeInsecureRequestsEnabled(
@@ -116,6 +139,11 @@ export function configureApp(app: INestApplication, options: ConfigureAppOptions
             : null,
         },
       },
+      // X-Frame-Options cannot express a second allowed origin, and browsers that still honour it
+      // (older Safari) would refuse the Core embed even though CSP allows it. When a Core origin is
+      // configured, CSP `frame-ancestors` is the sole framing policy; otherwise the default
+      // SAMEORIGIN stays in place.
+      frameguard: coreWebOrigin ? false : undefined,
       hsts: {
         maxAge: 31536000,
         includeSubDomains: true,

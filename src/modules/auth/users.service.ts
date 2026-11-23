@@ -24,16 +24,27 @@ export interface CreateUserInput {
   assignments?: AssignmentSpec[];
   /** The key that created the account, recorded on each assignment it grants. */
   grantedByKeyId?: string | null;
+  /** External ALIM Core identity, when the account is created already mapped. */
+  coreUserId?: string | null;
 }
 
 export interface UpdateUserInput {
   name?: string;
   role?: ApiKeyRole;
   isActive?: boolean;
+  /** External ALIM Core identity. `null` or a blank string removes the mapping. */
+  coreUserId?: string | null;
 }
 
 export function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
+}
+
+/** Blank and null both mean "not mapped"; anything else is the exact external id Core sent. */
+export function normalizeCoreUserId(coreUserId: string | null | undefined): string | null {
+  if (coreUserId === null || coreUserId === undefined) return null;
+  const trimmed = coreUserId.trim();
+  return trimmed === '' ? null : trimmed;
 }
 
 /**
@@ -71,6 +82,25 @@ export class UsersService {
     return user;
   }
 
+  /**
+   * The account mapped to an ALIM Core person, or null. This is the ONLY lookup the SSO handoff
+   * uses: an unmapped Core user is refused rather than matched by email or name, and no account is
+   * created here.
+   */
+  async findByCoreUserId(coreUserId: string): Promise<User | null> {
+    const normalized = normalizeCoreUserId(coreUserId);
+    if (normalized === null) return null;
+    return this.userRepository.findOne({ where: { coreUserId: normalized } });
+  }
+
+  /** Refuses a second account claiming an external id that is already mapped. */
+  private async assertCoreUserIdAvailable(coreUserId: string, exceptUserId?: string): Promise<void> {
+    const existing = await this.userRepository.findOne({ where: { coreUserId } });
+    if (existing && existing.id !== exceptUserId) {
+      throw new ConflictException('That ALIM Core user is already mapped to another account');
+    }
+  }
+
   async count(): Promise<number> {
     return this.userRepository.count();
   }
@@ -99,6 +129,10 @@ export class UsersService {
     if (await this.userRepository.findOne({ where: { email } })) {
       throw new ConflictException('A user with that email already exists');
     }
+    const coreUserId = normalizeCoreUserId(input.coreUserId);
+    if (coreUserId !== null) {
+      await this.assertCoreUserIdAvailable(coreUserId);
+    }
 
     const passwordHash = await hashPassword(input.password);
     const rawKey = `owa_k1_${randomBytes(32).toString('hex')}`;
@@ -125,6 +159,7 @@ export class UsersService {
         isActive: true,
         apiKeyId: savedKey.id,
         lastLoginAt: null,
+        coreUserId,
       });
       const savedUser = await manager.save(user);
 
@@ -163,6 +198,13 @@ export class UsersService {
     if (input.name !== undefined) patch.name = input.name;
     if (input.role !== undefined) patch.role = input.role;
     if (input.isActive !== undefined) patch.isActive = input.isActive;
+    if (input.coreUserId !== undefined) {
+      const coreUserId = normalizeCoreUserId(input.coreUserId);
+      if (coreUserId !== null) {
+        await this.assertCoreUserIdAvailable(coreUserId, id);
+      }
+      patch.coreUserId = coreUserId;
+    }
 
     const saved = await this.dataSource.transaction(async manager => {
       if (Object.keys(patch).length > 0) {

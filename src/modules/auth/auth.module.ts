@@ -65,6 +65,14 @@ import { ProxyAwareThrottlerGuard } from '../../common/security/proxy-aware-thro
       useClass: PermissionGuard,
     },
   ],
-  exports: [AuthService, SessionAuthService, ChatScopeService, ActiveKeyIndex, PermissionService, AssignmentsService],
+  exports: [
+    AuthService,
+    SessionAuthService,
+    UsersService,
+    ChatScopeService,
+    ActiveKeyIndex,
+    PermissionService,
+    AssignmentsService,
+  ],
 })
 export class AuthModule {}

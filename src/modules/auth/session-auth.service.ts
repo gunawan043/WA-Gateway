@@ -70,13 +70,33 @@ export class SessionAuthService implements OnModuleInit, OnModuleDestroy {
     return safe * 3_600_000;
   }
 
-  async issue(user: User, context: { ipAddress?: string; userAgent?: string } = {}): Promise<IssuedSession> {
+  /**
+   * The idle bound, or 0 when disabled. Read per call so an operator can change it without a code
+   * change, and enforced on the resolver so it applies to every session the same way the absolute
+   * expiry does.
+   */
+  private idleMs(): number {
+    const minutes = Number(this.configService.get<number>('auth.sessionIdleTimeoutMinutes', 0));
+    return Number.isFinite(minutes) && minutes > 0 ? minutes * 60_000 : 0;
+  }
+
+  /**
+   * Issues a session. `ttlMs` lets the SSO handoff mint a shorter-lived session than a password
+   * login without a second resolver: the row still carries one `expiresAt`, and every check below
+   * is unchanged.
+   */
+  async issue(
+    user: User,
+    context: { ipAddress?: string; userAgent?: string } = {},
+    options: { ttlMs?: number } = {},
+  ): Promise<IssuedSession> {
     const token = generateSessionToken();
     const now = new Date();
+    const ttl = options.ttlMs && options.ttlMs > 0 ? options.ttlMs : this.ttlMs();
     const session = this.sessionRepository.create({
       userId: user.id,
       tokenHash: hashSessionToken(token),
-      expiresAt: new Date(now.getTime() + this.ttlMs()),
+      expiresAt: new Date(now.getTime() + ttl),
       revokedAt: null,
       lastSeenAt: now,
       ipAddress: context.ipAddress ?? null,
@@ -115,6 +135,18 @@ export class SessionAuthService implements OnModuleInit, OnModuleDestroy {
     const expiresAt = new Date(session.expiresAt).getTime();
     if (!Number.isFinite(expiresAt) || expiresAt <= now) {
       throw new UnauthorizedException('Session is invalid or has expired');
+    }
+
+    // Idle timeout, when configured. `lastSeenAt` is coalesced (one write per 5 minutes), so a
+    // value below 10 minutes is effectively "every request" — the documentation says so. A session
+    // that trips this is revoked as well as refused, so it cannot come back to life.
+    const idleMs = this.idleMs();
+    if (idleMs > 0) {
+      const last = session.lastSeenAt ? new Date(session.lastSeenAt).getTime() : new Date(session.createdAt).getTime();
+      if (Number.isFinite(last) && now - last > idleMs) {
+        await this.revoke(session.id).catch(() => false);
+        throw new UnauthorizedException('Session is invalid or has expired');
+      }
     }
 
     const user = await this.userRepository.findOne({ where: { id: session.userId } });
