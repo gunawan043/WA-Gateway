@@ -42,6 +42,12 @@ const containsOn = new ConfigService({ search: { containsEnabled: true } });
 (POSTGRES_ENABLED ? describe : describe.skip)('BuiltInFtsProvider match=contains (postgres)', () => {
   let admin: DataSource;
   let ds: DataSource;
+  /**
+   * The scratch database inherits the server's default ctype. On a C or POSIX database pg_trgm takes no trigram
+   * from any non-ASCII run, so the term rule there is the one the C-ctype suite below asserts; the default-ctype
+   * assertions only hold elsewhere. Read once, so both remain stated rather than assumed.
+   */
+  let adminAsciiTrigrams = false;
 
   const insert = (id: string, sessionId: string, body: string, ts: number) =>
     ds.query(
@@ -62,6 +68,10 @@ const containsOn = new ConfigService({ search: { containsEnabled: true } });
   beforeAll(async () => {
     admin = new DataSource(connection(process.env.DATABASE_NAME || 'openwa'));
     await admin.initialize();
+    const [{ ascii }] = await admin.query<Array<{ ascii: boolean }>>(
+      `SELECT datctype IN ('C', 'POSIX') AS ascii FROM pg_database WHERE datname = current_database()`,
+    );
+    adminAsciiTrigrams = ascii;
     await admin.query(`DROP DATABASE IF EXISTS "${SCRATCH_DB}"`);
     await admin.query(`CREATE DATABASE "${SCRATCH_DB}"`);
     ds = new DataSource({
@@ -223,16 +233,19 @@ const containsOn = new ConfigService({ search: { containsEnabled: true } });
       await expect(provider.search({ q: 'id to', match: 'contains' })).rejects.toBeInstanceOf(BadRequestException);
     });
 
-    it('rejects a query with no run of three letters or digits, which pg_trgm cannot look up', async () => {
-      for (const q of ['😂😂😂', '...', ':-)', 'a.b.c', '안녕', '\u02bc'.repeat(3), '¹²³']) {
-        await expect(provider.search({ q, match: 'contains' })).rejects.toBeInstanceOf(BadRequestException);
-      }
-      await insert('m5', 's1', '서울역에서 라멘을 먹었다', 50);
-      expect((await provider.search({ q: '서울역', match: 'contains' })).hits.map(h => h.messageId)).toEqual(['m5']);
-      expect((await provider.search({ q: 'ラーメン', match: 'contains' })).total).toBe(0);
-      expect((await provider.search({ q: ':-) invoice', match: 'contains' })).total).toBe(0);
-      expect((await provider.search({ q: 'INV-2048', match: 'contains' })).total).toBe(1);
-    });
+    (adminAsciiTrigrams ? it.skip : it)(
+      'rejects a query with no run of three letters or digits, which pg_trgm cannot look up',
+      async () => {
+        for (const q of ['😂😂😂', '...', ':-)', 'a.b.c', '안녕', '\u02bc'.repeat(3), '¹²³']) {
+          await expect(provider.search({ q, match: 'contains' })).rejects.toBeInstanceOf(BadRequestException);
+        }
+        await insert('m5', 's1', '서울역에서 라멘을 먹었다', 50);
+        expect((await provider.search({ q: '서울역', match: 'contains' })).hits.map(h => h.messageId)).toEqual(['m5']);
+        expect((await provider.search({ q: 'ラーメン', match: 'contains' })).total).toBe(0);
+        expect((await provider.search({ q: ':-) invoice', match: 'contains' })).total).toBe(0);
+        expect((await provider.search({ q: 'INV-2048', match: 'contains' })).total).toBe(1);
+      },
+    );
 
     it('matches LIKE wildcards literally, the fullwidth forms unaccent folds into them included', async () => {
       await insert('m5', 's1', 'price 100 dollars', 50);

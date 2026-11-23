@@ -85,3 +85,6 @@ _docs/
 .superpowers/
 # TypeScript incremental build cache (tsc writes this at repo root under the TS6 build config)
 *.tsbuildinfo
+
+# Local PostgreSQL cluster for the PostgreSQL lane (scripts/pg-local.ts)
+.cache/

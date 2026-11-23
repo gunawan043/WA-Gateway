@@ -22,6 +22,21 @@ import { IntegrationDeliveryFailure } from '../integration/entities/integration-
 import { StatusUpdate } from '../status-store/entities/status-update.entity';
 import { SendIdempotencyKey } from './entities/send-idempotency-key.entity';
 import { AutomationRule } from '../automation/entities/automation-rule.entity';
+import { InboxConversation } from '../inbox/entities/inbox-conversation.entity';
+import { InboxNote } from '../inbox/entities/inbox-note.entity';
+import { CrmStage } from '../crm/entities/crm-stage.entity';
+import { CrmDeal } from '../crm/entities/crm-deal.entity';
+import { CrmDealActivity } from '../crm/entities/crm-deal-activity.entity';
+import { Campaign } from '../campaign/entities/campaign.entity';
+import { CampaignRecipient } from '../campaign/entities/campaign-recipient.entity';
+import { CampaignSegment } from '../campaign/entities/campaign-segment.entity';
+import { Division } from '../division/entities/division.entity';
+import { DivisionAgent } from '../division/entities/division-agent.entity';
+import { DivisionSettings } from '../division/entities/division-settings.entity';
+import { DivisionChatState } from '../division/entities/division-chat-state.entity';
+import { ApprovalRequest } from '../approval/entities/approval-request.entity';
+import { ApprovalCommand } from '../approval/entities/approval-command.entity';
+import { WhatsAppIdentity } from '../approval/entities/whatsapp-identity.entity';
 import { ApiKey, ApiKeyRole } from '../auth/entities/api-key.entity';
 import { ChatScopeService } from '../auth/chat-scope.service';
 import { postgresUtcExtra } from '../../database/postgres-utc';
@@ -91,6 +106,21 @@ const deferred = () => {
         IntegrationDeliveryFailure,
         StatusUpdate,
         AutomationRule,
+        InboxConversation,
+        InboxNote,
+        CrmStage,
+        CrmDeal,
+        CrmDealActivity,
+        Campaign,
+        CampaignRecipient,
+        CampaignSegment,
+        Division,
+        DivisionAgent,
+        DivisionSettings,
+        DivisionChatState,
+        ApprovalRequest,
+        ApprovalCommand,
+        WhatsAppIdentity,
         SendIdempotencyKey,
       ],
       synchronize: true,

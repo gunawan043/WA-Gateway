@@ -29,6 +29,13 @@ import { Campaign } from '../campaign/entities/campaign.entity';
 import { CampaignRecipient } from '../campaign/entities/campaign-recipient.entity';
 import { CampaignSegment } from '../campaign/entities/campaign-segment.entity';
 import { CrmStage } from '../crm/entities/crm-stage.entity';
+import { Division } from '../division/entities/division.entity';
+import { DivisionAgent } from '../division/entities/division-agent.entity';
+import { DivisionSettings } from '../division/entities/division-settings.entity';
+import { DivisionChatState } from '../division/entities/division-chat-state.entity';
+import { ApprovalRequest } from '../approval/entities/approval-request.entity';
+import { ApprovalCommand } from '../approval/entities/approval-command.entity';
+import { WhatsAppIdentity } from '../approval/entities/whatsapp-identity.entity';
 import { postgresUtcExtra } from '../../database/postgres-utc';
 
 const entities = [
@@ -56,6 +63,13 @@ const entities = [
   Campaign,
   CampaignRecipient,
   CampaignSegment,
+  Division,
+  DivisionAgent,
+  DivisionSettings,
+  DivisionChatState,
+  ApprovalRequest,
+  ApprovalCommand,
+  WhatsAppIdentity,
   SendIdempotencyKey,
 ];
 
