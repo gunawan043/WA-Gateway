@@ -29,6 +29,11 @@ export enum AuditAction {
   // values. A rejected reassignment is recorded too — an attempt to move a number to another Core
   // person is exactly what an audit trail exists to show.
   APPROVAL_IDENTITY_CHANGED = 'approval_identity_changed',
+  // One row per command outcome, written by the processor so both the inbound reply and the retry
+  // worker are covered. The row carries the command id, the Core request id, the decision, the
+  // attempt count, Core's HTTP status and error code, and the actor's Core person id — enough to
+  // reconcile a decision with Core without storing the reply text, the sender's number, or any key.
+  APPROVAL_COMMAND = 'approval_command',
 
   // Rate-limit enforcement (sampled: at most one row per subject+kind per minute — see
   // EventsGateway — so enforcing a limit never becomes an audit-write flood of its own).

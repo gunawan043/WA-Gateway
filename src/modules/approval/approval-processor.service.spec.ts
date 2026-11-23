@@ -32,6 +32,7 @@ describe('ApprovalProcessorService', () => {
   let sent: SentMessage[];
   let replyToUnknown: boolean;
   let seq: number;
+  let audited: Array<{ action: string; severity: string; metadata: Record<string, unknown> }>;
 
   beforeAll(async () => {
     ds = new DataSource({
@@ -60,6 +61,14 @@ describe('ApprovalProcessorService', () => {
     seq = 0;
     replyToUnknown = false;
     core = new MockAlimCoreApprovalClient();
+    audited = [];
+
+    const record = (severity: string) => (action: string, context: { metadata?: Record<string, unknown> }) => {
+      audited.push({ action, severity, metadata: context.metadata ?? {} });
+
+      return Promise.resolve(null);
+    };
+    const audit = { logInfo: record('info'), logWarn: record('warn') } as never;
 
     const messageService = {
       // eslint-disable-next-line @typescript-eslint/require-await -- tiruan MessageService.sendText yang async
@@ -88,6 +97,7 @@ describe('ApprovalProcessorService', () => {
       confirmation,
       config as never,
       core,
+      audit,
     );
   });
 
@@ -554,5 +564,108 @@ describe('ApprovalProcessorService', () => {
     expect(stored.status).toBe('APPROVED');
     expect(stored.decidedAt).toBeInstanceOf(Date);
     expect(stored.decisionSource).toBe('core');
+  });
+
+  // 20. Jejak audit command ------------------------------------------------
+
+  it('mencatat setiap command yang dikirim ke Core, tanpa nomor pengirim atau teks balasan', async () => {
+    await seedIdentity();
+    const request = await seedRequest();
+
+    await processor.handle(inbound(`SETUJU 2 HARI ${request.reference}`));
+
+    expect(audited).toHaveLength(1);
+    expect(audited[0]).toMatchObject({
+      action: 'approval_command',
+      severity: 'info',
+      metadata: {
+        outcome: 'applied',
+        coreRequestId: request.coreRequestId,
+        decision: 'approved',
+        approvedDurationDays: 2,
+        attempts: 1,
+        commandStatus: 'APPLIED',
+        requestStatus: 'APPROVED',
+        coreResponseCode: 200,
+        actorCorePersonId: PERSON,
+      },
+    });
+
+    const command = await commands.findOneByOrFail({ approvalRequestId: request.id });
+    expect(audited[0].metadata.commandId).toBe(command.commandId);
+
+    // The trail must not become a second copy of what it audits.
+    const flat = JSON.stringify(audited[0].metadata);
+    expect(flat).not.toContain(SENDER);
+    expect(flat).not.toContain('SETUJU 2 HARI');
+  });
+
+  it('mencatat penolakan Core sebagai peringatan dengan kode galatnya', async () => {
+    await seedIdentity();
+    const request = await seedRequest();
+    core.scenario = 'not_authorized';
+
+    await processor.handle(inbound(`SETUJU 2 HARI ${request.reference}`));
+
+    expect(audited).toHaveLength(1);
+    expect(audited[0].severity).toBe('warn');
+    expect(audited[0].metadata).toMatchObject({
+      outcome: 'rejected',
+      commandStatus: 'REJECTED',
+      coreErrorCode: 'actor_not_authorized',
+      decision: 'approved',
+    });
+  });
+
+  it('mencatat percobaan ulang yang berakhir menunggu pemeriksaan manual', async () => {
+    await seedIdentity();
+    const request = await seedRequest();
+    core.scenario = 'timeout';
+
+    // One attempt allowed, so the retry pass that follows parks the command immediately.
+    const retryConfig = {
+      get: (key: string, fallback?: unknown) =>
+        key === 'connect.approval.retry.maxAttempts'
+          ? 1
+          : key === 'connect.approval.replyToUnknownSender'
+            ? replyToUnknown
+            : fallback,
+    };
+    const retried: Array<{ severity: string; metadata: Record<string, unknown> }> = [];
+    const record =
+      (severity: string) =>
+      (action: string, context: { metadata?: Record<string, unknown> }): Promise<null> => {
+        retried.push({ severity, metadata: context.metadata ?? {} });
+
+        return Promise.resolve(null);
+      };
+    const noSend = {
+      sendText: jest.fn(() => Promise.resolve({ messageId: `wamid.out.${++seq}`, timestamp: 1 })),
+    } as never;
+    const retryProcessor = new ApprovalProcessorService(
+      requests,
+      commands,
+      identities,
+      new ApprovalReplyResolver(requests, identities),
+      new ApprovalConfirmationService(noSend, new ApprovalNotificationService(requests, noSend, identities)),
+      retryConfig as never,
+      core,
+      { logInfo: record('info'), logWarn: record('warn') } as never,
+    );
+
+    await processor.handle(inbound(`SETUJU 2 HARI ${request.reference}`));
+
+    expect(audited.at(-1)?.metadata).toMatchObject({ outcome: 'unavailable', commandStatus: 'UNKNOWN' });
+
+    const command = await commands.findOneByOrFail({ approvalRequestId: request.id });
+    expect(command.status).toBe('UNKNOWN');
+
+    // The retry path writes its own row: an operator can find the parked command without reading
+    // the command table.
+    expect(await retryProcessor.retryUnknown(command.commandId)).toBe('core_unavailable');
+    expect((await commands.findOneByOrFail({ id: command.id })).status).toBe('FAILED');
+    expect(retried).toHaveLength(1);
+    expect(retried[0].severity).toBe('warn');
+    expect(retried[0].metadata).toMatchObject({ outcome: 'exhausted', commandStatus: 'FAILED', attempts: 1 });
   });
 });

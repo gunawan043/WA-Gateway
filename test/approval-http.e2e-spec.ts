@@ -15,6 +15,7 @@ import { assertApprovalCoreClientAllowed } from '../src/modules/approval/core-cl
 import { HttpAlimCoreApprovalClient } from '../src/modules/approval/core-client/http-alim-core-approval.client';
 import { ApprovalRetryService } from '../src/modules/approval/approval-retry.service';
 import { ApprovalCommand } from '../src/modules/approval/entities/approval-command.entity';
+import { AuditAction, AuditLog } from '../src/modules/audit/entities/audit-log.entity';
 import { MetricsService } from '../src/modules/metrics/metrics.service';
 import { AuthService } from '../src/modules/auth/auth.service';
 import { ApiKeyRole } from '../src/modules/auth/entities/api-key.entity';
@@ -386,6 +387,39 @@ describe('Approval over HTTP with a mock Core at the HTTP boundary (e2e)', () =>
         durationDays: 2,
       });
       expect(after.commands?.[0]?.commandId).toBe(call.body.command_id);
+    });
+
+    it('meninggalkan satu baris audit per command, tanpa nomor pengirim maupun teks balasan', async () => {
+      const coreRequestId = randomUUID();
+      const ingested = await ingest({ coreRequestId, reference: 'IZN-2026-104' }).expect(201);
+      const request = ingested.body as ApprovalRequestBody;
+
+      await reply('SETUJU 2 HARI IZN-2026-104', 'wamid-e2e-104');
+
+      const after = await detail(request.id);
+      const [command] = after.commands ?? [];
+
+      // Read through the application's own audit repository, so this proves the wiring and not just
+      // the processor's intent.
+      const audits = app.get<Repository<AuditLog>>(getRepositoryToken(AuditLog, 'main'));
+      const rows = await audits.find({ where: { action: AuditAction.APPROVAL_COMMAND } });
+      const mine = rows.filter(row => row.metadata?.commandId === command?.commandId);
+
+      expect(mine).toHaveLength(1);
+      expect(mine[0].metadata).toMatchObject({
+        outcome: 'applied',
+        coreRequestId,
+        decision: 'approved',
+        approvedDurationDays: 2,
+        commandStatus: 'APPLIED',
+        requestStatus: 'APPROVED',
+        actorCorePersonId: TARGET_CORE_PERSON_ID,
+      });
+
+      const flat = JSON.stringify(mine[0].metadata);
+      expect(flat).not.toContain(TARGET_NUMBER);
+      expect(flat).not.toContain('SETUJU 2 HARI');
+      expect(flat).not.toContain(CORE_KEY);
     });
 
     it('tidak mengembalikan body mentah Core, id pesan WhatsApp, atau topologi sesi', async () => {

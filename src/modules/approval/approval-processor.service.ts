@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 import { createLogger } from '../../common/services/logger.service';
 import { recordApprovalCommand } from '../../common/metrics/approval-metrics';
 import { ConfigService } from '@nestjs/config';
@@ -16,6 +16,8 @@ import { isDecidable } from './approval-status';
 import { isRetryExhausted, nextAttemptAt, readRetryPolicy, RETRY_EXHAUSTED_MESSAGE } from './approval-retry.policy';
 import { WhatsAppIdentityService } from './whatsapp-identity.service';
 import { boundCoreBody } from './core-response-body';
+import { AuditService } from '../audit/audit.service';
+import { AuditAction } from '../audit/entities/audit-log.entity';
 
 export interface ApprovalInboundContext {
   sessionId: string | null;
@@ -63,6 +65,10 @@ export class ApprovalProcessorService {
     private readonly config: ConfigService,
     @Inject(ALIM_CORE_APPROVAL_CLIENT)
     private readonly core: AlimCoreApprovalClient,
+    // Written for every command outcome; optional so a direct-construction unit test does not have to
+    // build an audit repository. AuditService.log is itself best-effort and never throws.
+    @Optional()
+    private readonly audit?: AuditService,
   ) {}
 
   async handle(ctx: ApprovalInboundContext): Promise<ApprovalInboundOutcome> {
@@ -211,6 +217,11 @@ export class ApprovalProcessorService {
         .andWhere('status IN (:...statuses)', { statuses: ['PENDING', 'UNKNOWN'] })
         .execute();
 
+      command.status = 'FAILED';
+      command.nextAttemptAt = null;
+      command.lastError = 'Permohonan untuk command ini tidak ditemukan.';
+      await this.auditCommand(command, request, 'request_missing', 'warn');
+
       return 'not_found';
     }
 
@@ -228,6 +239,11 @@ export class ApprovalProcessorService {
         .where('id = :id', { id: command.id })
         .andWhere('status IN (:...statuses)', { statuses: ['PENDING', 'UNKNOWN'] })
         .execute();
+
+      command.status = 'FAILED';
+      command.nextAttemptAt = null;
+      command.lastError = command.lastError ?? RETRY_EXHAUSTED_MESSAGE;
+      await this.auditCommand(command, request, 'exhausted', 'warn');
 
       return 'core_unavailable';
     }
@@ -325,6 +341,10 @@ export class ApprovalProcessorService {
       await this.commands.save(command);
       await this.requests.save(request);
 
+      // Audit before the WhatsApp confirmation: the decision is already durable in Core's answer, and
+      // a best-effort send must not be able to hide it from the trail.
+      await this.auditCommand(command, request, result.outcome);
+
       // Konfirmasi hanya setelah Core menyatakan sukses, dan pesannya mengikuti status yang
       // benar-benar ditetapkan Core — termasuk tiga nilai non-final.
       switch (request.status) {
@@ -357,6 +377,8 @@ export class ApprovalProcessorService {
       recordApprovalCommand(exhausted ? 'failed' : 'unknown');
       await this.commands.save(command);
 
+      await this.auditCommand(command, request, exhausted ? 'exhausted' : 'unavailable', 'warn');
+
       // Pesan "belum dapat dipastikan" bukan konfirmasi sukses/gagal; pada retry
       // berikutnya pesan ini tidak diulang agar Kepala Asrama tidak dibanjiri.
       if (options.notifyUnavailable !== false) {
@@ -385,6 +407,8 @@ export class ApprovalProcessorService {
 
     await this.requests.save(request);
 
+    await this.auditCommand(command, request, 'rejected', 'warn');
+
     switch (result.code) {
       case 'actor_not_authorized':
         await this.confirmation.notAuthorized(request);
@@ -402,6 +426,43 @@ export class ApprovalProcessorService {
     }
 
     return 'core_rejected';
+  }
+
+  /**
+   * One audit row per command outcome. Written at the terminal point of each path (applied,
+   * duplicate, unknown, exhausted, rejected) so the retry worker is recorded exactly like an
+   * inbound reply. Deliberately carries no message text, no sender number and no credential:
+   * the command id, Core's request id and Core's status are what reconcile this decision with
+   * Core, and the actor is named by Core's person id rather than by the number that answered.
+   */
+  private auditCommand(
+    command: ApprovalCommand,
+    request: ApprovalRequest | null,
+    outcome: string,
+    severity: 'info' | 'warn' = 'info',
+  ): Promise<unknown> {
+    const context = {
+      sessionId: request?.sessionId ?? undefined,
+      metadata: {
+        outcome,
+        commandId: command.commandId,
+        coreRequestId: request?.coreRequestId ?? null,
+        decision: command.decision,
+        approvedDurationDays: command.durationDays,
+        attempts: command.attempts,
+        commandStatus: command.status,
+        requestStatus: request?.status ?? null,
+        coreResponseCode: command.coreResponseCode,
+        coreErrorCode: command.errorCode ?? null,
+        actorCorePersonId: request?.targetCorePersonId ?? null,
+      },
+    };
+
+    return (
+      (severity === 'warn'
+        ? this.audit?.logWarn(AuditAction.APPROVAL_COMMAND, context)
+        : this.audit?.logInfo(AuditAction.APPROVAL_COMMAND, context)) ?? Promise.resolve(null)
+    );
   }
 
   private statusForCoreRejection(result: CoreApprovalResult): ApprovalRequestStatus {

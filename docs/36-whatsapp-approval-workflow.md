@@ -290,6 +290,15 @@ terautentikasi (principal API key), waktu, jenis perubahan, nilai sebelum dan se
 Percobaan `reassign` yang ditolak juga dicatat (`result: 'rejected'`) agar upaya pengambilalihan
 nomor tetap terlihat. Tidak ada nilai mentah kredensial yang disimpan di audit.
 
+Selain perubahan pemetaan, **setiap hasil command** ke Core — dari balasan WhatsApp maupun dari
+worker retry — menulis satu baris `approval_command`. Baris itu memuat `outcome` (`applied`,
+`duplicate`, `unavailable`, `exhausted`, `rejected`, `request_missing`), `commandId`,
+`coreRequestId`, `decision`, `approvedDurationDays`, `attempts`, `commandStatus`, `requestStatus`,
+`coreResponseCode`, `coreErrorCode`, dan `actorCorePersonId`. Yang sengaja **tidak** dicatat: teks
+balasan WhatsApp, nomor pengirim, dan kredensial apa pun — jejak audit tidak boleh menjadi salinan
+kedua dari data yang ia audit. Baris ditulis sebelum konfirmasi WhatsApp dikirim, sehingga kegagalan
+pengiriman tidak dapat menyembunyikan keputusan yang sudah ditetapkan Core.
+
 Respons endpoint permohonan memakai DTO tampilan, bukan entitas mentah: hanya
 `id`, `coreRequestId`, `reference`, `studentName`, `studentClass`, `dormitoryCoreId`,
 `dormitoryName`, `permitType`, `requestedDurationDays`, `departureAt`, `expectedReturnAt`, `status`,

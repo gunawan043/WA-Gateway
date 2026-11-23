@@ -75,6 +75,7 @@
                 "role_assignment_updated",
                 "role_assignment_revoked",
                 "approval_identity_changed",
+                "approval_command",
                 "rate_limit_exceeded",
                 "queue_board_mutated",
                 "session_created",
