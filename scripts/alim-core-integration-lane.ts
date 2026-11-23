@@ -23,9 +23,52 @@ import * as path from 'path';
 /** Specs that carry a real-Core section, so the lane is meaningless without them. */
 const LANE_SPECS = ['test/sso-handoff-http.e2e-spec.ts', 'test/approval-http.e2e-spec.ts'];
 
-const SSO_KEYS = ['ALIM_CORE_BASE_URL', 'ALIM_CONNECT_SSO_KEY'];
-const APPROVAL_KEYS = ['ALIM_CORE_BASE_URL', 'ALIM_CORE_APPROVAL_API_KEY'];
+/**
+ * Checks in the order an operator meets them. `required` is what makes the real Core sections run
+ * rather than skip; the rest are conditions under which the feature is silently off or answering 503,
+ * which is worth knowing before a run is read as a pass.
+ */
+interface Check {
+  env: string;
+  required: boolean;
+  /** Which integration the value belongs to; the lane reports each one only under its own heading. */
+  scope: 'both' | 'sso' | 'approval';
+  /** What breaks without it, in the operator's words. */
+  why: string;
+}
 
+const CHECKS: Check[] = [
+  {
+    env: 'ALIM_CORE_BASE_URL',
+    required: true,
+    scope: 'both',
+    why: 'both integrations answer core_not_configured',
+  },
+  {
+    env: 'ALIM_CONNECT_SSO_KEY',
+    required: true,
+    scope: 'sso',
+    why: 'SSO exchange is disabled; the handoff page refuses',
+  },
+  {
+    env: 'ALIM_CORE_WEB_ORIGIN',
+    required: true,
+    scope: 'sso',
+    why: 'no Origin is allowed to post the handoff, so SSO is disabled',
+  },
+  {
+    env: 'ALIM_CORE_APPROVAL_API_KEY',
+    required: true,
+    scope: 'approval',
+    why: 'approval commands are never sent to Core',
+  },
+  {
+    env: 'ALIM_CONNECT_INGEST_KEY',
+    required: false,
+    scope: 'approval',
+    why: 'POST /approval/requests answers 503, so no permit can arrive from Core',
+  },
+];
 const args = process.argv.slice(2);
 const guardOnly = args.includes('--lane-guard');
 const wantApproval = args.includes('--approval') || args.includes('--all');
@@ -34,17 +77,26 @@ const ssoCode = args.find(arg => arg.startsWith('--sso-code='))?.slice('--sso-co
 const repoRoot = path.resolve(__dirname, '..');
 const isSet = (key: string): boolean => (process.env[key] ?? '').trim() !== '';
 
-function report(label: string, keys: string[]): boolean {
-  const absent = keys.filter(key => !isSet(key));
-  console.log(`  ${label.padEnd(26)} ${absent.length === 0 ? 'ready' : `MISSING ${absent.join(', ')}`}`);
-  return absent.length === 0;
+function report(label: string, checks: Check[]): boolean {
+  const absent = checks.filter(check => !isSet(check.env));
+  const hard = absent.filter(check => check.required);
+  const detail = absent.length === 0 ? 'ready' : `MISSING ${absent.map(check => check.env).join(', ')}`;
+  console.log(`  ${label.padEnd(26)} ${detail}`);
+  for (const check of absent) {
+    const marker = check.required ? 'blocks  ' : 'degrades';
+    console.log(`  ${''.padEnd(26)}   ${marker}  ${check.env} — ${check.why}`);
+  }
+  if (isSet('ALIM_CONNECT_CORE_CLIENT') && process.env.ALIM_CONNECT_CORE_CLIENT?.trim() !== 'http') {
+    console.log(`  ${''.padEnd(26)}   degrades  ALIM_CONNECT_CORE_CLIENT is not "http", so nothing reaches Core`);
+  }
+  return hard.length === 0;
 }
 
 function runJest(specs: string[]): void {
   console.log('');
-  console.log(`Running: jest --config ./test/jest-e2e.json ${specs.join(' ')} --maxWorkers=1`);
+  console.log(`Running: jest --config ./test/jest-e2e.json ${specs.join(' ')} --runInBand`);
   try {
-    execFileSync('npx', ['jest', '--config', './test/jest-e2e.json', ...specs, '--maxWorkers=1'], {
+    execFileSync('npx', ['jest', '--config', './test/jest-e2e.json', ...specs, '--runInBand'], {
       cwd: repoRoot,
       stdio: 'inherit',
     });
@@ -63,8 +115,10 @@ function main(): void {
     return;
   }
 
-  const ssoReady = report('SSO (exchange)', SSO_KEYS);
-  const approvalReady = report('approval (command)', APPROVAL_KEYS);
+  const ssoChecks = CHECKS.filter(check => check.scope !== 'approval');
+  const approvalChecks = CHECKS.filter(check => check.scope !== 'sso');
+  const ssoReady = report('SSO (exchange)', ssoChecks);
+  const approvalReady = report('approval (command)', approvalChecks);
 
   if (guardOnly) {
     console.log('');
@@ -75,8 +129,8 @@ function main(): void {
 
   if (!ssoReady) {
     console.log('');
-    console.log('Nothing was run: the SSO credentials are not set, so the real sections would skip and only');
-    console.log('the mock sections would pass. Set ALIM_CORE_BASE_URL and ALIM_CONNECT_SSO_KEY first.');
+    console.log('Nothing was run: the SSO configuration is incomplete, so the real sections would skip and');
+    console.log('only the mock sections would pass. Provide the values listed above first.');
     process.exitCode = 2;
     return;
   }
@@ -91,7 +145,7 @@ function main(): void {
   // read as a pass.
   const specs = wantApproval && approvalReady ? LANE_SPECS : [LANE_SPECS[0]];
   if (wantApproval && !approvalReady) {
-    console.log('Approval: skipped — ALIM_CORE_APPROVAL_API_KEY is not set.');
+    console.log('Approval: skipped — its configuration is incomplete.');
   }
   runJest(specs);
 }
