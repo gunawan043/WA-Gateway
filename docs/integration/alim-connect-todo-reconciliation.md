@@ -218,6 +218,19 @@ seluruh pengujiannya berada di lane e2e HTTP (23 test) yang tidak dijalankan ole
 pembagian lane yang disengaja, bukan test yang hilang. Ambang tidak diubah dan tidak ada assertion
 yang dihapus.
 
+**Penyelesaian (siklus 4, checkpoint `7b50bd427`).** Akar masalahnya dikonfirmasi dari source Jest:
+setiap berkas dibebankan ke kunci `coverageThreshold` pertama yang cocok, sehingga `global` berarti
+"berkas di luar 44 direktori yang terdaftar", bukan "semua berkas". Bucket itu memang tertinggal
+(101 berkas, functions 74,01%), dan tiga direktori benar-benar di bawah ambangnya sendiri. Diperbaiki
+dengan menambah test, bukan menurunkan ambang atau mengecualikan berkas: controller campaign/crm/
+division/inbox, `campaign.service` (35→37 dari 38 fungsi), `infra-status`, `save-config.dto`,
+kontrak generik 30 `table-importers`, `auth-agents`/`auth-assignments`, dan route
+`sso-handoff.controller` (0/9 → 9/9 fungsi). Hasil `npx jest --coverage --maxWorkers=2` (2026-11-23,
+1000 s): **864 suite, 21.412 lulus, 141 skip, 3 timeout beban, exit 0, tanpa satu pun pesan ambang**.
+Bucket global functions **91,76%**, `auth` branch **83,75%**, `infra` functions **98,85%**. Ketiga
+suite yang timeout (message-send-refusal, session-reconnect-init, ssrf-guard-session-proxy) lulus
+bersama-sama saat dijalankan sendiri: 25/25 dalam 1,8 s.
+
 ---
 
 ## 5. Risiko yang masih terbuka
