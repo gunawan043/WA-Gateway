@@ -1,6 +1,7 @@
 import { INestApplication } from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Test, TestingModule } from '@nestjs/testing';
+import { randomUUID } from 'crypto';
 import { createServer, Server } from 'http';
 import type { AddressInfo } from 'net';
 import supertest from 'supertest';
@@ -545,5 +546,64 @@ describe('WhatsApp Connect SSO handoff over HTTP (e2e)', () => {
       expect(log).not.toContain('code-log-secret-unknown');
       expect(log).not.toContain(SSO_KEY);
     });
+  });
+
+  /**
+   * Runs only when the process was pointed at a real Core (`ALIM_CORE_BASE_URL` plus
+   * `ALIM_CONNECT_SSO_KEY`, set before this file loads). The mock sections above stay the contract
+   * evidence until staging exists; this one reports what Core actually answers for a code it never
+   * issued, which is the proof that the route, the key and the envelope are right.
+   *
+   * It cannot mint a real handoff code — only Core can — so a full successful login here needs a
+   * code issued by Core's UI. What this asserts is the refusal path on the real integration: the
+   * refusal must be a business refusal with no session, not a 502 from a broken client.
+   */
+  describe('Z. ALIM Core sungguhan', () => {
+    const baseUrl = (process.env.ALIM_CORE_BASE_URL ?? '').trim();
+    const ssoKey = (process.env.ALIM_CONNECT_SSO_KEY ?? '').trim();
+    const real = baseUrl !== '' && ssoKey !== '';
+
+    (real ? it : it.skip)(
+      'menolak kode yang tidak pernah diterbitkan Core tanpa membuat sesi',
+      async () => {
+        const before = await liveSessionCount();
+
+        const res = await postHandoff(`probe-${randomUUID()}`, { accept: 'application/json' });
+
+        // A real Core refuses an invented code with a 4xx business answer.
+        expect([400, 404, 409, 410, 422]).toContain(res.status);
+        expect((res.body as { ok?: boolean }).ok).toBe(false);
+        expect(await liveSessionCount()).toBe(before);
+      },
+      30_000,
+    );
+
+    (real ? it : it.skip)(
+      'mencatat kode status Core untuk kode yang direkayasa, tanpa membocorkan kunci atau kode',
+      async () => {
+        const written: string[] = [];
+        const stdout = jest.spyOn(process.stdout, 'write').mockImplementation((chunk: unknown) => {
+          written.push(String(chunk));
+          return true;
+        });
+        const stderr = jest.spyOn(process.stderr, 'write').mockImplementation((chunk: unknown) => {
+          written.push(String(chunk));
+          return true;
+        });
+        const probeCode = `probe-${randomUUID()}`;
+
+        try {
+          await postHandoff(probeCode, { accept: 'application/json' });
+        } finally {
+          stdout.mockRestore();
+          stderr.mockRestore();
+        }
+
+        const log = written.join('\n');
+        expect(log).not.toContain(probeCode);
+        expect(log).not.toContain(SSO_KEY);
+      },
+      30_000,
+    );
   });
 });

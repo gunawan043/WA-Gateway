@@ -9,6 +9,7 @@
  * Usage:
  *   npm run probe:alim-core                 # configuration summary + SSO exchange probe
  *   npm run probe:alim-core -- --sso        # same
+ *   npm run probe:alim-core -- --sso-code=<code>   # spend a code Core issued: proves the success path
  *   npm run probe:alim-core -- --approval   # also send one invalid approval command (opt-in)
  *   npm run probe:alim-core -- --all        # both
  *
@@ -39,6 +40,11 @@ interface Line {
 const args = new Set(process.argv.slice(2));
 const runSso = args.has('--all') || args.has('--sso') || !args.has('--approval');
 const runApproval = args.has('--all') || args.has('--approval');
+/** `--sso-code=<code>`: a handoff code Core's UI issued, for proving the success path. */
+const ssoCode = process.argv
+  .slice(2)
+  .find(arg => arg.startsWith('--sso-code='))
+  ?.slice('--sso-code='.length);
 
 const env = process.env;
 const coreBaseUrl = (env.ALIM_CORE_BASE_URL ?? '').replace(/\/+$/, '');
@@ -71,13 +77,22 @@ function printConfiguration(): void {
   console.log('');
 }
 
-/** The SSO exchange refuses codes it did not issue; that refusal is the proof the route works. */
-function classifySso(result: Awaited<ReturnType<HttpAlimCoreSsoClient['exchange']>>): Line {
+/**
+ * The SSO exchange refuses codes it did not issue; that refusal is the proof the route works.
+ *
+ * `--sso-code=<code>` takes a code Core's UI really issued, which is the only way to prove the
+ * SUCCESS path: it must come back `ok` with a `core_user_id`. A code is one-time, so this probe
+ * spends it — that is why it is never automatic.
+ */
+function classifySso(result: Awaited<ReturnType<HttpAlimCoreSsoClient['exchange']>>, issuedCode: boolean): Line {
   if (result.ok) {
+    const identity = result.identity;
     return {
       probe: 'SSO exchange',
-      verdict: 'FAIL',
-      detail: 'Core redeemed a code this probe invented — one-time semantics are not enforced',
+      verdict: 'PASS',
+      detail: issuedCode
+        ? `Core redeemed the issued code and returned core_user_id ${identity.coreUserId} (audience ${identity.audience}, scope ${identity.scope})`
+        : 'CONTRACT VIOLATION: Core redeemed a code this probe invented — one-time semantics are not enforced',
     };
   }
   switch (result.reason) {
@@ -122,8 +137,12 @@ function classifySso(result: Awaited<ReturnType<HttpAlimCoreSsoClient['exchange'
 async function probeSso(): Promise<Line> {
   const client = new HttpAlimCoreSsoClient(config);
   // A code Core cannot know. `state` is included so the probe exercises the optional field too.
-  const result = await client.exchange({ code: `probe-${randomUUID()}`, state: 'connect-readiness-probe' });
-  return classifySso(result);
+  // With `--sso-code=<code>` the probe spends a code Core really issued instead, which is the only
+  // way to see a successful exchange; the code itself is never printed.
+  const issuedCode = (ssoCode ?? '').trim();
+  const code = issuedCode !== '' ? issuedCode : `probe-${randomUUID()}`;
+  const result = await client.exchange({ code, state: 'connect-readiness-probe' });
+  return classifySso(result, issuedCode !== '');
 }
 
 /**

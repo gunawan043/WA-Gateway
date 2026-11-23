@@ -53,6 +53,8 @@
     "test:pg-smoke": "node scripts/pg-uuid-smoke.js",
     "test:pg-approval": "node -e \"if(process.env.DATABASE_TYPE!=='postgres')throw new Error('DATABASE_TYPE=postgres wajib diisi')\" && jest src/modules/approval/approval-retry.pg.spec.ts",
     "probe:alim-core": "ts-node scripts/alim-core-probe.ts",
+    "test:core-integration:lane": "ts-node scripts/alim-core-integration-lane.ts --lane-guard",
+    "test:core-integration": "ts-node scripts/alim-core-integration-lane.ts",
     "pg:local:start": "ts-node scripts/pg-local.ts",
     "pg:local:stop": "ts-node scripts/pg-local.ts --stop",
     "pg:local:status": "ts-node scripts/pg-local.ts --status",

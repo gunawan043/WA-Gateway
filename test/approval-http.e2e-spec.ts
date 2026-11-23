@@ -281,6 +281,10 @@ describe('Approval over HTTP with a mock Core at the HTTP boundary (e2e)', () =>
     return req.send(payload);
   };
 
+  // Dipakai test terakhir: satu permohonan dan satu balasan WhatsApp lewat rute yang sama, sehingga
+  // apa pun yang dikirim ke Core berasal dari aplikasi, bukan dari test.
+  const ingestApproval = (overrides: Record<string, unknown> = {}) => ingest(overrides);
+
   const reply = async (body: string, messageId: string): Promise<void> => {
     const result = await hooks.execute(
       'message:received',
@@ -780,5 +784,74 @@ describe('Approval over HTTP with a mock Core at the HTTP boundary (e2e)', () =>
         expect(value).toMatch(/^[a-z_]+$/);
       }
     });
+  });
+
+  /**
+   * Runs only when the process was pointed at a real Core (`ALIM_CORE_BASE_URL` plus the approval
+   * key set before this file loads). With no Core there is nothing to prove, so it skips instead of
+   * pretending: the mock sections above are the contract evidence until staging exists.
+   *
+   * It sends one permit and one WhatsApp reply through the ordinary routes, then reports what Core
+   * actually answered. `outcome: 'unavailable'` is a FAIL, not a skip — reaching this test means the
+   * operator asked for a real run, and an unreachable Core is the thing being tested.
+   */
+  describe('Z. ALIM Core sungguhan', () => {
+    const baseUrl = (process.env.ALIM_CORE_BASE_URL ?? '').trim();
+    const approvalKey = (process.env.ALIM_CORE_APPROVAL_API_KEY ?? '').trim();
+    const real = baseUrl !== '' && approvalKey !== '';
+    // A PERMIT for a nil UUID in a person's name is legal in Core's domain; a probe command is not.
+    const targetCorePersonId = '00000000-0000-4000-8000-000000000003';
+
+    (real ? it : it.skip)(
+      'mengirim satu command dan mencatat jawaban Core yang sebenarnya',
+      async () => {
+        const marker = `PROBE-C5-${randomUUID()}`;
+        coreCalls = [];
+
+        await supertest(app.getHttpServer())
+          .post('/api/approval/identities')
+          .set('x-api-key', adminKey)
+          .send({
+            externalIdentity: TARGET_NUMBER,
+            corePersonId: targetCorePersonId,
+            displayName: 'Probe staging',
+            isVerified: true,
+          })
+          .expect(201);
+
+        const ingested = await ingestApproval({
+          coreRequestId: randomUUID(),
+          reference: marker,
+          requestedDurationDays: 1,
+          notify: false,
+        }).expect(201);
+        const request = ingested.body as ApprovalRequestBody;
+
+        await reply(`SETUJU 1 HARI ${marker}`, `wamid-real-${randomUUID()}`);
+
+        const after = await detail(request.id);
+        const [command] = after.commands ?? [];
+
+        // Printed so the operator has a verbatim record; none of it is a credential or a permit body.
+        console.log(
+          '[real-core] approval command ' +
+            JSON.stringify({
+              commandId: command?.commandId,
+              status: command?.status,
+              attempts: command?.attempts,
+              coreResponseCode: command?.coreResponseCode,
+              errorCode: command?.errorCode,
+              requestStatus: after.status,
+              coreStatus: after.coreStatus,
+            }),
+        );
+
+        expect(command).toBeDefined();
+        expect([200, 201, 202]).toContain(command?.coreResponseCode);
+        expect(['APPLIED', 'DUPLICATE']).toContain(command?.status);
+        expect(after.status).toBe('APPROVED');
+      },
+      60_000,
+    );
   });
 });
