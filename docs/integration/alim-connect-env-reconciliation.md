@@ -50,35 +50,74 @@ ke `sso:exchange` dan `approval:command` secara terpisah.
 | `ALIM_CORE_WEB_ORIGIN`    | masuk (browser) | satu-satunya Origin yang boleh mem-post handoff dan meng-embed Connect                     | ya untuk SSO              | kosong → SSO mati, `frame-ancestors` tidak diperlebar |
 | `TRUSTED_PROXIES`         | masuk           | proxy yang `X-Forwarded-For`-nya dipercaya saat menilai IP pemanggil                       | tidak                     | kosong → hanya alamat socket                          |
 
-### 2.3 Nama di instruksi yang **tidak ada** di kode
+### 2.3 Dipasang di Core, bukan di Connect (`CONNECT_*`)
 
-| Nama di instruksi §2       | Nama aktual                                                                  | Catatan                                                                               |
-| -------------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| `CONNECT_SSO_API_KEY`      | `ALIM_CONNECT_SSO_KEY`                                                       | **credential Core** yang dikeluarkan Connect. Bukan milik Connect.                    |
-| `CONNECT_APPROVAL_API_KEY` | `ALIM_CORE_APPROVAL_API_KEY` (+ `ALIM_CORE_APPROVAL_API_HEADER`)             | pasangan yang sama seperti di atas.                                                   |
-| `CONNECT_SSO_FRAME_ORIGIN` | `ALIM_CORE_WEB_ORIGIN`                                                       | satu nilai mengisi allowlist Origin **dan** `frame-ancestors` CSP. Bukan dua setelan. |
-| `CONNECT_SSO_HANDOFF_URL`  | tidak ada setelan; rute **milik Connect sendiri** di `POST /api/sso/handoff` | Yang dikonfigurasi adalah URL Core yang di-embed, bukan URL handoff Connect.          |
-| `CONNECT_*_ALLOWED_IPS`    | tidak ada di kode                                                            | Lihat §3 — belum diimplementasikan.                                                   |
+Sebagian besar nama `CONNECT_*` **ada**, tetapi bukan milik Connect: semuanya dibaca
+`config/services.php` di repository ALIM Core. Menyetelnya di Connect tidak berpengaruh apa pun.
+Dialah sisi yang harus dipasang operator Core.
 
-Jadi `CONNECT_SSO_API_KEY` dan `ALIM_CONNECT_SSO_KEY` adalah **satu credential yang sama**, bukan dua;
-begitu pula pasangan approval. Menyetel empat nilai berbeda akan membuat dua di antaranya tidak
-dibaca kode dan dua lainnya kosong.
+| Nama (`CONNECT_*`)             | Pemilik | Arah yang dijelaskan         | Fungsi                                                                                         |
+| ------------------------------ | ------- | ---------------------------- | ---------------------------------------------------------------------------------------------- |
+| `CONNECT_SSO_API_KEY`          | Core    | masuk ke Core                | nilai yang dicocokkan terhadap key yang dikirim Connect (`ALIM_CONNECT_SSO_KEY`)               |
+| `CONNECT_SSO_SCOPES`           | Core    | —                            | cakupan key SSO; default `sso:exchange`                                                        |
+| `CONNECT_SSO_FRAME_ORIGIN`     | Core    | **Connect → Core (browser)** | origin **Connect** yang boleh di-iframe Core dan dipakai di `frame-src` CSP halaman embed Core |
+| `CONNECT_SSO_HANDOFF_URL`      | Core    | **Connect → Core (browser)** | URL halaman handoff **Connect** (`https://connect/sso/handoff`) yang di-iframe Core            |
+| `CONNECT_SSO_ALLOWED_IPS`      | Core    | masuk ke Core                | allowlist CIDR egress Connect di sisi Core                                                     |
+| `CONNECT_APPROVAL_API_KEY`     | Core    | masuk ke Core                | nilai yang dicocokkan terhadap key yang dikirim Connect (`ALIM_CORE_APPROVAL_API_KEY`)         |
+| `CONNECT_APPROVAL_SCOPES`      | Core    | —                            | cakupan key approval; default `approval:command`                                               |
+| `CONNECT_APPROVAL_ALLOWED_IPS` | Core    | masuk ke Core                | allowlist CIDR egress Connect di sisi Core                                                     |
+| `CONNECT_*_REQUIRE_HTTPS`      | Core    | —                            | menolak request non-HTTPS                                                                      |
+
+**Nama header juga milik Core.** `CONNECT_SSO_API_HEADER` dan `CONNECT_APPROVAL_API_HEADER` (di Core,
+defaultnya persis `X-ALIM-CONNECT-SSO-KEY` dan `X-ALIM-CONNECT-APPROVAL-KEY`) adalah pasangan dari
+`ALIM_CONNECT_SSO_API_HEADER` dan `ALIM_CORE_APPROVAL_API_HEADER` di Connect. Bila salah satu sisi
+mengganti nama header, sisi lain tidak tahu apa pun — request hanya gagal 401. Ubah keduanya, atau
+biarkan default di kedua sisi.
+
+**Koreksi terhadap versi sebelumnya dokumen ini.** Dua baris di tabel lama salah dan sudah diganti:
+
+- `CONNECT_SSO_FRAME_ORIGIN` **bukan** pasangan `ALIM_CORE_WEB_ORIGIN`. Keduanya berbicara arah
+  berlawanan: `ALIM_CORE_WEB_ORIGIN` (Connect) menyebut origin **Core**; `CONNECT_SSO_FRAME_ORIGIN`
+  (Core) menyebut origin **Connect**. Mengisi satu dengan nilai yang lain akan membuat kedua sisi
+  memercayai origin yang salah — dan SSO tetap mati di salah satu sisi tanpa pesan yang jelas.
+- `CONNECT_SSO_HANDOFF_URL` **bukan** "tidak ada setelan". Ia ada, di Core, dan harus berisi rute
+  handoff milik Connect.
+
+### 2.4 Pasangan credential: satu nilai untuk dua nama
+
+| Nilai yang sama          | Nama di Connect                        | Nama di Core                            |
+| ------------------------ | -------------------------------------- | --------------------------------------- |
+| key `sso:exchange`       | `ALIM_CONNECT_SSO_KEY` (dikirim)       | `CONNECT_SSO_API_KEY` (dicocokkan)      |
+| key `approval:command`   | `ALIM_CORE_APPROVAL_API_KEY` (dikirim) | `CONNECT_APPROVAL_API_KEY` (dicocokkan) |
+| nama header key SSO      | `ALIM_CONNECT_SSO_API_HEADER`          | `CONNECT_SSO_API_HEADER`                |
+| nama header key approval | `ALIM_CORE_APPROVAL_API_HEADER`        | `CONNECT_APPROVAL_API_HEADER`           |
+
+Dua nama, satu nilai. Ini bukan dua credential; menerbitkan dua nilai berbeda akan membuat setiap
+request ditolak 401/403 oleh Core.
+
+Satu nilai yang **memang berbeda tiap sisi** adalah kunci masuk: `ALIM_CONNECT_INGEST_KEY` (Connect)
+harus sama dengan nilai yang dipegang Core untuk memanggil `POST /api/approval/requests`. Nilainya
+diterbitkan operator Connect dan diserahkan ke Core, bukan sebaliknya.
 
 ---
 
-## 3. `CONNECT_*_ALLOWED_IPS` — belum ada, dan alasannya
+## 3. Allowlist IP: dua arah, dua keadaan
 
-Kode tidak memiliki allowlist IP untuk rute Core. Yang ada saat ini sebagai pengganti:
+**Outbound (Core memfilter Connect).** `CONNECT_SSO_ALLOWED_IPS` dan `CONNECT_APPROVAL_ALLOWED_IPS`
+ada dan berlaku di Core. Isinya CIDR egress staging Connect. Tanpa itu, Core menerima request dari
+IP mana pun yang memegang key.
 
-| Rute                          | Pengganti allowlist IP sekarang                               |
+**Inbound (Connect memfilter Core).** Connect **tidak** memiliki allowlist IP untuk request yang
+masuk dari Core. Yang berlaku sekarang:
+
+| Rute yang dipanggil Core      | Pengganti allowlist IP sekarang                               |
 | ----------------------------- | ------------------------------------------------------------- |
 | `POST /api/sso/handoff`       | allowlist **Origin** ketat + throttle 5/menit & 20/jam per IP |
 | `POST /api/approval/requests` | `ALIM_CONNECT_INGEST_KEY` (fail-closed 503 bila kosong)       |
 
-Ini bukan kelalaian yang disembunyikan: allowlist IP statis untuk Core berarti daftar IP yang harus
-dipelihara setiap kali Core memindahkan ingress, dan `ALIM_CORE_BASE_URL` berskema host. Ia **belum**
-diimplementasikan, jadi jangan diasumsikan ada. Bila Core mensyaratkannya, pekerjaan itu terpisah dan
-butuh daftar CIDR staging dari Core.
+Kunci layanan + throttle sudah membatasi dampak, tetapi keduanya tidak menyebut asal jaringan. Ini
+batas yang diketahui, bukan fitur tersembunyi: jangan melaporkan Connect punya allowlist IP Core.
+Menambahkannya butuh daftar CIDR ingress Core, dan itu pekerjaan terpisah.
 
 ---
 

@@ -52,18 +52,18 @@ lagi sebagai "kontradiksi".
 
 Lengkap di `docs/integration/alim-connect-env-reconciliation.md`. Ringkas:
 
-| Nama di instruksi §2         | Nama aktual                  | Hubungan                                                                                          |
-| ---------------------------- | ---------------------------- | ------------------------------------------------------------------------------------------------- |
-| `ALIM_CORE_BASE_URL`         | sama                         | keluar, wajib untuk keduanya                                                                      |
-| `ALIM_CONNECT_SSO_KEY`       | sama                         | **keluar** — kredensial milik Core, bukan Connect                                                 |
-| `ALIM_CORE_WEB_ORIGIN`       | sama                         | mengisi allowlist Origin **dan** `frame-ancestors` sekaligus                                      |
-| `ALIM_CORE_APPROVAL_API_KEY` | sama                         | keluar                                                                                            |
-| `ALIM_CONNECT_INGEST_KEY`    | sama                         | **masuk** — Core memegangnya untuk memanggil Connect                                              |
-| `CONNECT_SSO_API_KEY`        | `ALIM_CONNECT_SSO_KEY`       | **satu credential yang sama**, bukan dua                                                          |
-| `CONNECT_APPROVAL_API_KEY`   | `ALIM_CORE_APPROVAL_API_KEY` | satu credential yang sama                                                                         |
-| `CONNECT_SSO_FRAME_ORIGIN`   | `ALIM_CORE_WEB_ORIGIN`       | satu nilai, bukan dua setelan                                                                     |
-| `CONNECT_SSO_HANDOFF_URL`    | tidak ada setelan            | rute milik Connect sendiri di `POST /api/sso/handoff`                                             |
-| `CONNECT_*_ALLOWED_IPS`      | **tidak ada di kode**        | belum diimplementasikan; penggantinya Origin allowlist + throttle (SSO) dan ingest key (approval) |
+| Nama di instruksi §2         | Nama aktual                  | Hubungan                                                                                                                                              |
+| ---------------------------- | ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ALIM_CORE_BASE_URL`         | sama                         | keluar, wajib untuk keduanya                                                                                                                          |
+| `ALIM_CONNECT_SSO_KEY`       | sama                         | **keluar** — kredensial milik Core, bukan Connect                                                                                                     |
+| `ALIM_CORE_WEB_ORIGIN`       | sama                         | orientasi **Core → Origin browser Connect**: mengisi allowlist Origin **dan** `frame-ancestors` sekaligus                                             |
+| `ALIM_CORE_APPROVAL_API_KEY` | sama                         | keluar                                                                                                                                                |
+| `ALIM_CONNECT_INGEST_KEY`    | sama                         | **masuk** — Core memegangnya untuk memanggil Connect                                                                                                  |
+| `CONNECT_SSO_API_KEY`        | `ALIM_CONNECT_SSO_KEY`       | **nama Core** untuk credential yang sama; Connect tidak pernah membaca nama `CONNECT_*`                                                               |
+| `CONNECT_APPROVAL_API_KEY`   | `ALIM_CORE_APPROVAL_API_KEY` | idem — satu credential, dua nama di dua sistem                                                                                                        |
+| `CONNECT_SSO_FRAME_ORIGIN`   | `ALIM_CORE_WEB_ORIGIN`       | **arah berlawanan**: nilai Core ini adalah Origin **Connect** (sisi yang diizinkan meng-embed), sedangkan `ALIM_CORE_WEB_ORIGIN` = Origin Core        |
+| `CONNECT_SSO_HANDOFF_URL`    | tidak ada setelan Connect    | **arah berlawanan**: handout Core menunjuk URL handoff **Connect** (`POST /api/sso/handoff`)                                                          |
+| `CONNECT_*_ALLOWED_IPS`      | **tidak ada di kode**        | milik Core, menyaring IP **keluar** Core → Connect; Connect tidak punya allowlist IP masuk (penggantinya Origin allowlist + throttle, dan ingest key) |
 
 Semua variabel yang dibaca kode terverifikasi terdaftar di `BLANK_SHADOWED_ENV_KEYS`, sehingga nilai
 kosong dari compose berarti "tidak di-set" dan tidak menutupi `.env`.
