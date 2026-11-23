@@ -917,13 +917,71 @@ describe('Approval over HTTP with a mock Core at the HTTP boundary (e2e)', () =>
         // yang tidak memanggil Core. Kasus kedua dibuktikan dengan tidak adanya request, bukan
         // dengan menganggapnya lulus — dan sebabnya disebut agar keluar sebagai diagnosa.
         if (!command) {
-          expect(coreCalls).toHaveLength(0);
+          // A real Core never reaches the loopback recorder, so this is reported, not asserted on it.
           throw new Error(`no command was created: request status ${after.status} did not produce one`);
         }
 
         expect([200, 201, 202]).toContain(command.coreResponseCode);
         expect(['APPLIED', 'DUPLICATE']).toContain(command.status);
         expect(after.status).toBe('APPROVED');
+
+        // The Connect-side trail, read back through the repository the processor writes to. Core's
+        // verdict is confirmed above; this proves Connect recorded the same verdict.
+        //
+        // `commandId` is absent here for a reason worth stating: `AuditService.log` merges the live
+        // request id *last*, so a row written inside the message hook carries `requestId` where the
+        // command id would be. The row is found by `coreRequestId` instead, and the processor spec
+        // pins the precedence (`mempertahankan commandId walau AuditService menimpanya`).
+        const trails = (
+          await app.get<Repository<AuditLog>>(getRepositoryToken(AuditLog, 'main')).find({
+            where: { action: AuditAction.APPROVAL_COMMAND },
+            order: { createdAt: 'DESC' },
+            take: 20,
+          })
+        ).filter(row => row.metadata?.coreRequestId === request.coreRequestId);
+
+        expect(trails).toHaveLength(1);
+        expect(trails[0].metadata).toMatchObject({
+          coreResponseCode: command.coreResponseCode,
+          commandStatus: command.status,
+          decision: command.decision,
+          coreRequestId: request.coreRequestId,
+        });
+
+        const serialised = JSON.stringify(trails[0].metadata);
+        expect(serialised).not.toContain(TARGET_NUMBER);
+        expect(serialised).not.toContain(marker);
+        expect(serialised).not.toContain(approvalKey);
+
+        // A second reply for a decision already settled must not become a second command.
+        const settled = (await detail(request.id)).commands?.length ?? 0;
+        await reply(`SETUJU 1 HARI ${request.reference}`, `wamid-real-again-${randomUUID()}`);
+        expect((await detail(request.id)).commands?.length ?? 0).toBe(settled);
+
+        // Retry path against Core. The suite's own policy (400 ms timeout, 2 attempts) is reused on
+        // purpose: a temporary env override here would also apply to the mock sections above, because
+        // config is read once at module load. A permit Core just approved answers the replay with a
+        // business refusal, so the command is expected to end `REJECTED` writing no second decision.
+        const sent = command.attempts;
+        const now = new Date();
+        await commands.update(
+          { commandId: command.commandId },
+          { status: 'UNKNOWN', nextAttemptAt: null, lastAttemptAt: now },
+        );
+
+        const stats = await retry.runOnce(new Date(now.getTime() + 1_000));
+
+        console.log('[real-core] approval retry ' + JSON.stringify(stats));
+
+        const replayed = (await detail(request.id)).commands?.find(c => c.commandId === command.commandId);
+
+        const final = await detail(request.id);
+
+        expect(replayed?.attempts ?? 0).toBe(sent + 1);
+        expect(['APPLIED', 'DUPLICATE', 'REJECTED', 'FAILED']).toContain(replayed?.status);
+        // Whatever Core answered the second time, it never became a second decision in Connect.
+        expect(final.status).toBe('APPROVED');
+        expect(final.commands).toHaveLength(settled);
       },
       60_000,
     );

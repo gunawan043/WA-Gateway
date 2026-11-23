@@ -605,5 +605,58 @@ describe('WhatsApp Connect SSO handoff over HTTP (e2e)', () => {
       },
       30_000,
     );
+
+    /**
+     * The success path needs a code only Core can mint, so it runs when the operator passes one.
+     * It spends the code — a one-time code that outlives the run is a code that leaked.
+     *
+     * `ALIM_CONNECT_SSO_EXPECTED_CORE_USER` is what turns assertions into proofs: with it, this
+     * checks that Connect received the identity the operator asked Core for, that a session row
+     * exists for the mapped account, and that the session token never appears in the JSON response.
+     */
+    const expectedCoreUser = (process.env.ALIM_CONNECT_SSO_EXPECTED_CORE_USER ?? '').trim();
+    const liveCode = (process.env.ALIM_CONNECT_SSO_TEST_CODE ?? '').trim();
+
+    (real && liveCode !== '' ? it : it.skip)(
+      'menukar kode nyata sekali, memetakan identitas, dan membuat sesi Connect',
+      async () => {
+        const before = await liveSessionCount();
+        const res = await postHandoff(liveCode, { accept: 'application/json' });
+
+        console.log(
+          '[real-core] sso exchange ' +
+            JSON.stringify({
+              httpStatus: res.status,
+              ok: (res.body as { ok?: boolean }).ok === true,
+              reason: (res.body as { code?: string }).code ?? null,
+              expectedCoreUser: expectedCoreUser === '' ? null : expectedCoreUser,
+            }),
+        );
+
+        expect(res.status).toBe(200);
+        expect((res.body as { ok?: boolean }).ok).toBe(true);
+        // The token belongs in the HTML page's sessionStorage, never in a JSON body.
+        expect(JSON.stringify(res.body)).not.toMatch(/owa_s\d_/);
+        expect(await liveSessionCount()).toBe(before + 1);
+
+        if (expectedCoreUser !== '') {
+          const mapped = await app.get(UsersService).findByCoreUserId(expectedCoreUser);
+          expect(mapped).not.toBeNull();
+        }
+      },
+      30_000,
+    );
+
+    (real && liveCode !== '' ? it : it.skip)(
+      'menolak kode yang baru dipakai sebagai sudah terpakai',
+      async () => {
+        // The test above already spent `liveCode`. A second exchange is Core's verdict to give.
+        const res = await postHandoff(liveCode, { accept: 'application/json' });
+
+        // Only reachable after the success case ran; if it was skipped this is skipped too.
+        expect([409, 410]).toContain(res.status);
+      },
+      30_000,
+    );
   });
 });

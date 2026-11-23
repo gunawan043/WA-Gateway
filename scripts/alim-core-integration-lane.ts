@@ -11,6 +11,9 @@
  *   npm run test:core-integration -- --approval         # + one real approval command
  *   npm run test:core-integration -- --sso-code=<code>  # + one real SSO exchange (spends the code)
  *
+ * The two SSO success settings are read by the spec, not by the application, so they are reported as
+ * an optional line under SSO: without them the success proof skips while everything else passes.
+ *
  * Exit codes: 0 ready / lane passed; 1 a test failed; 2 configuration incomplete;
  * 3 a spec named here does not exist (a silent skip waiting to happen).
  *
@@ -80,6 +83,9 @@ const ssoCode = args.find(arg => arg.startsWith('--sso-code='))?.slice('--sso-co
 const repoRoot = path.resolve(__dirname, '..');
 const isSet = (key: string): boolean => (process.env[key] ?? '').trim() !== '';
 
+/** Read by `test/sso-handoff-http.e2e-spec.ts` to turn the success proof from "ran" into "proved". */
+const SSO_PROOF_KEYS = ['ALIM_CONNECT_SSO_TEST_CODE', 'ALIM_CONNECT_SSO_EXPECTED_CORE_USER'];
+
 function report(label: string, checks: Check[]): boolean {
   const absent = checks.filter(check => !isSet(check.env));
   const hard = absent.filter(check => check.required);
@@ -122,6 +128,16 @@ function main(): void {
   const approvalChecks = CHECKS.filter(check => check.scope !== 'sso');
   const ssoReady = report('SSO (exchange)', ssoChecks);
   const approvalReady = report('approval (command)', approvalChecks);
+
+  const missingProof = SSO_PROOF_KEYS.filter(key => !isSet(key));
+  if (missingProof.length === 0) {
+    console.log(`  ${'SSO success proof'.padEnd(26)} ready`);
+  } else {
+    console.log(`  ${'SSO success proof'.padEnd(26)} OPTIONAL ${missingProof.join(', ')}`);
+    console.log(
+      `  ${''.padEnd(26)}   skips     the success path needs a code Core issued; without it only refusals are proven`,
+    );
+  }
 
   if (guardOnly) {
     console.log('');
