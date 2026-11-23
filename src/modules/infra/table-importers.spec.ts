@@ -229,3 +229,74 @@ describe('table importers: JSON text that does not parse', () => {
     }
   });
 });
+
+/**
+ * The restore loop is table-agnostic, so the two things it relies on must hold for EVERY importer:
+ * `map()` returns exactly one bind parameter per `$n` placeholder (a short or long array would fail
+ * the insert for the whole table), and `id()` names the row for the failure warning.
+ *
+ * A minimal row is deliberate: a backup taken before a column existed omits it, and the importer has
+ * to fall back to a documented default rather than bind `undefined`.
+ */
+describe('every table importer', () => {
+  const cases = TABLE_IMPORTERS.map(importer => [importer.key, importer] as const);
+
+  it.each(cases)('%s maps a minimal row to one argument per placeholder', (_key, importer) => {
+    const args = importer.map({ id: 'row-1' } as never);
+    const placeholders = new Set(importer.sql.match(/\$\d+/g));
+
+    expect(Array.isArray(args)).toBe(true);
+    expect(args).toHaveLength(placeholders.size);
+  });
+
+  // `lid_mappings` keys on `lid` and a chat state on its session+chat pair, so the id is not always
+  // `row.id`; what the loop needs is a non-empty string to name the row in a failure warning.
+  it.each(cases)('%s names a row for its failure warning', (_key, importer) => {
+    const id = importer.id({ id: 'row-1', lid: 'lid-1', sessionId: 's1', chatId: 'c1' } as never);
+
+    expect(typeof id).toBe('string');
+    expect(id.length).toBeGreaterThan(0);
+    expect(id).not.toContain('undefined');
+  });
+
+  it.each(cases)('%s declares a singular label for its warnings', (_key, importer) => {
+    expect(importer.label.length).toBeGreaterThan(0);
+    expect(importer.label).not.toMatch(/s$/);
+  });
+});
+
+// A division restored without these columns must still route: the keywords list is the menu, and
+// sortOrder/slaMinutes/isActive are the values the router reads on every message.
+describe('divisions table importer defaults', () => {
+  const divisions = TABLE_IMPORTERS.find(importer => importer.key === 'divisions')!;
+
+  it('fills the routing defaults an older backup omits', () => {
+    const args = divisions.map({ id: 'd1', sessionId: 's1', createdAt: 'c', updatedAt: 'u' } as never);
+
+    // keywords is the menu, so an absent list must restore as an empty one, not as NULL.
+    expect(args[3]).toBe('[]');
+    expect(args[6]).toBe(0); // sortOrder
+    expect(args[7]).toBe(0); // slaMinutes
+    expect(args[8]).toBe(true); // isActive
+  });
+
+  it('keeps keywords as text, and encodes a list', () => {
+    const asText = divisions.map({
+      id: 'd1',
+      sessionId: 's1',
+      keywords: 'sales',
+      createdAt: 'c',
+      updatedAt: 'u',
+    } as never);
+    const asList = divisions.map({
+      id: 'd1',
+      sessionId: 's1',
+      keywords: ['sales', 'support'],
+      createdAt: 'c',
+      updatedAt: 'u',
+    } as never);
+
+    expect(asText[3]).toBe('sales');
+    expect(asList[3]).toBe('["sales","support"]');
+  });
+});

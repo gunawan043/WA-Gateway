@@ -15,7 +15,10 @@ jest.mock('fs', () => {
   };
 });
 
+jest.mock('./update-check', () => ({ checkForUpdate: jest.fn() }));
+
 import { InfraStatusController } from './infra-status.controller';
+import { checkForUpdate } from './update-check';
 import { InfraConfigController } from './infra-config.controller';
 import type { ConfigSectionContext } from './config-sections';
 import type { SaveConfigDto } from './dto/save-config.dto';
@@ -687,5 +690,84 @@ describe('InfraStatusController unavailable Docker inventory', () => {
     expect(empty.redis.running).toBe(false);
     expect(recovered.redis.builtIn).toBe(true);
     expect(recovered.redis.running).toBe(true);
+  });
+});
+
+// A backend that dies after init keeps `isInitialized` true, so the probe is what decides the tile.
+// The timeout is the other half: a hung connection must resolve to "not connected" instead of
+// holding the poll open.
+describe('InfraStatusController.getStatus DB probe timeout', () => {
+  it('reports connected:false when SELECT 1 never settles', async () => {
+    const config = { get: (key: string, def?: unknown) => (key === 'engine.type' ? 'baileys' : def) };
+    const ds = { isInitialized: true, query: jest.fn(() => new Promise(() => undefined)) };
+    const controller = new InfraStatusController(
+      config as never,
+      ds as never,
+      ds as never,
+      {} as never,
+      { isDockerAvailable: () => false } as never,
+      { isAvailable: () => Promise.resolve(false) } as never,
+      { refreshS3Availability: () => Promise.resolve(false) } as never,
+    );
+
+    jest.useFakeTimers();
+    try {
+      const pending = controller.getStatus();
+      await jest.advanceTimersByTimeAsync(3000);
+      const status = await pending;
+      expect(status.database.connected).toBe(false);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+});
+
+describe('InfraStatusController small routes', () => {
+  const build = (engines: unknown[] = [], current = 'baileys') => {
+    const engineFactory = {
+      getAvailableEngines: jest.fn().mockReturnValue(engines),
+      getCurrentEngine: jest.fn().mockReturnValue(current),
+    };
+    const controller = new InfraStatusController(
+      { get: (_key: string, def?: unknown) => def } as never,
+      {} as never,
+      {} as never,
+      engineFactory as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+    return { controller, engineFactory };
+  };
+
+  it('lists the engines the factory reports', () => {
+    const engines = [{ id: 'whatsapp-web.js', name: 'WhatsApp Web', enabled: true, features: [] }];
+    const { controller, engineFactory } = build(engines);
+
+    expect(controller.getEngines()).toBe(engines);
+    expect(engineFactory.getAvailableEngines).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports the current engine in the documented envelope', () => {
+    const { controller } = build([], 'whatsapp-web.js');
+
+    expect(controller.getCurrentEngine()).toEqual({ engineType: 'whatsapp-web.js' });
+  });
+
+  it('answers the update check with whatever the checker returns', async () => {
+    const result = { current: '1.0.0', latest: '1.1.0', updateAvailable: true };
+    (checkForUpdate as unknown as jest.Mock).mockResolvedValue(result);
+    const { controller } = build();
+
+    await expect(controller.getUpdateCheck()).resolves.toBe(result);
+  });
+
+  it('answers health with a timestamp and no dependency probe', () => {
+    const { controller } = build();
+
+    const health = controller.healthCheck();
+
+    expect(health.status).toBe('ok');
+    expect(Number.isNaN(Date.parse(health.timestamp))).toBe(false);
   });
 });

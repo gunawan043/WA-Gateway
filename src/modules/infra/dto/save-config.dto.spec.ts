@@ -123,3 +123,44 @@ describe('SaveConfigDto section types', () => {
     expect(errors.map(e => e.property)).toEqual([section]);
   });
 });
+
+/**
+ * Every nested section is declared as a lazy `type: () => Dto` thunk so Swagger can build the schema
+ * without a circular import. The thunk only runs when a schema is generated, which this suite never
+ * does — so a thunk pointing at the wrong class, or resolving to `undefined` through a cycle, would
+ * first surface in the OpenAPI export. Resolving each one here pins the mapping in the fast lane.
+ */
+describe('SaveConfigDto nested schema types', () => {
+  const METADATA = 'swagger/apiModelProperties';
+  const propertyNames = (
+    Reflect.getOwnMetadata('swagger/apiModelPropertiesArray', SaveConfigDto.prototype) as string[]
+  ).map(name => name.replace(/^:/, ''));
+
+  const expected: Record<string, string> = {
+    database: 'DatabaseConfigDto',
+    redis: 'RedisConfigDto',
+    queue: 'QueueConfigDto',
+    storage: 'StorageConfigDto',
+    engine: 'EngineConfigDto',
+  };
+
+  it('declares exactly the five nested sections', () => {
+    expect([...propertyNames].sort()).toEqual(Object.keys(expected).sort());
+  });
+
+  it.each(Object.entries(expected))('%s resolves to %s', (property, className) => {
+    const meta = Reflect.getOwnMetadata(METADATA, SaveConfigDto.prototype, property) as {
+      type?: unknown;
+      required?: boolean;
+    };
+
+    expect(meta).toBeDefined();
+    expect(typeof meta.type).toBe('function');
+
+    const resolved = (meta.type as () => unknown)() as { name?: string };
+    expect(resolved).toBeDefined();
+    expect(resolved.name).toBe(className);
+    // Every section is optional: a save may change one without resending the others.
+    expect(meta.required).toBe(false);
+  });
+});
