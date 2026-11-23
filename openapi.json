@@ -31840,7 +31840,7 @@
             "$ref": "#/components/schemas/CampaignContentDto"
           },
           "audience": {
-            "description": "Defaults to `manual` with no chats.",
+            "description": "Who receives the campaign. Required in practice: a `manual` audience needs at least one chatId, `segment` needs segmentId, and `label` needs labelId.",
             "allOf": [
               {
                 "$ref": "#/components/schemas/CampaignAudienceDto"
