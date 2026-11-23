@@ -10,7 +10,7 @@ export class CrmDealActivity {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
-  @Column({ type: 'varchar', length: 36 })
+  @Column({ type: 'varchar' })
   dealId!: string;
 
   @ManyToOne(() => CrmDeal, { onDelete: 'CASCADE' })

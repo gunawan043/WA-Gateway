@@ -72,6 +72,18 @@
 | 35c | [ALIM Core Connect API Contract Draft](./35c-alim-core-connect-api-contract-draft.md) | Tahap 0: draft contract, mock server, fixtures and contract tests |
 | 36  | [WhatsApp Approval Workflow](./36-whatsapp-approval-workflow.md)         | Core command API and Connect's WhatsApp approval flow, with tests and open decisions |
 
+**Integration audits**
+
+| Document                                                                              | Description                                                                     |
+| ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| [ALIM Connect TODO Reconciliation](./integration/alim-connect-todo-reconciliation.md) | Per-item status of the ALIM Connect TODO list, open risks and Core dependencies |
+| [PDCA Cycle 1 — HTTP E2E Approval](./integration/alim-connect-pdca-cycle-1.md)       | Cycle-1 plan/do/check/act report for the approval HTTP E2E suite                |
+| [Core Integration Contract](./integration/alim-connect-core-integration-contract.md) | Connect side of the Approval Command API contract, ready for Core to implement  |
+| [PDCA Cycle 2 — Technical Readiness](./integration/alim-connect-pdca-cycle-2.md)     | Cycle-2 PXP measurements, contract, retention and readiness status              |
+| [SSO Handoff Contract](./integration/alim-connect-whatsapp-connect-sso-contract.md)  | Connect side of the WhatsApp Connect SSO handoff contract and env configuration |
+| [PDCA Cycle 3 — SSO Handoff](./integration/alim-connect-pdca-cycle-3-sso.md)         | Cycle-3 plan/do/check/act report for the SSO handoff, with actual results       |
+| [SSO Browser Test Procedure](./integration/alim-connect-sso-browser-test.md)         | Reproducible Chrome/Safari/Firefox procedure and the blockers that remain       |
+
 **Examples**
 
 | Example                                                                        | Description                                                              |

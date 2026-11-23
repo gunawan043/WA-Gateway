@@ -227,7 +227,9 @@ describe('InboxService.update', () => {
 describe('InboxService notes', () => {
   it('creates a conversation row when the chat had none and records the author', async () => {
     const { service, conversations, notes, audit } = makeService();
-    conversations.save.mockImplementation((row: Record<string, unknown>) => Promise.resolve({ ...row, id: 'conv-1' }));
+    conversations.save.mockImplementation((row: unknown) =>
+      Promise.resolve({ ...(row as Record<string, unknown>), id: 'conv-1' }),
+    );
 
     const note = await service.addNote('sess-1', '628111@c.us', 'Follow up besok', actor);
 

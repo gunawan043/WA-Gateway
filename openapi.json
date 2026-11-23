@@ -19837,6 +19837,65 @@
         ]
       }
     },
+    "/api/sso/handoff": {
+      "post": {
+        "description": "Receives the one-time code ALIM Core issued for the embedded Connect page, exchanges it with Core server-to-server, maps core_user_id to an existing Connect account and starts a Connect session. The code is accepted only in the form body; it is never read from the query string or a URL. A browser receives the success page; a client that asks for application/json receives the outcome without the session token.",
+        "operationId": "SsoHandoffController_receive",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/SsoHandoffDto"
+              }
+            },
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SsoHandoffDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Handoff accepted and a Connect session was issued"
+          },
+          "400": {
+            "description": "Missing or malformed code (code_required, invalid_payload)"
+          },
+          "403": {
+            "description": "Origin not allowed, permission revoked, audience/scope mismatch, or identity not mapped"
+          },
+          "409": {
+            "description": "The one-time code was already used"
+          },
+          "410": {
+            "description": "The one-time code expired"
+          },
+          "422": {
+            "description": "The code is missing from the request (code_required)"
+          },
+          "429": {
+            "description": "Too many handoff attempts from this address"
+          },
+          "502": {
+            "description": "Connect could not verify the handoff with ALIM Core"
+          },
+          "503": {
+            "description": "SSO is not configured on this deployment"
+          },
+          "504": {
+            "description": "ALIM Core timed out while redeeming the code"
+          }
+        },
+        "summary": "Complete a WhatsApp Connect SSO handoff",
+        "tags": [
+          "sso"
+        ],
+        "security": []
+      }
+    },
     "/api/sessions/{sessionId}/catalog": {
       "get": {
         "operationId": "CatalogController_getCatalog",
@@ -22641,6 +22700,10 @@
       "description": "WhatsApp approval workflow: permits from ALIM Core and WhatsApp identity mapping"
     },
     {
+      "name": "sso",
+      "description": "WhatsApp Connect SSO handoff from ALIM Core"
+    },
+    {
       "name": "campaigns",
       "description": "Broadcast campaigns (audience, chunks and per-recipient results)"
     },
@@ -23273,6 +23336,11 @@
             "type": "string",
             "description": "The linked API key id (its plaintext is never issued)"
           },
+          "coreUserId": {
+            "type": "string",
+            "description": "ALIM Core `core_user_id` mapped to this account, or null when unmapped",
+            "nullable": true
+          },
           "lastLoginAt": {
             "type": "string",
             "description": "Last successful sign-in",
@@ -23518,6 +23586,11 @@
             "description": "Initial password, at least 12 characters",
             "example": "a-long-passphrase",
             "minLength": 12
+          },
+          "coreUserId": {
+            "type": "object",
+            "description": "ALIM Core `core_user_id` this account signs in as through the WhatsApp Connect SSO handoff. Optional; an unmapped account can still sign in with its password.",
+            "example": "9f1c2a44-3c55-4c1e-9c1f-2b7d8e6a5f03"
           }
         },
         "required": [
@@ -23547,6 +23620,11 @@
           "isActive": {
             "type": "boolean",
             "description": "Set false to disable the account immediately; every live session is revoked"
+          },
+          "coreUserId": {
+            "type": "string",
+            "description": "ALIM Core `core_user_id` mapped to this account for the SSO handoff. Send null (or an empty string) to remove the mapping; the account then cannot be reached through SSO.",
+            "nullable": true
           }
         }
       },
@@ -32398,6 +32476,23 @@
         "required": [
           "externalIdentity",
           "corePersonId"
+        ]
+      },
+      "SsoHandoffDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "One-time handoff code issued by ALIM Core. Never accepted as proof on its own.",
+            "example": "h_9f1c2a443c554c1e9c1f2b7d8e6a5f01"
+          },
+          "state": {
+            "type": "string",
+            "description": "Opaque state Core issued with the code. Forwarded unchanged; never interpreted."
+          }
+        },
+        "required": [
+          "code"
         ]
       },
       "CatalogDto": {

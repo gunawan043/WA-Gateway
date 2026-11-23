@@ -30,7 +30,7 @@ export class CrmDeal {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
-  @Column({ type: 'varchar', length: 36 })
+  @Column({ type: 'varchar' })
   stageId!: string;
 
   @ManyToOne(() => CrmStage, stage => stage.deals, { onDelete: 'RESTRICT' })

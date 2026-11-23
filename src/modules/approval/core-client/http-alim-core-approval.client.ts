@@ -45,6 +45,7 @@ export class HttpAlimCoreApprovalClient implements AlimCoreApprovalClient {
     const baseUrl = (this.config.get<string>('connect.approval.coreBaseUrl') ?? '').replace(/\/+$/, '');
     const apiKey = this.config.get<string>('connect.approval.coreApiKey') ?? '';
     const header = this.config.get<string>('connect.approval.coreApiHeader') ?? 'X-ALIM-CONNECT-APPROVAL-KEY';
+    const apiVersion = this.config.get<string>('connect.approval.apiVersion') ?? '1';
     const timeoutMs = this.config.get<number>('connect.approval.timeoutMs') ?? 5000;
 
     if (baseUrl === '' || apiKey === '') {
@@ -65,6 +66,18 @@ export class HttpAlimCoreApprovalClient implements AlimCoreApprovalClient {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
 
+    // Dua header kontrak, dikirim selalu kecuali versi dikosongkan:
+    //  - `Idempotency-Key` mengulang `command_id` di jalur HTTP, sehingga proxy atau gateway Core
+    //    dapat menolak pengiriman ulang sebelum body dibaca. Nilainya identik dengan body supaya
+    //    keduanya tidak pernah menyimpang.
+    //  - `X-ALIM-API-Version` menyatakan versi kontrak yang dipakai Connect.
+    // Core boleh mengabaikan keduanya; Connect tidak bergantung pada balasannya.
+    const contractHeaders: Record<string, string> = { 'Idempotency-Key': command.commandId };
+
+    if (apiVersion !== '') {
+      contractHeaders['X-ALIM-API-Version'] = apiVersion;
+    }
+
     try {
       const response = await fetch(`${baseUrl}/api/connect/v1/approval-commands`, {
         method: 'POST',
@@ -72,6 +85,7 @@ export class HttpAlimCoreApprovalClient implements AlimCoreApprovalClient {
           'content-type': 'application/json',
           accept: 'application/json',
           [header]: apiKey,
+          ...contractHeaders,
         },
         body: JSON.stringify({
           command_id: command.commandId,

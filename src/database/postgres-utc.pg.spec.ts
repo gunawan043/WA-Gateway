@@ -1,27 +1,20 @@
 /* istanbul ignore file -- PG-gated: only runs under DATABASE_TYPE=postgres (test-postgres CI job);
    skipped in the default test job, so its lines would be unread and skew the global coverage gate. */
 import 'reflect-metadata';
+import { join } from 'path';
 import { DataSource, EntitySchema, LessThan } from 'typeorm';
 import type { ClientBase } from 'pg';
 import { assertDataConnectionUtc, postgresUtcExtra } from './postgres-utc';
 import { InfraDataService, sqliteDatetimeColumns, toSqliteDatetime } from '../modules/infra/infra-data.service';
-import { Session, SessionStatus } from '../modules/session/entities/session.entity';
-import { Webhook } from '../modules/webhook/entities/webhook.entity';
-import { Message, MessageDirection, MessageStatus } from '../modules/message/entities/message.entity';
-import { MessageBatch } from '../modules/message/entities/message-batch.entity';
-import { Template } from '../modules/template/entities/template.entity';
-import { BaileysStoredMessage } from '../engine/adapters/baileys-stored-message.entity';
-import { LidMapping } from '../engine/identity/lid-mapping.entity';
-import { ChatState } from '../engine/adapters/baileys-chat-state.entity';
-import { PluginInstance } from '../modules/integration/entities/plugin-instance.entity';
-import { ConversationMapping } from '../modules/integration/entities/conversation-mapping.entity';
-import { IngressEvent } from '../modules/integration/entities/ingress-event.entity';
-import { WebhookDeliveryFailure } from '../modules/webhook/entities/webhook-delivery-failure.entity';
-import { WebhookOutboxEvent } from '../modules/webhook/entities/webhook-outbox-event.entity';
+import { SessionStatus } from '../modules/session/entities/session.entity';
+import type { Session } from '../modules/session/entities/session.entity';
+import { MessageDirection, MessageStatus } from '../modules/message/entities/message.entity';
+import type { Message } from '../modules/message/entities/message.entity';
+import type { LidMapping } from '../engine/identity/lid-mapping.entity';
+import type { ChatState } from '../engine/adapters/baileys-chat-state.entity';
+import type { BaileysStoredMessage } from '../engine/adapters/baileys-stored-message.entity';
+import type { WebhookOutboxEvent } from '../modules/webhook/entities/webhook-outbox-event.entity';
 import { WebhookOutboxService } from '../modules/webhook/webhook-outbox.service';
-import { IntegrationDeliveryFailure } from '../modules/integration/entities/integration-delivery-failure.entity';
-import { StatusUpdate } from '../modules/status-store/entities/status-update.entity';
-import { AutomationRule } from '../modules/automation/entities/automation-rule.entity';
 import { StatsService } from '../modules/stats/stats.service';
 import type { MigrationTables } from '../modules/infra/migration-tables.types';
 
@@ -49,23 +42,28 @@ const AFTER_ID = '55555555-5555-4555-8555-555555555555';
 /** An instant as the naive UTC text a pinned server writes into a `timestamp` column. */
 const utcWallText = (at: Date): string => at.toISOString().replace('T', ' ').replace('Z', '');
 
+/**
+ * The `data` connection's entity set, by the same globs `data-source.ts` uses.
+ *
+ * It used to be a hand-written array of classes, and that is exactly how it broke: a module added
+ * later (division, crm, inbox, campaign, approval) was missing from the list, so `exportData()`
+ * refused metadata for a table `EXPORT_TABLES` names and every export test failed for a reason
+ * unrelated to UTC. A glob cannot drift from the app's own definition.
+ */
 const ENTITIES = [
-  Session,
-  Webhook,
-  Message,
-  MessageBatch,
-  Template,
-  BaileysStoredMessage,
-  LidMapping,
-  ChatState,
-  PluginInstance,
-  ConversationMapping,
-  IngressEvent,
-  WebhookDeliveryFailure,
-  WebhookOutboxEvent,
-  IntegrationDeliveryFailure,
-  StatusUpdate,
-  AutomationRule,
+  join(__dirname, '../modules/session/**/*.entity{.ts,.js}'),
+  join(__dirname, '../modules/webhook/**/*.entity{.ts,.js}'),
+  join(__dirname, '../modules/message/**/*.entity{.ts,.js}'),
+  join(__dirname, '../modules/template/**/*.entity{.ts,.js}'),
+  join(__dirname, '../engine/**/*.entity{.ts,.js}'),
+  join(__dirname, '../modules/integration/**/*.entity{.ts,.js}'),
+  join(__dirname, '../modules/status-store/**/*.entity{.ts,.js}'),
+  join(__dirname, '../modules/automation/**/*.entity{.ts,.js}'),
+  join(__dirname, '../modules/inbox/**/*.entity{.ts,.js}'),
+  join(__dirname, '../modules/crm/**/*.entity{.ts,.js}'),
+  join(__dirname, '../modules/campaign/**/*.entity{.ts,.js}'),
+  join(__dirname, '../modules/division/**/*.entity{.ts,.js}'),
+  join(__dirname, '../modules/approval/**/*.entity{.ts,.js}'),
 ];
 
 /**
@@ -94,6 +92,13 @@ const SqliteSession = new EntitySchema<Record<string, unknown>>({
 });
 
 (POSTGRES_ENABLED ? describe : describe.skip)('postgres UTC pin (real server, non-UTC process)', () => {
+  // These tests export every table and restore it twice, which is thousands of round-trips. Against
+  // a LOCAL Postgres (the CI service container) that is seconds; against a remote managed pooler it
+  // measured 27 s for the largest one. The 5 s Jest default therefore aborted real work, and the
+  // aborted promise left `importInFlight` set, which made every later test fail with 409 for a
+  // reason unrelated to UTC. This raises the ceiling only — no assertion, dataset or count changed.
+  jest.setTimeout(60_000);
+
   let ds: DataSource;
   let sqlite: DataSource;
   let infra: InfraDataService;
@@ -149,7 +154,7 @@ const SqliteSession = new EntitySchema<Record<string, unknown>>({
 
   /** A session whose app-written columns hold a known instant; `createdAt` comes from DEFAULT now(). */
   const seedSession = async (id: string, connectedAt: Date): Promise<Session> => {
-    const repo = ds.getRepository(Session);
+    const repo = ds.getRepository<Session>('Session');
     return repo.save(
       repo.create({
         id,
@@ -226,9 +231,9 @@ const SqliteSession = new EntitySchema<Record<string, unknown>>({
     const lid = { lid: '55501', phone: '628111', sessionId: null, updatedAt: at };
     const chat = { sessionId: SESSION_ID, chatId: '628111@c.us', archived: false, pinned: false, updatedAt: at };
     const stored = { sessionId: SESSION_ID, waMessageId: 'WA1', serializedMessage: '{}', createdAt: at };
-    await ds.getRepository(LidMapping).upsert(lid, ['lid']);
-    await ds.getRepository(ChatState).upsert(chat, ['sessionId', 'chatId']);
-    await ds.getRepository(BaileysStoredMessage).upsert(stored, ['sessionId', 'waMessageId']);
+    await ds.getRepository<LidMapping>('LidMapping').upsert(lid, ['lid']);
+    await ds.getRepository<ChatState>('ChatState').upsert(chat, ['sessionId', 'chatId']);
+    await ds.getRepository<BaileysStoredMessage>('BaileysStoredMessage').upsert(stored, ['sessionId', 'waMessageId']);
 
     const text = async (table: string, column: string): Promise<string> => {
       const rows: Array<{ t: string }> = await ds.query(`SELECT "${column}"::text AS t FROM ${table}`);
@@ -251,7 +256,7 @@ const SqliteSession = new EntitySchema<Record<string, unknown>>({
     const created = new Date(`${raw.created?.replace(' ', 'T')}Z`).getTime();
     expect(Math.abs(created - Date.now())).toBeLessThan(60_000);
 
-    const read = await ds.getRepository(Session).findOneByOrFail({ id: SESSION_ID });
+    const read = await ds.getRepository<Session>('Session').findOneByOrFail({ id: SESSION_ID });
     expect(read.connectedAt?.toISOString()).toBe('2026-01-01T00:00:00.000Z');
   });
 
@@ -262,7 +267,7 @@ const SqliteSession = new EntitySchema<Record<string, unknown>>({
     // are rounded off by the first restore. That rounding is bounded at one millisecond and never
     // compounds; a zone shift is what this asserts against.
     const stamps = async (): Promise<Record<string, number | undefined>> => {
-      const row = await ds.getRepository(Session).findOneByOrFail({ id: SESSION_ID });
+      const row = await ds.getRepository<Session>('Session').findOneByOrFail({ id: SESSION_ID });
       return { connected: row.connectedAt?.getTime(), created: row.createdAt.getTime() };
     };
     const before = await stamps();
@@ -308,7 +313,7 @@ const SqliteSession = new EntitySchema<Record<string, unknown>>({
       warnings: [],
     });
 
-    const restored = await ds.getRepository(Session).findOneByOrFail({ id: SESSION_ID });
+    const restored = await ds.getRepository<Session>('Session').findOneByOrFail({ id: SESSION_ID });
     expect(restored.connectedAt?.toISOString()).toBe('2026-01-01T00:00:00.000Z');
     expect(restored.createdAt.getTime()).toBe(
       new Date(`${(archived.createdAt as string).replace(' ', 'T')}Z`).getTime(),
@@ -318,7 +323,7 @@ const SqliteSession = new EntitySchema<Record<string, unknown>>({
   it('restores a postgres-made archive onto SQLite at the same instant', async () => {
     const connectedAt = new Date('2026-01-01T00:00:00.000Z');
     await seedSession(SESSION_ID, connectedAt);
-    const created = (await ds.getRepository(Session).findOneByOrFail({ id: SESSION_ID })).createdAt;
+    const created = (await ds.getRepository<Session>('Session').findOneByOrFail({ id: SESSION_ID })).createdAt;
 
     const archive = JSON.parse(JSON.stringify(await infra.exportData())) as { tables: MigrationTables };
     const row = archive.tables.sessions[0] as unknown as Record<string, unknown>;
@@ -358,7 +363,7 @@ const SqliteSession = new EntitySchema<Record<string, unknown>>({
   });
 
   it('deletes exactly the rows a retention window names', async () => {
-    const outbox = ds.getRepository(WebhookOutboxEvent);
+    const outbox = ds.getRepository<WebhookOutboxEvent>('WebhookOutboxEvent');
     const hoursFromCutoff = (hours: number): string =>
       // Written the way `DEFAULT now()` writes it on a pinned server, so this measures the cutoff the
       // service binds against a stored value the app did not bind.
@@ -384,7 +389,7 @@ const SqliteSession = new EntitySchema<Record<string, unknown>>({
 
   it('counts a day of messages from the local midnight the host means', async () => {
     await seedSession(SESSION_ID, new Date('2026-01-01T00:00:00.000Z'));
-    const messages = ds.getRepository(Message);
+    const messages = ds.getRepository<Message>('Message');
     const localMidnight = new Date();
     localMidnight.setHours(0, 0, 0, 0);
     // Stored as the server writes `createdAt` (DEFAULT now() on a pinned session), one minute either
@@ -406,13 +411,13 @@ const SqliteSession = new EntitySchema<Record<string, unknown>>({
       );
     }
 
-    const stats = new StatsService(ds.getRepository(Session), messages, cfg as never);
+    const stats = new StatsService(ds.getRepository<Session>('Session'), messages, cfg as never);
 
     expect((await stats.getOverview()).messages.today).toEqual({ sent: 1, received: 0 });
   });
 
   it('keeps a lease comparison honest across the restore that carries it', async () => {
-    const repo = ds.getRepository(Session);
+    const repo = ds.getRepository<Session>('Session');
     await seedSession(SESSION_ID, new Date('2026-01-01T00:00:00.000Z'));
     const leaseExpiresAt = new Date(Date.now() + 60_000);
     await repo.update({ id: SESSION_ID }, { nodeId: 'node-a', claimedAt: new Date(), leaseExpiresAt });
@@ -430,7 +435,7 @@ const SqliteSession = new EntitySchema<Record<string, unknown>>({
     // synchronize gives sessions.id a native uuid type, which has no `=` against the varchar key.
     await ds.query('DELETE FROM chat_states');
     const session = await seedSession(SESSION_ID, new Date('2026-01-01T00:00:00.000Z'));
-    const chats = ds.getRepository(ChatState);
+    const chats = ds.getRepository<ChatState>('ChatState');
     await chats.save([
       { sessionId: session.name, chatId: 'by-name@c.us', archived: true, pinned: false },
       { sessionId: SESSION_ID, chatId: 'by-id@c.us', archived: false, pinned: true },
@@ -463,6 +468,6 @@ const SqliteSession = new EntitySchema<Record<string, unknown>>({
     expect(res.imported).toBe(false);
     expect(res.warnings).toHaveLength(1);
     expect(res.warnings[0]).toContain('duplicate key');
-    expect((await ds.getRepository(Session).find()).map(s => s.id)).toEqual([SESSION_ID]);
+    expect((await ds.getRepository<Session>('Session').find()).map(s => s.id)).toEqual([SESSION_ID]);
   });
 });

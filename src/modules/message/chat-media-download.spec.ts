@@ -237,6 +237,11 @@ describe('GET /sessions/:sessionId/messages/:chatId/:messageId/media', () => {
 
   it('answers a JSON 500 without the media headers when the store fails before the first byte', async () => {
     const body = new PassThrough();
+    // The failure is injected on a timer, and the handler only attaches its own error listener once it
+    // starts piping. On a loaded machine that can be later than the timer, and an `error` emitted with
+    // no listener takes the process down. This listener is the test's own; the handler still sees the
+    // error and answers 500.
+    body.on('error', () => undefined);
     await start('s3');
     s3Answers(() => Promise.resolve({ Body: body, ContentLength: 1000 }));
     setTimeout(() => body.destroy(new Error('connection reset by the store')), 50);

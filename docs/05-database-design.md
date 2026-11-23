@@ -722,6 +722,7 @@ CREATE TABLE users (
     role VARCHAR(20) NOT NULL DEFAULT 'operator',  -- admin | operator | viewer
     "isActive" BOOLEAN NOT NULL DEFAULT 1,
     "apiKeyId" VARCHAR(36) NOT NULL,               -- UNIQUE index; the linked api_keys row
+    "coreUserId" VARCHAR(64),                      -- UNIQUE index; ALIM Core identity for SSO, NULL = unmapped
     "lastLoginAt" DATETIME,
     "createdAt" DATETIME NOT NULL DEFAULT (datetime('now')),
     "updatedAt" DATETIME NOT NULL DEFAULT (datetime('now'))
@@ -729,7 +730,15 @@ CREATE TABLE users (
 
 CREATE UNIQUE INDEX "UQ_users_email" ON users(email);
 CREATE UNIQUE INDEX "UQ_users_apiKeyId" ON users("apiKeyId");
+CREATE UNIQUE INDEX "UQ_users_coreUserId" ON users("coreUserId");
 ```
+
+> [!NOTE]
+> **`coreUserId` is a mapping, not an authorization.** The WhatsApp Connect SSO handoff looks up an
+> account by this column only — never by email or name — and refuses an unmapped Core identity
+> (`identity_not_mapped`) rather than creating an account. The account's own `role` and assignments
+> still decide what it may do; Core's roles are never read. SQLite treats NULLs as distinct, so any
+> number of accounts may be unmapped while two cannot claim the same Core person.
 
 > [!NOTE]
 > **One identity, two credentials.** Every user owns exactly one `api_keys` row (`users."apiKeyId"`),
@@ -1058,7 +1067,8 @@ src/database/migrations-main/      # main connection (auth + audit, SQLite)
 ├── 1786610000000-DropSynchronizeIndexDuplicates.ts  # drops synchronize-named duplicate indexes
 ├── 1786700000000-AddUsersAndSessions.ts     # creates users + user_sessions (dashboard sign-in)
 ├── 1787000000000-CreateRoleAssignments.ts   # creates role_assignments and backfills one global grant per legacy role
-└── 1787010000000-AddApiKeyAuthzVersion.ts   # adds api_keys.authzVersion (bumped on every grant change, drives socket eviction)
+├── 1787010000000-AddApiKeyAuthzVersion.ts   # adds api_keys.authzVersion (bumped on every grant change, drives socket eviction)
+└── 1792700000000-AddUserCoreUserId.ts       # adds users.coreUserId + UNIQUE index (ALIM Core SSO handoff mapping)
 
 src/database/migrations/           # data connection (pluggable)
 ├── 1770108659848-AddMessageStatus.ts
@@ -1117,7 +1127,8 @@ src/database/migrations/           # data connection (pluggable)
 ├── 1792200000000-CreateDivisionTables.ts   # divisions + division_agents + division_settings + division_chat_states, and inbox_conversations.divisionId/divisionName (shared-number routing)
 ├── 1792300000000-AddInboxSla.ts   # divisions.slaMinutes and the inbox_conversations first-response clock (started, due, breached, first response)
 ├── 1792400000000-CreateApprovalWorkflow.ts   # whatsapp_identities + approval_requests + approval_commands (WhatsApp approval workflow, docs/36)
-└── 1792500000000-AddApprovalCommandRetry.ts   # approval_commands retry columns (lastError, lastAttemptAt, nextAttemptAt) + (status, nextAttemptAt) index
+├── 1792500000000-AddApprovalCommandRetry.ts   # approval_commands retry columns (lastError, lastAttemptAt, nextAttemptAt) + (status, nextAttemptAt) index
+└── 1792600000000-AddApprovalLookupIndexes.ts   # approval_requests lookup indexes: (notificationMessageId, targetIdentity) and (targetIdentity, createdAt)
 ```
 
 > [!NOTE]

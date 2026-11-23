@@ -25,6 +25,7 @@ describe('HttpAlimCoreApprovalClient', () => {
     'connect.approval.coreBaseUrl': 'https://core.test',
     'connect.approval.coreApiKey': 'secret-key',
     'connect.approval.coreApiHeader': 'X-ALIM-CONNECT-APPROVAL-KEY',
+    'connect.approval.apiVersion': '1',
     'connect.approval.timeoutMs': 5000,
   };
 
@@ -64,6 +65,10 @@ describe('HttpAlimCoreApprovalClient', () => {
     expect(url).toBe('https://core.test/api/connect/v1/approval-commands');
     expect(init.method).toBe('POST');
     expect((init.headers as Record<string, string>)['X-ALIM-CONNECT-APPROVAL-KEY']).toBe('secret-key');
+    // `Idempotency-Key` harus sama dengan `command_id` di body: dua nilai berbeda berarti Core dapat
+    // menerima satu command sebagai dua pengiriman, atau menolak replay yang sebenarnya sah.
+    expect((init.headers as Record<string, string>)['Idempotency-Key']).toBe('cmd-1');
+    expect((init.headers as Record<string, string>)['X-ALIM-API-Version']).toBe('1');
     expect(JSON.parse(init.body as string)).toMatchObject({
       command_id: 'cmd-1',
       request_id: 'req-1',
@@ -72,6 +77,21 @@ describe('HttpAlimCoreApprovalClient', () => {
       external_message_id: 'wamid.IN',
       source: 'whatsapp',
     });
+  });
+
+  it('tidak mengirim X-ALIM-API-Version bila versinya dikosongkan', async () => {
+    fetchMock.mockResolvedValue({
+      status: 200,
+      json: jest.fn().mockResolvedValue({ success: true, data: { outcome: 'applied' } }),
+    });
+
+    await client({ 'connect.approval.apiVersion': '' }).sendApprovalCommand(command);
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const headers = init.headers as Record<string, string>;
+
+    expect(headers['Idempotency-Key']).toBe('cmd-1');
+    expect(headers).not.toHaveProperty('X-ALIM-API-Version');
   });
 
   it('memetakan 200 applied menjadi keputusan yang diterapkan', async () => {

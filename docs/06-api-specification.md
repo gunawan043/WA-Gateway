@@ -7833,6 +7833,7 @@ is discarded, so the only way to use it is through this account or through a sep
 | `role`        | enum   | no       | `admin`, `operator`, `viewer`. Derived from `assignments` when omitted                     |
 | `password`    | string | yes      | At least 12 characters                                                                     |
 | `assignments` | array  | yes      | At least one grant. A new account never gets global access implicitly (see below)          |
+| `coreUserId`  | string | no       | ALIM Core `core_user_id` for the SSO handoff. Unique; omitted means unmapped               |
 
 Each entry of `assignments` is `{ "role", "scopeType", "scopeId"?, "validFrom"?, "validTo"? }`:
 
@@ -7855,12 +7856,14 @@ Each entry of `assignments` is `{ "role", "scopeType", "scopeId"?, "validFrom"?,
 
 **Response** `201` — `UserResponseDto`
 
-**Errors:** `400` validation failed, `assignments` missing/empty, or an invalid role/scope · `401` missing or invalid credential · `403` role below ADMIN, a session-scoped key, or a scope the caller cannot itself reach · `409` a user with that email already exists
+**Errors:** `400` validation failed, `assignments` missing/empty, or an invalid role/scope · `401` missing or invalid credential · `403` role below ADMIN, a session-scoped key, or a scope the caller cannot itself reach · `409` a user with that email already exists, or that `coreUserId` is already mapped to another account
 
 #### PATCH /api/auth/users/:id
 
-Update the display name, role or active flag. A role or active change is mirrored onto the linked key
-in the same transaction; disabling the account revokes every live session of it at once.
+Update the display name, role, active flag or ALIM Core mapping. A role or active change is mirrored
+onto the linked key in the same transaction; disabling the account revokes every live session of it
+at once. `coreUserId` is the only identity the SSO handoff maps on: setting it links the account to
+that Core person, and `null` (or an empty string) removes the link so SSO can no longer reach it.
 
 **Auth:** API key (ADMIN, unscoped)
 
@@ -7872,19 +7875,20 @@ in the same transaction; disabling the account revokes every live session of it 
 
 **Request body** — `UpdateUserDto`
 
-| Field      | Type    | Required | Notes                                   |
-| ---------- | ------- | -------- | --------------------------------------- |
-| `name`     | string  | no       | 2-100 characters                        |
-| `role`     | enum    | no       | `admin`, `operator`, `viewer`           |
-| `isActive` | boolean | no       | `false` disables and revokes sessions   |
+| Field        | Type           | Required | Notes                                              |
+| ------------ | -------------- | -------- | -------------------------------------------------- |
+| `name`       | string         | no       | 2-100 characters                                   |
+| `role`       | enum           | no       | `admin`, `operator`, `viewer`                      |
+| `isActive`   | boolean        | no       | `false` disables and revokes sessions              |
+| `coreUserId` | string \| null | no       | ALIM Core identity for SSO; `null` removes it      |
 
 ```json
-{ "role": "operator", "isActive": true }
+{ "role": "operator", "isActive": true, "coreUserId": "9f1c2a44-3c55-4c1e-9c1f-2b7d8e6a5f03" }
 ```
 
 **Response** `200` — `UserResponseDto`
 
-**Errors:** `401` missing or invalid credential · `403` role below ADMIN, or a session-scoped key · `404` no such account · `409` the change would remove the last admin
+**Errors:** `401` missing or invalid credential · `403` role below ADMIN, or a session-scoped key · `404` no such account · `409` the change would remove the last admin, or that `coreUserId` is already mapped to another account
 
 #### POST /api/auth/users/:id/reset-password
 
@@ -8154,6 +8158,46 @@ the actor, the change kind, and the before/after values.
 
 **Errors:** `400` a number that does not normalise to 8–15 digits, or a malformed UUID · `409` a
 reassignment without `reassign: true`.
+
+#### POST /api/sso/handoff
+
+Completes the WhatsApp Connect SSO handoff. ALIM Core embeds Connect in an iframe and auto-submits a
+form to the browser-facing address `POST /sso/handoff`; the production surface rewrites that path to
+this operation, so the guards, the throttler, the body parser and the DTO pipe all run once.
+
+The body is `application/x-www-form-urlencoded` (a browser form) or JSON. The `code` is a one-time
+handoff code issued by Core. Connect exchanges it **server-to-server** at Core's
+`POST /api/connect/v1/sso/exchange` using `X-ALIM-CONNECT-SSO-KEY`; the browser never sees that key
+and the code is never read from a query string, a URL or a log. A session is written only after Core
+replies successfully **and** the returned `core_user_id` maps to an existing, active Connect account.
+An unmapped identity is refused with `identity_not_mapped`; no account is ever created.
+
+The session is a normal Connect dashboard session (`owa_s1_…`, `X-API-Key`), issued with a fresh
+random token every time, so there is no identifier to fixate. `AUTH_SESSION_IDLE_TIMEOUT_MINUTES`
+adds an idle bound to the absolute expiry. A browser receives an HTML page that writes the token to
+`sessionStorage` and replaces the document with the workspace; a client that sends
+`Accept: application/json` receives the outcome **without** the token.
+
+**Auth:** none. The controls are an exact `Origin` allowlist (`ALIM_CORE_WEB_ORIGIN`), a per-IP
+throttle of 5 attempts a minute and 20 an hour, strict body validation, and Core's one-time code.
+The route is `@Public()` because the caller has no Connect credential yet; it is not a CSRF
+exemption, because this application has no cookie-based session and therefore no CSRF middleware.
+
+**Request body**
+
+| Field   | Type   | Required | Notes                                              |
+| ------- | ------ | -------- | -------------------------------------------------- |
+| `code`  | string | yes      | 1–512 characters; opaque to Connect                |
+| `state` | string | no       | Forwarded to Core unchanged; never interpreted     |
+
+**Response** `200` — `text/html` success page (browser) or `application/json`
+`{ "ok": true, "userId": "…", "expiresAt": "…" }` (no token).
+
+**Errors:** `400` `code_not_found` / `invalid_payload` · `403` `origin_not_allowed`,
+`origin_required`, `permission_revoked`, `user_inactive`, `audience_mismatch`, `scope_mismatch`,
+`identity_not_mapped`, `account_disabled` · `409` `code_already_used` · `410` `code_expired` ·
+`422` `code_required` · `429` too many attempts · `502` Core unreachable or verification failed ·
+`503` SSO not configured · `504` Core timeout.
 
 ## 6.5 Real-time API (WebSocket)
 

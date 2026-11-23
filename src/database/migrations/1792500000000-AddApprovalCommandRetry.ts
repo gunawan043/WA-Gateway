@@ -30,10 +30,20 @@ export class AddApprovalCommandRetry1792500000000 implements MigrationInterface 
       }
     }
 
-    await queryRunner.createIndex(
-      'approval_commands',
-      new TableIndex({ name: 'IDX_approval_commands_retry', columnNames: ['status', 'nextAttemptAt'] }),
-    );
+    // Guard ini bukan hiasan: tanpa itu, `up()` gagal dengan "index already exists" bila indeks
+    // dibuat di luar ledger (restore parsial, atau migrasi yang dijalankan manual setelah kolom
+    // ditambahkan). Menambahkan guard ke migrasi yang sudah tercatat aman karena TypeORM menyimpan
+    // nama dan timestamp migrasi, bukan checksum isinya: database yang sudah menjalankan migrasi ini
+    // tidak akan menjalankannya lagi, sedangkan database baru mendapat `up()` yang idempoten.
+    const table = await queryRunner.getTable('approval_commands');
+    const hasRetryIndex = table?.indices.some(index => index.name === 'IDX_approval_commands_retry') ?? false;
+
+    if (!hasRetryIndex) {
+      await queryRunner.createIndex(
+        'approval_commands',
+        new TableIndex({ name: 'IDX_approval_commands_retry', columnNames: ['status', 'nextAttemptAt'] }),
+      );
+    }
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {

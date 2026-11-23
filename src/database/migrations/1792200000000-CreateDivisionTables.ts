@@ -23,7 +23,7 @@ export class CreateDivisionTables1792200000000 implements MigrationInterface {
     if (isPostgres) {
       await queryRunner.query(
         `CREATE TABLE "divisions" ("id" varchar PRIMARY KEY NOT NULL DEFAULT gen_random_uuid()::varchar, ` +
-          `"sessionId" varchar(100) NOT NULL, "name" varchar(100) NOT NULL, "keywords" text NOT NULL DEFAULT '[]', ` +
+          `"sessionId" varchar NOT NULL, "name" varchar(100) NOT NULL, "keywords" text NOT NULL DEFAULT '[]', ` +
           `"menuLabel" varchar(100), "welcomeText" text, "sortOrder" int NOT NULL DEFAULT 0, ` +
           `"isActive" boolean NOT NULL DEFAULT true, ` +
           `"createdAt" timestamp NOT NULL DEFAULT NOW(), "updatedAt" timestamp NOT NULL DEFAULT NOW(), ` +
@@ -31,21 +31,21 @@ export class CreateDivisionTables1792200000000 implements MigrationInterface {
       );
       await queryRunner.query(
         `CREATE TABLE "division_agents" ("id" varchar PRIMARY KEY NOT NULL DEFAULT gen_random_uuid()::varchar, ` +
-          `"divisionId" varchar(36) NOT NULL, "apiKeyId" varchar(36) NOT NULL, "agentName" varchar(100) NOT NULL, ` +
+          `"divisionId" varchar NOT NULL, "apiKeyId" varchar(36) NOT NULL, "agentName" varchar(100) NOT NULL, ` +
           `"createdAt" timestamp NOT NULL DEFAULT NOW(), ` +
           `CONSTRAINT "FK_division_agents_divisionId" FOREIGN KEY ("divisionId") REFERENCES "divisions" ("id") ON DELETE CASCADE)`,
       );
       await queryRunner.query(
         `CREATE TABLE "division_settings" ("id" varchar PRIMARY KEY NOT NULL DEFAULT gen_random_uuid()::varchar, ` +
-          `"sessionId" varchar(100) NOT NULL, "enabled" boolean NOT NULL DEFAULT true, "menuHeader" text, ` +
+          `"sessionId" varchar NOT NULL, "enabled" boolean NOT NULL DEFAULT true, "menuHeader" text, ` +
           `"invalidReply" text, "idleHours" int NOT NULL DEFAULT 24, ` +
           `"createdAt" timestamp NOT NULL DEFAULT NOW(), "updatedAt" timestamp NOT NULL DEFAULT NOW(), ` +
           `CONSTRAINT "FK_division_settings_sessionId" FOREIGN KEY ("sessionId") REFERENCES "sessions" ("id") ON DELETE CASCADE)`,
       );
       await queryRunner.query(
         `CREATE TABLE "division_chat_states" ("id" varchar PRIMARY KEY NOT NULL DEFAULT gen_random_uuid()::varchar, ` +
-          `"sessionId" varchar(100) NOT NULL, "chatId" varchar(100) NOT NULL, ` +
-          `"status" varchar(16) NOT NULL DEFAULT 'awaiting', "divisionId" varchar(36), ` +
+          `"sessionId" varchar NOT NULL, "chatId" varchar(100) NOT NULL, ` +
+          `"status" varchar(16) NOT NULL DEFAULT 'awaiting', "divisionId" varchar, ` +
           `"menuDivisionIds" text, "promptedAt" timestamp, "invalidReplyAt" timestamp, "routedAt" timestamp, ` +
           `"lastInboundAt" timestamp, ` +
           `"createdAt" timestamp NOT NULL DEFAULT NOW(), "updatedAt" timestamp NOT NULL DEFAULT NOW(), ` +
@@ -55,7 +55,7 @@ export class CreateDivisionTables1792200000000 implements MigrationInterface {
     } else {
       await queryRunner.query(
         `CREATE TABLE "divisions" ("id" varchar PRIMARY KEY NOT NULL, ` +
-          `"sessionId" varchar(100) NOT NULL, "name" varchar(100) NOT NULL, "keywords" text NOT NULL DEFAULT ('[]'), ` +
+          `"sessionId" varchar NOT NULL, "name" varchar(100) NOT NULL, "keywords" text NOT NULL DEFAULT ('[]'), ` +
           `"menuLabel" varchar(100), "welcomeText" text, "sortOrder" integer NOT NULL DEFAULT (0), ` +
           `"isActive" boolean NOT NULL DEFAULT (1), ` +
           `"createdAt" datetime NOT NULL DEFAULT (datetime('now')), "updatedAt" datetime NOT NULL DEFAULT (datetime('now')), ` +
@@ -63,21 +63,21 @@ export class CreateDivisionTables1792200000000 implements MigrationInterface {
       );
       await queryRunner.query(
         `CREATE TABLE "division_agents" ("id" varchar PRIMARY KEY NOT NULL, ` +
-          `"divisionId" varchar(36) NOT NULL, "apiKeyId" varchar(36) NOT NULL, "agentName" varchar(100) NOT NULL, ` +
+          `"divisionId" varchar NOT NULL, "apiKeyId" varchar(36) NOT NULL, "agentName" varchar(100) NOT NULL, ` +
           `"createdAt" datetime NOT NULL DEFAULT (datetime('now')), ` +
           `CONSTRAINT "FK_division_agents_divisionId" FOREIGN KEY ("divisionId") REFERENCES "divisions" ("id") ON DELETE CASCADE ON UPDATE NO ACTION)`,
       );
       await queryRunner.query(
         `CREATE TABLE "division_settings" ("id" varchar PRIMARY KEY NOT NULL, ` +
-          `"sessionId" varchar(100) NOT NULL, "enabled" boolean NOT NULL DEFAULT (1), "menuHeader" text, ` +
+          `"sessionId" varchar NOT NULL, "enabled" boolean NOT NULL DEFAULT (1), "menuHeader" text, ` +
           `"invalidReply" text, "idleHours" integer NOT NULL DEFAULT (24), ` +
           `"createdAt" datetime NOT NULL DEFAULT (datetime('now')), "updatedAt" datetime NOT NULL DEFAULT (datetime('now')), ` +
           `CONSTRAINT "FK_division_settings_sessionId" FOREIGN KEY ("sessionId") REFERENCES "sessions" ("id") ON DELETE CASCADE ON UPDATE NO ACTION)`,
       );
       await queryRunner.query(
         `CREATE TABLE "division_chat_states" ("id" varchar PRIMARY KEY NOT NULL, ` +
-          `"sessionId" varchar(100) NOT NULL, "chatId" varchar(100) NOT NULL, ` +
-          `"status" varchar(16) NOT NULL DEFAULT ('awaiting'), "divisionId" varchar(36), ` +
+          `"sessionId" varchar NOT NULL, "chatId" varchar(100) NOT NULL, ` +
+          `"status" varchar(16) NOT NULL DEFAULT ('awaiting'), "divisionId" varchar, ` +
           `"menuDivisionIds" text, "promptedAt" datetime, "invalidReplyAt" datetime, "routedAt" datetime, ` +
           `"lastInboundAt" datetime, ` +
           `"createdAt" datetime NOT NULL DEFAULT (datetime('now')), "updatedAt" datetime NOT NULL DEFAULT (datetime('now')), ` +

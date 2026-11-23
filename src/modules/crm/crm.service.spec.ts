@@ -123,8 +123,8 @@ describe('CrmService.create', () => {
     const { service, stages, deals, activities, audit } = makeService();
     stages.find.mockResolvedValue([stage({ id: 'stage-new', name: 'New' })]);
     let saved: CrmDeal | null = null;
-    deals.save.mockImplementation((row: Record<string, unknown>) => {
-      saved = { ...row, id: 'deal-1', createdAt: now, updatedAt: now } as CrmDeal;
+    deals.save.mockImplementation((row: unknown) => {
+      saved = { ...(row as Record<string, unknown>), id: 'deal-1', createdAt: now, updatedAt: now } as CrmDeal;
       return Promise.resolve(saved);
     });
     deals.findOne.mockImplementation(() => Promise.resolve(saved));
@@ -149,8 +149,8 @@ describe('CrmService.create', () => {
     const { service, stages, deals } = makeService();
     stages.findOne.mockResolvedValue(stage({ id: 'stage-won', name: 'Won', kind: 'won' }));
     let saved: CrmDeal | null = null;
-    deals.save.mockImplementation((row: Record<string, unknown>) => {
-      saved = { ...row, id: 'deal-1', createdAt: now, updatedAt: now } as CrmDeal;
+    deals.save.mockImplementation((row: unknown) => {
+      saved = { ...(row as Record<string, unknown>), id: 'deal-1', createdAt: now, updatedAt: now } as CrmDeal;
       return Promise.resolve(saved);
     });
     deals.findOne.mockImplementation(() => Promise.resolve(saved));

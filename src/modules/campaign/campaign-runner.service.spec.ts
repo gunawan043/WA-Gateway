@@ -242,9 +242,12 @@ describe('CampaignRunnerService.drive', () => {
     await settle(runner);
 
     expect(bulk.createBatch).toHaveBeenCalledTimes(1);
-    const dto = bulk.createBatch.mock.calls[0][1] as {
-      messages: Array<{ chatId: string; variables: Record<string, string> }>;
-    };
+    // `createBatch` is a bare `jest.fn()`, so its recorded call tuple has no declared elements;
+    // the shape is asserted here instead of being inferred from the mock.
+    const [, dto] = bulk.createBatch.mock.calls[0] as unknown as [
+      string,
+      { messages: Array<{ chatId: string; variables: Record<string, string> }> },
+    ];
     expect(dto.messages.map(message => message.chatId)).toEqual(['628111@c.us', '628222@c.us']);
     expect(dto.messages[0].variables).toEqual({ chatId: '628111@c.us', name: 'Budi' });
     expect(dto.messages[1].variables).toEqual({ chatId: '628222@c.us' });

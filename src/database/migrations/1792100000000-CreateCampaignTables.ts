@@ -31,7 +31,7 @@ export class CreateCampaignTables1792100000000 implements MigrationInterface {
       );
       await queryRunner.query(
         `CREATE TABLE "campaign_recipients" ("id" varchar PRIMARY KEY NOT NULL DEFAULT gen_random_uuid()::varchar, ` +
-          `"campaignId" varchar(36) NOT NULL, "chatId" varchar(100) NOT NULL, "chatName" varchar(200), ` +
+          `"campaignId" varchar NOT NULL, "chatId" varchar(100) NOT NULL, "chatName" varchar(200), ` +
           `"status" varchar(12) NOT NULL DEFAULT 'pending', "batchId" varchar(255), "messageId" varchar(200), ` +
           `"errorCode" varchar(64), "errorMessage" varchar(500), "sentAt" timestamp, ` +
           `"createdAt" timestamp NOT NULL DEFAULT NOW(), "updatedAt" timestamp NOT NULL DEFAULT NOW(), ` +
@@ -55,7 +55,7 @@ export class CreateCampaignTables1792100000000 implements MigrationInterface {
       );
       await queryRunner.query(
         `CREATE TABLE "campaign_recipients" ("id" varchar PRIMARY KEY NOT NULL, ` +
-          `"campaignId" varchar(36) NOT NULL, "chatId" varchar(100) NOT NULL, "chatName" varchar(200), ` +
+          `"campaignId" varchar NOT NULL, "chatId" varchar(100) NOT NULL, "chatName" varchar(200), ` +
           `"status" varchar(12) NOT NULL DEFAULT ('pending'), "batchId" varchar(255), "messageId" varchar(200), ` +
           `"errorCode" varchar(64), "errorMessage" varchar(500), "sentAt" datetime, ` +
           `"createdAt" datetime NOT NULL DEFAULT (datetime('now')), "updatedAt" datetime NOT NULL DEFAULT (datetime('now')), ` +

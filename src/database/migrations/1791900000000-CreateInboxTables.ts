@@ -20,7 +20,7 @@ export class CreateInboxTables1791900000000 implements MigrationInterface {
     if (isPostgres) {
       await queryRunner.query(
         `CREATE TABLE "inbox_conversations" ("id" varchar PRIMARY KEY NOT NULL DEFAULT gen_random_uuid()::varchar, ` +
-          `"sessionId" varchar(100) NOT NULL, "chatId" varchar(100) NOT NULL, ` +
+          `"sessionId" varchar NOT NULL, "chatId" varchar(100) NOT NULL, ` +
           `"status" varchar(16) NOT NULL DEFAULT 'open', "assigneeKeyId" varchar(36), ` +
           `"assigneeName" varchar(100), "resolvedAt" timestamp, "lastInboundAt" timestamp, ` +
           `"createdAt" timestamp NOT NULL DEFAULT NOW(), "updatedAt" timestamp NOT NULL DEFAULT NOW(), ` +
@@ -36,7 +36,7 @@ export class CreateInboxTables1791900000000 implements MigrationInterface {
     } else {
       await queryRunner.query(
         `CREATE TABLE "inbox_conversations" ("id" varchar PRIMARY KEY NOT NULL, ` +
-          `"sessionId" varchar(100) NOT NULL, "chatId" varchar(100) NOT NULL, ` +
+          `"sessionId" varchar NOT NULL, "chatId" varchar(100) NOT NULL, ` +
           `"status" varchar(16) NOT NULL DEFAULT ('open'), "assigneeKeyId" varchar(36), ` +
           `"assigneeName" varchar(100), "resolvedAt" datetime, "lastInboundAt" datetime, ` +
           `"createdAt" datetime NOT NULL DEFAULT (datetime('now')), "updatedAt" datetime NOT NULL DEFAULT (datetime('now')), ` +

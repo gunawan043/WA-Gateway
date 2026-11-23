@@ -16,6 +16,8 @@ export type ApprovalRequestStatus =
 @Index('UQ_approval_requests_reference', ['reference'], { unique: true })
 @Index('IDX_approval_requests_status', ['status'])
 @Index('IDX_approval_requests_target_status', ['targetCorePersonId', 'status'])
+@Index('IDX_approval_requests_notification', ['notificationMessageId', 'targetIdentity'])
+@Index('IDX_approval_requests_target_created', ['targetIdentity', 'createdAt'])
 export class ApprovalRequest {
   @PrimaryGeneratedColumn('uuid')
   id!: string;

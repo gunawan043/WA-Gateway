@@ -35,8 +35,8 @@ paths:
       summary: Terapkan satu keputusan izin dari ALIM Connect
       x-contract-status: provisional
       x-needs-core-confirmation:
-        - Apakah Core ingin menambah `Idempotency-Key` HTTP di samping `command_id`.
-        - Apakah `X-ALIM-API-Version` akan dipasang juga pada endpoint command.
+        - Apakah Core akan memvalidasi `Idempotency-Key`. Connect sudah mengirimnya, nilainya sama dengan `command_id`; Core boleh mengabaikannya.
+        - Apakah Core akan memvalidasi `X-ALIM-API-Version`. Connect mengirim versi kontrak; header boleh diabaikan.
       x-aligned-with-core-contract: docs/integration/alim-connect-approval-command-api.md (version 1)
       parameters:
         - name: X-ALIM-CONNECT-APPROVAL-KEY
@@ -46,6 +46,27 @@ paths:
             API key service-to-service khusus Connect. Middleware Core juga menerima
             `Authorization: Bearer <key>` sebagai cadangan, tetapi Connect selalu
             memakai header ini.
+          schema:
+            type: string
+            minLength: 1
+        - name: Idempotency-Key
+          in: header
+          required: false
+          description: |
+            Selalu dikirim Connect dan **sama dengan `command_id` di body**. Pengiriman ulang
+            memakai nilai yang sama, sehingga gateway Core dapat menolak duplikat sebelum body
+            dibaca. Bila Core tidak memakainya, `command_id` di body tetap menjadi kunci
+            idempotensi.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 100
+        - name: X-ALIM-API-Version
+          in: header
+          required: false
+          description: |
+            Versi kontrak command yang dipakai Connect (`1`). Dapat dikosongkan lewat
+            `ALIM_CORE_API_VERSION` bila Core menyatakan header ini tidak diterima.
           schema:
             type: string
             minLength: 1

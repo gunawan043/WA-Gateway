@@ -34,7 +34,7 @@ export class CampaignRecipient {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
-  @Column({ type: 'varchar', length: 36 })
+  @Column({ type: 'varchar' })
   campaignId!: string;
 
   @ManyToOne(() => Campaign, { onDelete: 'CASCADE' })

@@ -33,6 +33,12 @@ export const PUBLIC_PATHS = [
   // Password sign-in is the one auth route a caller reaches without a credential; the rest of
   // /api/auth requires either a key or the session token it returns.
   '/api/auth/login',
+  // The SSO handoff is reached by a browser ALIM Core embeds, before any Connect credential
+  // exists — that is the whole point of a handoff. It is public only in the OpenAPI sense: the
+  // route refuses a request that does not come from the configured Core origin, is throttled per
+  // IP, and accepts only a one-time code Core itself issued. No API key is involved, so declaring
+  // one here would make the published document wrong in the other direction.
+  '/api/sso/handoff',
 ];
 
 const HTTP_METHODS = ['get', 'post', 'put', 'delete', 'patch', 'options', 'head', 'trace', 'search'] as const;
@@ -276,6 +282,7 @@ export function createSwaggerConfig(): Omit<OpenAPIObject, 'paths'> {
       .addTag('divisions', 'Division routing on a shared number (menu, keywords and CS assignment)')
       .addTag('crm', 'Sales pipeline (stages, deals and activity history)')
       .addTag('approval', 'WhatsApp approval workflow: permits from ALIM Core and WhatsApp identity mapping')
+      .addTag('sso', 'WhatsApp Connect SSO handoff from ALIM Core')
       .addTag('campaigns', 'Broadcast campaigns (audience, chunks and per-recipient results)')
       .addTag('media', 'Media conversion')
       // ORDER MATTERS. Swagger UI resolves "Try it" against servers[0], substituting the variable

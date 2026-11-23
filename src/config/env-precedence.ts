@@ -262,6 +262,7 @@ export const BLANK_SHADOWED_ENV_KEYS: string[] = [
   'ALIM_CORE_BASE_URL',
   'ALIM_CORE_APPROVAL_API_KEY',
   'ALIM_CORE_APPROVAL_API_HEADER',
+  'ALIM_CORE_API_VERSION',
   'ALIM_CONNECT_INGEST_KEY',
   'ALIM_CORE_TIMEOUT_MS',
   'ALIM_CONNECT_REPLY_UNKNOWN',
@@ -271,6 +272,16 @@ export const BLANK_SHADOWED_ENV_KEYS: string[] = [
   'ALIM_CONNECT_RETRY_BASE_DELAY_MS',
   'ALIM_CONNECT_RETRY_MAX_DELAY_MS',
   'ALIM_CONNECT_RETRY_LEASE_MS',
+  // WhatsApp Connect SSO handoff. Blank-forwarded for the same reason: an empty value must mean
+  // "unset" (SSO disabled), not a key that is the empty string.
+  'ALIM_CONNECT_SSO_KEY',
+  'ALIM_CONNECT_SSO_API_HEADER',
+  'ALIM_CONNECT_SSO_TIMEOUT_MS',
+  'ALIM_CONNECT_SSO_AUDIENCE',
+  'ALIM_CONNECT_SSO_SCOPE',
+  'ALIM_CONNECT_SSO_SESSION_TTL_HOURS',
+  'ALIM_CORE_WEB_ORIGIN',
+  'AUTH_SESSION_IDLE_TIMEOUT_MINUTES',
 ];
 
 export function clearBlankEnv(env: NodeJS.ProcessEnv, keys: string[]): void {

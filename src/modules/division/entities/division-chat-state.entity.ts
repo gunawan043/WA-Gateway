@@ -33,7 +33,11 @@ export class DivisionChatState {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
-  @Column({ type: 'varchar', length: 100 })
+  // No `length`: the column is also the join column of the `Session` relation below, and
+  // TypeORM derives a relation-backed FK's type from the referenced primary key. Declaring a
+  // length there makes the metadata invalid on PostgreSQL ("does not support length
+  // property"). `varchar` without a limit is what webhooks/templates already do.
+  @Column({ type: 'varchar' })
   sessionId!: string;
 
   @ManyToOne(() => Session, { onDelete: 'CASCADE' })
@@ -46,7 +50,7 @@ export class DivisionChatState {
   @Column({ type: 'varchar', length: 16, default: 'awaiting' })
   status!: DivisionChatStatus;
 
-  @Column({ type: 'varchar', length: 36, nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   divisionId!: string | null;
 
   @ManyToOne(() => Division, { onDelete: 'SET NULL', nullable: true })

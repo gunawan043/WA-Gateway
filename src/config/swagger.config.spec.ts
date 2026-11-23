@@ -217,6 +217,10 @@ describe('PUBLIC_PATHS drift guard', () => {
     'src/modules/integration/ingress.controller.ts',
     'src/modules/metrics/metrics.controller.ts',
     'src/modules/auth/auth-session.controller.ts',
+    // Browser-facing SSO handoff. Public by necessity (the browser has no Connect credential yet);
+    // the route's own controls are the Core Origin allowlist, a per-IP throttle and Core's
+    // one-time code — see PUBLIC_PATHS for why the document must not claim an API key.
+    'src/modules/sso/sso-handoff.controller.ts',
   ];
 
   function listTsFiles(dir: string, out: string[] = []): string[] {
@@ -256,6 +260,7 @@ describe('PUBLIC_PATHS drift guard', () => {
         '/api/infra/health',
         '/api/ingress/{pluginId}/{instanceId}/{path}',
         '/api/auth/login',
+        '/api/sso/handoff',
       ].sort(),
     );
   });

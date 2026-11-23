@@ -8,6 +8,7 @@ import { ApprovalCommand } from './entities/approval-command.entity';
 import type { ApprovalProcessorService } from './approval-processor.service';
 import { CreateApprovalWorkflow1792400000000 } from '../../database/migrations/1792400000000-CreateApprovalWorkflow';
 import { AddApprovalCommandRetry1792500000000 } from '../../database/migrations/1792500000000-AddApprovalCommandRetry';
+import { AddApprovalLookupIndexes1792600000000 } from '../../database/migrations/1792600000000-AddApprovalLookupIndexes';
 
 /**
  * Perilaku retry worker pada PostgreSQL — dialect yang dipakai deployment.
@@ -69,7 +70,11 @@ interface RegclassRow {
     scratch = new DataSource({
       ...connection(SCRATCH_DB),
       entities: [ApprovalCommand],
-      migrations: [CreateApprovalWorkflow1792400000000, AddApprovalCommandRetry1792500000000],
+      migrations: [
+        CreateApprovalWorkflow1792400000000,
+        AddApprovalCommandRetry1792500000000,
+        AddApprovalLookupIndexes1792600000000,
+      ],
       synchronize: false,
     });
     await scratch.initialize();
@@ -78,7 +83,8 @@ interface RegclassRow {
 
   afterAll(async () => {
     if (scratch?.isInitialized) {
-      // Validasi `down()` sebelum database dibuang: kedua migration harus bisa dicabut bersih.
+      // Validasi `down()` sebelum database dibuang: ketiga migration harus bisa dicabut bersih.
+      await scratch.undoLastMigration();
       await scratch.undoLastMigration();
       await scratch.undoLastMigration();
       const [left] = await scratch.query<RegclassRow[]>(`SELECT to_regclass('public.approval_commands') AS "table"`);
@@ -255,5 +261,25 @@ interface RegclassRow {
     expect(after.nextAttemptAt).toBeNull();
     expect(after.lastError).toMatch(/Batas percobaan/);
     expect(stats.exhausted).toBe(1);
+  });
+
+  it('membuat indeks pencarian dan tetap idempoten bila dijalankan ulang', async () => {
+    const indexes: Array<{ indexname: string }> = await scratch.query(
+      `SELECT indexname FROM pg_indexes WHERE schemaname = 'public' AND tablename = 'approval_requests'`,
+    );
+    const names = indexes.map(row => row.indexname);
+
+    expect(names).toEqual(
+      expect.arrayContaining(['IDX_approval_requests_notification', 'IDX_approval_requests_target_created']),
+    );
+
+    // Restore parsial: objek ada tetapi entri ledger hilang. `up()` harus melewati, bukan gagal.
+    const runner = scratch.createQueryRunner();
+    try {
+      await expect(new AddApprovalLookupIndexes1792600000000().up(runner)).resolves.toBeUndefined();
+      await expect(new AddApprovalCommandRetry1792500000000().up(runner)).resolves.toBeUndefined();
+    } finally {
+      await runner.release();
+    }
   });
 });

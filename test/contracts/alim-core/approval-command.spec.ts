@@ -443,6 +443,28 @@ describe('kontrak Approval Command: klien Connect terhadap mock', () => {
     );
   });
 
+  it('mengirim Idempotency-Key dan X-ALIM-API-Version yang menyatakan versi kontrak', async () => {
+    await client.sendApprovalCommand(command({ commandId: 'cmd-client-2' }));
+
+    const [headers] = mock.receivedHeaders;
+
+    expect(headers['idempotency-key']).toBe('cmd-client-2');
+    expect(headers['x-alim-api-version']).toBe('1');
+    // Header dan body tidak boleh menyimpang: Core memakai salah satunya sebagai kunci idempotensi.
+    expect(mock.received[0].command_id).toBe(headers['idempotency-key']);
+  });
+
+  it('mengulang Idempotency-Key yang sama saat command dikirim ulang', async () => {
+    mock.setScenario('server_error');
+
+    await client.sendApprovalCommand(command({ commandId: 'cmd-client-3' }));
+    mock.setScenario(null);
+    await client.sendApprovalCommand(command({ commandId: 'cmd-client-3' }));
+
+    expect(mock.receivedHeaders.map(headers => headers['idempotency-key'])).toEqual(['cmd-client-3', 'cmd-client-3']);
+    expect(mock.appliedCount()).toBe(1);
+  });
+
   it('memetakan sukses menjadi applied beserta status izin Core', async () => {
     const result = await client.sendApprovalCommand(command());
 

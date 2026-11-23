@@ -38,7 +38,7 @@ export class CreateCrmTables1792000000000 implements MigrationInterface {
       );
       await queryRunner.query(
         `CREATE TABLE "crm_deals" ("id" varchar PRIMARY KEY NOT NULL DEFAULT gen_random_uuid()::varchar, ` +
-          `"stageId" varchar(36) NOT NULL, "title" varchar(200) NOT NULL, ` +
+          `"stageId" varchar NOT NULL, "title" varchar(200) NOT NULL, ` +
           `"sessionId" varchar(100), "chatId" varchar(100), "value" int, ` +
           `"currency" varchar(3) NOT NULL DEFAULT 'IDR', "status" varchar(12) NOT NULL DEFAULT 'open', ` +
           `"assigneeKeyId" varchar(36), "assigneeName" varchar(100), ` +
@@ -48,7 +48,7 @@ export class CreateCrmTables1792000000000 implements MigrationInterface {
       );
       await queryRunner.query(
         `CREATE TABLE "crm_deal_activities" ("id" varchar PRIMARY KEY NOT NULL DEFAULT gen_random_uuid()::varchar, ` +
-          `"dealId" varchar(36) NOT NULL, "kind" varchar(20) NOT NULL, "body" text, ` +
+          `"dealId" varchar NOT NULL, "kind" varchar(20) NOT NULL, "body" text, ` +
           `"fromStageId" varchar(36), "toStageId" varchar(36), ` +
           `"authorKeyId" varchar(36) NOT NULL, "authorName" varchar(100) NOT NULL, ` +
           `"createdAt" timestamp NOT NULL DEFAULT NOW(), ` +
@@ -63,7 +63,7 @@ export class CreateCrmTables1792000000000 implements MigrationInterface {
       );
       await queryRunner.query(
         `CREATE TABLE "crm_deals" ("id" varchar PRIMARY KEY NOT NULL, ` +
-          `"stageId" varchar(36) NOT NULL, "title" varchar(200) NOT NULL, ` +
+          `"stageId" varchar NOT NULL, "title" varchar(200) NOT NULL, ` +
           `"sessionId" varchar(100), "chatId" varchar(100), "value" int, ` +
           `"currency" varchar(3) NOT NULL DEFAULT ('IDR'), "status" varchar(12) NOT NULL DEFAULT ('open'), ` +
           `"assigneeKeyId" varchar(36), "assigneeName" varchar(100), ` +
@@ -73,7 +73,7 @@ export class CreateCrmTables1792000000000 implements MigrationInterface {
       );
       await queryRunner.query(
         `CREATE TABLE "crm_deal_activities" ("id" varchar PRIMARY KEY NOT NULL, ` +
-          `"dealId" varchar(36) NOT NULL, "kind" varchar(20) NOT NULL, "body" text, ` +
+          `"dealId" varchar NOT NULL, "kind" varchar(20) NOT NULL, "body" text, ` +
           `"fromStageId" varchar(36), "toStageId" varchar(36), ` +
           `"authorKeyId" varchar(36) NOT NULL, "authorName" varchar(100) NOT NULL, ` +
           `"createdAt" datetime NOT NULL DEFAULT (datetime('now')), ` +

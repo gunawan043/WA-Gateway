@@ -42,6 +42,8 @@ export interface MockApprovalHandle {
   url: string;
   /** Semua command yang diterima, termasuk yang akhirnya duplikat. */
   received: Array<Record<string, unknown>>;
+  /** Header tiap request, sejajar dengan `received`. */
+  receivedHeaders: Array<IncomingMessage['headers']>;
   /** Berapa kali Core benar-benar mengubah status izin. Harus tetap 1 pada replay. */
   appliedCount: () => number;
   setScenario: (scenario: MockApprovalScenario | null) => void;
@@ -161,6 +163,7 @@ export const startMockApprovalCore = async (options: MockApprovalOptions = {}): 
   const apiKey = options.apiKey ?? DEFAULT_API_KEY;
   const scopes = options.scopes ?? ['approval:command'];
   const received: Array<Record<string, unknown>> = [];
+  const receivedHeaders: Array<IncomingMessage['headers']> = [];
   const decided = new Map<string, RecordedDecision>();
   const messageIds = new Map<string, string>();
   let applied = 0;
@@ -203,6 +206,7 @@ export const startMockApprovalCore = async (options: MockApprovalOptions = {}): 
     headers: IncomingMessage['headers'],
   ): { status: number; body: Record<string, unknown> } => {
     received.push(payload);
+    receivedHeaders.push(headers);
 
     // ── Cakupan key (subclass middleware) ────────────────────────────────
     if (!scopes.includes('approval:command')) {
@@ -380,6 +384,7 @@ export const startMockApprovalCore = async (options: MockApprovalOptions = {}): 
   return {
     url: `http://127.0.0.1:${address.port}`,
     received,
+    receivedHeaders,
     appliedCount: () => applied,
     setScenario: next => {
       scenario = next;

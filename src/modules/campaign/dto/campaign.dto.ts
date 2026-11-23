@@ -120,7 +120,12 @@ export class CreateCampaignDto {
   @Type(() => CampaignContentDto)
   content!: CampaignContentDto;
 
-  @ApiPropertyOptional({ type: CampaignAudienceDto, description: 'Defaults to `manual` with no chats.' })
+  @ApiPropertyOptional({
+    type: CampaignAudienceDto,
+    description:
+      'Who receives the campaign. Required in practice: a `manual` audience needs at least one chatId, ' +
+      '`segment` needs segmentId, and `label` needs labelId.',
+  })
   @IsOptional()
   @IsObject()
   @ValidateNested()

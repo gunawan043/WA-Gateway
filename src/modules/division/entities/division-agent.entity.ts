@@ -18,7 +18,7 @@ export class DivisionAgent {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
-  @Column({ type: 'varchar', length: 36 })
+  @Column({ type: 'varchar' })
   divisionId!: string;
 
   @ManyToOne(() => Division, { onDelete: 'CASCADE' })

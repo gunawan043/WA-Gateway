@@ -15,6 +15,7 @@ import { ApprovalReplyResolver } from './approval-reply-resolver.service';
 import { isDecidable } from './approval-status';
 import { isRetryExhausted, nextAttemptAt, readRetryPolicy, RETRY_EXHAUSTED_MESSAGE } from './approval-retry.policy';
 import { WhatsAppIdentityService } from './whatsapp-identity.service';
+import { boundCoreBody } from './core-response-body';
 
 export interface ApprovalInboundContext {
   sessionId: string | null;
@@ -295,7 +296,9 @@ export class ApprovalProcessorService {
     command.attempts += 1;
     command.lastAttemptAt = now;
     command.coreResponseCode = result.httpStatus;
-    command.coreResponseBody = (result.raw as Record<string, unknown> | null) ?? null;
+    // Bounded: the reply is kept for manual review, never for the API, and must not be able to
+    // grow the row without a ceiling. A body that fits is stored exactly as received.
+    command.coreResponseBody = boundCoreBody(result.raw as Record<string, unknown> | null);
     command.errorCode = result.code;
 
     if (result.outcome === 'applied' || result.outcome === 'duplicate') {
