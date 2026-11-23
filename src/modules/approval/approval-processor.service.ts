@@ -441,11 +441,14 @@ export class ApprovalProcessorService {
     outcome: string,
     severity: 'info' | 'warn' = 'info',
   ): Promise<unknown> {
+    // `requestId` is spread last so it always wins. `AuditService.log` merges the live request id
+    // *over* the caller's metadata, and every inbound reply runs inside the message hook's request
+    // context: without this line the row carries that id instead of `commandId`, which is the one
+    // field an operator reconciles against Core.
     const context = {
       sessionId: request?.sessionId ?? undefined,
       metadata: {
         outcome,
-        commandId: command.commandId,
         coreRequestId: request?.coreRequestId ?? null,
         decision: command.decision,
         approvedDurationDays: command.durationDays,
@@ -455,6 +458,7 @@ export class ApprovalProcessorService {
         coreResponseCode: command.coreResponseCode,
         coreErrorCode: command.errorCode ?? null,
         actorCorePersonId: request?.targetCorePersonId ?? null,
+        commandId: command.commandId,
       },
     };
 

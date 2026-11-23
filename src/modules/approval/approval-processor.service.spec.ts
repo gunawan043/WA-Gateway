@@ -600,6 +600,28 @@ describe('ApprovalProcessorService', () => {
     expect(flat).not.toContain('SETUJU 2 HARI');
   });
 
+  it('mempertahankan commandId walau AuditService menimpanya dengan request id', async () => {
+    // The recorder above stores the context as handed over, so it cannot see this. AuditService.log
+    // merges `{...context.metadata, requestId}` — request id last — and an inbound reply always runs
+    // inside a request scope. If commandId were not last in the context, this row would name the
+    // message's request id instead of the command, and no operator could reconcile it with Core.
+    const merge = (metadata: Record<string, unknown>, requestId: string): Record<string, unknown> => ({
+      ...metadata,
+      requestId,
+    });
+
+    await seedIdentity();
+    const request = await seedRequest();
+
+    await processor.handle(inbound(`SETUJU 2 HARI ${request.reference}`));
+
+    const command = await commands.findOneByOrFail({ approvalRequestId: request.id });
+    const row = merge(audited[0].metadata, 'req-inbound-1');
+
+    expect(row.commandId).toBe(command.commandId);
+    expect(row.requestId).toBe('req-inbound-1');
+  });
+
   it('mencatat penolakan Core sebagai peringatan dengan kode galatnya', async () => {
     await seedIdentity();
     const request = await seedRequest();
