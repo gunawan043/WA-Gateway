@@ -27,8 +27,11 @@ const LANE_SPECS = ['test/sso-handoff-http.e2e-spec.ts', 'test/approval-http.e2e
  * Checks in the order an operator meets them. `required` is what makes the real Core sections run
  * rather than skip; the rest are conditions under which the feature is silently off or answering 503,
  * which is worth knowing before a run is read as a pass.
+ *
+ * Exported so a test can assert every name here is one the application actually reads: a lane that
+ * asks for a variable nothing consumes reports "ready" for a deployment that is not.
  */
-interface Check {
+export interface Check {
   env: string;
   required: boolean;
   /** Which integration the value belongs to; the lane reports each one only under its own heading. */
@@ -37,7 +40,7 @@ interface Check {
   why: string;
 }
 
-const CHECKS: Check[] = [
+export const CHECKS: Check[] = [
   {
     env: 'ALIM_CORE_BASE_URL',
     required: true,
@@ -150,4 +153,5 @@ function main(): void {
   runJest(specs);
 }
 
-main();
+// Importable by the spec that cross-checks CHECKS without running the lane.
+if (require.main === module) main();
