@@ -168,7 +168,9 @@ dan **tidak** di-commit.
 2. Target Siklus 9: **bukti nyata** untuk (a) SSO sukses dengan `core_user_id` yang dikenal, (b) replay
    kode ditolak, (c) satu command approval `APPLIED` dengan baris audit yang cocok, (d) replay
    `duplicate` tanpa perubahan permit, (e) timeout → `UNKNOWN` → retry dengan `commandId` sama.
-3. Pekerjaan kualitas terpisah (terbuka, kepemilikan Connect):
+3. **Selesai di siklus 9:** akar penyebab `exit 1` ditemukan — bukan threshold coverage.
+   Lihat `alim-connect-pdca-cycle-9.md` §9.
+4. Pekerjaan kualitas terpisah (terbuka, kepemilikan Connect):
    - full suite paralel tidak stabil (suite berbeda gagal di tiap run, semuanya lulus sendiri);
    - `exit 1` pada run berlingkup penuh setelah ringkasan bersih, juga pada baseline — perlu
      dijelaskan sebelum gerbang ini dapat disebut hijau;
