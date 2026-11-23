@@ -46,6 +46,12 @@ export interface HandoffInput {
  * A failure at any step returns without touching `user_sessions`, so an invalid, expired, reused or
  * revoked handoff can never leave a session behind. Core's role/assignment data is never read: the
  * mapped account's own Connect role and grants are what the workspace enforces afterwards.
+ *
+ * Every refusal in steps 2 and 3 is also recorded in the audit trail. Step 1 (Core's verdict) is not:
+ * a wrong code is far more often a mistyped URL than an attack, and Core keeps the authoritative
+ * record of its own redemption. The gap that mattered was the opposite one — a code that Core said
+ * yes to, refused by Connect's own mapping, left no trace at all in a deployment shipping with the
+ * file logger. That is exactly what an operator has to reconstruct by hand, so it is recorded here.
  */
 @Injectable()
 export class SsoHandoffService {
@@ -78,6 +84,7 @@ export class SsoHandoffService {
     const user = await this.users.findByCoreUserId(exchange.identity.coreUserId);
     if (!user) {
       this.logger.warn('SSO handoff ditolak: identitas Core belum dipetakan ke akun Connect');
+      await this.auditRefusal('identity_not_mapped', exchange.identity.coreUserId, input);
       return {
         ok: false,
         reason: 'identity_not_mapped',
@@ -86,6 +93,7 @@ export class SsoHandoffService {
     }
     if (!user.isActive) {
       this.logger.warn(`SSO handoff ditolak: akun Connect ${user.id} dinonaktifkan`);
+      await this.auditRefusal('account_disabled', exchange.identity.coreUserId, input, user.id);
       return {
         ok: false,
         reason: 'account_disabled',
@@ -126,11 +134,42 @@ export class SsoHandoffService {
       };
     } catch (error) {
       this.logger.error(`Gagal membuat sesi SSO: ${(error as Error).message}`);
+      await this.auditRefusal('session_issue_failed', exchange.identity.coreUserId, input, user.id);
       return {
         ok: false,
         reason: 'session_issue_failed',
         message: 'Sesi ALIM Connect tidak dapat dibuat. Coba lagi dari ALIM Core.',
       };
     }
+  }
+
+  /**
+   * Records a refusal that happens *after* Core said yes.
+   *
+   * `core_user_id` is Core's own identifier for a person, which is exactly what an operator needs to
+   * reconcile a refused handoff with Core; the code, the key and the token are never part of it.
+   * Best effort, like the success row: the person's outcome does not depend on the audit write.
+   */
+  private async auditRefusal(
+    reason: 'identity_not_mapped' | 'account_disabled' | 'session_issue_failed',
+    coreUserId: string,
+    input: HandoffInput,
+    userId?: string,
+  ): Promise<void> {
+    await this.audit
+      .logWarn(AuditAction.USER_LOGIN_FAILED, {
+        ipAddress: input.ipAddress,
+        method: 'POST',
+        path: '/sso/handoff',
+        metadata: {
+          reason,
+          via: 'alim_core_sso',
+          coreUserId,
+          ...(userId !== undefined ? { userId } : {}),
+        },
+      })
+      .catch(error => {
+        this.logger.warn(`Audit penolakan SSO gagal ditulis: ${(error as Error).message}`);
+      });
   }
 }
