@@ -690,4 +690,87 @@ describe('ApprovalProcessorService', () => {
     expect(retried[0].severity).toBe('warn');
     expect(retried[0].metadata).toMatchObject({ outcome: 'exhausted', commandStatus: 'FAILED', attempts: 1 });
   });
+
+  // Tautan balasan lewat pesan notifikasi ------------------------------------
+
+  /**
+   * Kepala asrama usually answers by QUOTING the notification ("SETUJU 2 HARI"), which carries no
+   * reference. WhatsApp stamps that reply with the quoted message's id, and the resolver needs it to be
+   * the request's `notificationMessageId`. Before this, nothing wrote that id from the outbound side, so
+   * the reply resolved to `not_found` and no command ever reached Core.
+   */
+  describe('recordNotification', () => {
+    it('menautkan pesan keluar notifikasi ke permohonan yang masih terbuka', async () => {
+      await seedIdentity();
+      const request = await seedRequest({ notificationMessageId: null });
+      const text = new ApprovalNotificationService(requests, {} as never, identities).buildText(request);
+
+      await processor.recordNotification(SESSION, 'wamid.notif.out.9', text, `${SENDER}@c.us`);
+
+      expect((await requests.findOneByOrFail({ id: request.id })).notificationMessageId).toBe('wamid.notif.out.9');
+    });
+
+    it('menautkan pengingat yang membawa baris referensi yang sama', async () => {
+      await seedIdentity();
+      const request = await seedRequest({ notificationMessageId: null });
+
+      await processor.recordNotification(
+        SESSION,
+        'wamid.reminder.1',
+        `*Pengingat Persetujuan Izin*\n\nReferensi: ${request.reference}\nBalas SETUJU 2 HARI`,
+        `${SENDER}@c.us`,
+      );
+
+      expect((await requests.findOneByOrFail({ id: request.id })).notificationMessageId).toBe('wamid.reminder.1');
+    });
+
+    it('tidak menautkan pesan yang bukan notifikasi permohonan', async () => {
+      await seedIdentity();
+      const request = await seedRequest({ notificationMessageId: null });
+
+      await processor.recordNotification(SESSION, 'wamid.chat.1', 'Halo, ada yang bisa dibantu?', `${SENDER}@c.us`);
+
+      expect((await requests.findOneByOrFail({ id: request.id })).notificationMessageId).toBeNull();
+    });
+
+    it('tidak menautkan permohonan yang sudah diputuskan', async () => {
+      await seedIdentity();
+      const request = await seedRequest({ status: 'APPROVED', notificationMessageId: null });
+      const text = `Referensi: ${request.reference}`;
+
+      await processor.recordNotification(SESSION, 'wamid.notif.out.1', text, `${SENDER}@c.us`);
+
+      expect((await requests.findOneByOrFail({ id: request.id })).notificationMessageId).toBeNull();
+    });
+
+    it('tidak menautkan pesan dari sesi lain', async () => {
+      await seedIdentity();
+      const request = await seedRequest({ notificationMessageId: null });
+
+      await processor.recordNotification('sess-lain', 'wamid.notif.out.2', `Referensi: ${request.reference}`);
+
+      expect((await requests.findOneByOrFail({ id: request.id })).notificationMessageId).toBeNull();
+    });
+
+    it('balasan yang mengutip notifikasi menghasilkan command ke Core', async () => {
+      const identity = await seedIdentity();
+      const request = await seedRequest({ notificationMessageId: null });
+      const notificationText = new ApprovalNotificationService(requests, {} as never, identities).buildText(request);
+      await processor.recordNotification(SESSION, 'wamid.notif.out.3', notificationText, `${SENDER}@c.us`);
+
+      const outcome = await processor.handle(
+        inbound('SETUJU 2 HARI', { quotedMessageId: 'wamid.notif.out.3', senderIdentity: identity.externalIdentity }),
+      );
+
+      expect(outcome).toBe('applied');
+      const [command] = await commands.find({ where: { approvalRequestId: request.id } });
+      expect(command).toBeDefined();
+      expect(command.decision).toBe('approved');
+      expect(command.durationDays).toBe(2);
+      const stored = await requests.findOneByOrFail({ id: request.id });
+      expect(stored.status).toBe('APPROVED');
+      // Core saw the command under the same id the audit row names.
+      expect(command.commandId).toBe(stored.lastCommandId);
+    });
+  });
 });

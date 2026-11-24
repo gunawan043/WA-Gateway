@@ -4,7 +4,7 @@ import { recordApprovalCommand } from '../../common/metrics/approval-metrics';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { ALIM_CORE_APPROVAL_CLIENT } from './core-client/alim-core-approval.client';
 import type { AlimCoreApprovalClient, CoreApprovalResult } from './core-client/alim-core-approval.client';
 import { ApprovalCommand } from './entities/approval-command.entity';
@@ -187,6 +187,51 @@ export class ApprovalProcessorService {
     }
 
     return this.submitDecision(request, parsed, ctx);
+  }
+
+  /**
+   * Tautkan satu pesan keluar yang baru saja dikirim ke permohonan yang dikirimi notifikasi itu.
+   *
+   * WhatsApp menandai sebuah balasan dengan id pesan yang DIKUTIP, dan yang dikutip Kepala Asrama
+   * adalah pesan notifikasi — bukan id permohonan. `ApprovalReplyResolver` menyelesaikan tautan itu
+   * lewat `notificationMessageId`, jadi tanpa baris ini balasan "SETUJU 2 HARI" tanpa referensi
+   * berakhir `not_found` dan tidak pernah menjadi command.
+   *
+   * `body` harus memuat baris `Referensi: <reference>` yang ditulis
+   * {@link ApprovalNotificationService}; notifikasi dan pengingatnya sama-sama membawanya, dan tidak
+   * ada pesan lain dari gateway yang membawa baris itu. Obrolan biasa karena itu tidak pernah
+   * ditautkan ke permohonan.
+   *
+   * Yang dicari adalah permohonan terbuka TERBARU pada sesi dan tujuan yang sama. Pencocokan
+   * referensi membuat pesan notifikasi milik permohonan lain berhenti di sini, bukan tertaut salah.
+   */
+  async recordNotification(sessionId: string, messageId: string, body: string, chatId = ''): Promise<void> {
+    if (messageId === '' || body === '') {
+      return;
+    }
+
+    const request = await this.requests.findOne({
+      where: {
+        sessionId,
+        status: In(['PENDING_APPROVAL', 'NEEDS_CLARIFICATION']),
+        ...(chatId !== '' ? { targetIdentity: this.identities.normalize(chatId) } : {}),
+      },
+      order: { createdAt: 'DESC' },
+    });
+
+    if (!request) {
+      return;
+    }
+
+    // The notification and any reminder both carry the permit's reference line, and nothing the
+    // gateway sends for another purpose does. A reply quoting a chat message is therefore never
+    // linked to a permit.
+    if (!body.includes(`Referensi: ${request.reference}`)) {
+      return;
+    }
+
+    request.notificationMessageId = messageId;
+    await this.requests.save(request);
   }
 
   /**

@@ -1,4 +1,5 @@
 import { INestApplication } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
@@ -48,6 +49,9 @@ const MAX_ATTEMPTS = 2;
 process.env.METRICS_TOKEN = METRICS_TOKEN;
 process.env.ALIM_CONNECT_CORE_CLIENT = 'http';
 process.env.ALIM_CONNECT_INGEST_KEY = INGEST_KEY;
+// Kunci untuk mock (section mock) harus CORE_KEY, tetapi section "Core sungguhan" harus memakai
+// kunci milik operator: menimpanya di sini membuat uji nyata ditolak 401 oleh Core staging.
+const operatorApprovalKey = (process.env.ALIM_CORE_APPROVAL_API_KEY ?? '').trim();
 process.env.ALIM_CORE_APPROVAL_API_KEY = CORE_KEY;
 process.env.ALIM_CORE_TIMEOUT_MS = String(CORE_TIMEOUT_MS);
 // Worker deterministik: tidak ada pass otomatis; test memanggil runOnce() sendiri.
@@ -131,6 +135,7 @@ describe('Approval over HTTP with a mock Core at the HTTP boundary (e2e)', () =>
   let hooks: HookManager;
   let retry: ApprovalRetryService;
   let commands: Repository<ApprovalCommand>;
+  let requests: Repository<ApprovalRequest>;
   let metricsService: MetricsService;
 
   const resetCoreMock = (): void => {
@@ -184,6 +189,10 @@ describe('Approval over HTTP with a mock Core at the HTTP boundary (e2e)', () =>
     coreBaseUrl = `http://127.0.0.1:${(coreServer.address() as AddressInfo).port}`;
   };
 
+  // Lihat catatan di sso-handoff-http.e2e-spec.ts: nilai operator harus ditangkap sebelum mock
+  // menimpa variabelnya, atau uji "Core sungguhan" akan menembak mock dan tetap melaporkan lulus.
+  const operatorCoreBaseUrl = (process.env.ALIM_CORE_BASE_URL ?? '').trim();
+
   beforeAll(async () => {
     await startMockCore();
 
@@ -223,6 +232,7 @@ describe('Approval over HTTP with a mock Core at the HTTP boundary (e2e)', () =>
     hooks = app.get(HookManager);
     retry = app.get(ApprovalRetryService);
     commands = app.get<Repository<ApprovalCommand>>(getRepositoryToken(ApprovalCommand, 'data'));
+    requests = app.get<Repository<ApprovalRequest>>(getRepositoryToken(ApprovalRequest, 'data'));
     metricsService = app.get(MetricsService);
 
     // Pemetaan identitas lewat endpoint yang sesungguhnya, bukan penyisipan baris langsung:
@@ -814,6 +824,49 @@ describe('Approval over HTTP with a mock Core at the HTTP boundary (e2e)', () =>
       expect(metricValue(after, notificationMetric('failed'))).toBe(metricValue(before, notificationMetric('failed')));
     });
 
+    it('menautkan balasan yang mengutip pesan notifikasi, lewat event message:sent yang sesungguhnya', async () => {
+      const ingested = await ingest({
+        reference: 'IZN-2026-140',
+        sessionId: 'e2e-session',
+        notify: false,
+      }).expect(201);
+      const request = ingested.body as ApprovalRequestBody;
+
+      // What the gateway dispatches when it records a message this process just sent: the chain runs
+      // the approval hook on `message:sent`, which links the notification id to the permit.
+      const notificationText = `*Persetujuan Izin Santri*\n\nReferensi: IZN-2026-140\n\nBalas:\nSETUJU <jumlah hari> HARI IZN-2026-140`;
+      await hooks.execute(
+        'message:sent',
+        { id: 'wamid.NOTIF-OUT-140', chatId: `${TARGET_NUMBER}@c.us`, body: notificationText, fromMe: true },
+        { sessionId: 'e2e-session', source: 'Engine' },
+      );
+
+      const stored = await requests.findOneByOrFail({ id: request.id });
+      expect(stored.notificationMessageId).toBe('wamid.NOTIF-OUT-140');
+
+      // The reply quotes the notification and names no reference of its own.
+      await hooks.execute(
+        'message:received',
+        {
+          id: 'wamid.REPLY-140',
+          from: `${TARGET_NUMBER}@s.whatsapp.net`,
+          chatId: `${TARGET_NUMBER}@c.us`,
+          body: 'SETUJU 2 HARI',
+          isGroup: false,
+          fromMe: false,
+          quotedMessage: { id: 'wamid.NOTIF-OUT-140' },
+        },
+        { sessionId: 'e2e-session', source: 'Engine' },
+      );
+
+      const [command] = await commands.find({ where: { approvalRequestId: request.id } });
+      expect(command).toBeDefined();
+      expect(command.decision).toBe('approved');
+      expect(command.durationDays).toBe(2);
+      expect(coreCalls.some(call => call.body.command_id === command.commandId)).toBe(true);
+      expect((await requests.findOneByOrFail({ id: request.id })).status).toBe('APPROVED');
+    });
+
     it('label metrik approval hanya berisi nilai dari himpunan tetap, tanpa PII', async () => {
       const text = await metrics();
       const labels = text
@@ -838,15 +891,32 @@ describe('Approval over HTTP with a mock Core at the HTTP boundary (e2e)', () =>
    * operator asked for a real run, and an unreachable Core is the thing being tested.
    */
   describe('Z. ALIM Core sungguhan', () => {
-    const baseUrl = (process.env.ALIM_CORE_BASE_URL ?? '').trim();
-    const approvalKey = (process.env.ALIM_CORE_APPROVAL_API_KEY ?? '').trim();
-    const real = baseUrl !== '' && approvalKey !== '';
+    const baseUrl = operatorCoreBaseUrl;
+    const approvalKey = operatorApprovalKey;
     // A PERMIT for a nil UUID in a person's name is legal in Core's domain; a probe command is not.
-    const targetCorePersonId = '00000000-0000-4000-8000-000000000003';
+    // But Core resolves the REPLIER to a person it can name, so this section needs a staging actor
+    // Core mapped and verified — otherwise Core correctly answers 403 actor_identity_unmapped.
+    const targetCorePersonId =
+      (process.env.ALIM_CONNECT_STAGING_ACTOR_CORE_USER ?? '').trim() || '00000000-0000-4000-8000-000000000003';
+    // Identity used only by this section, so suite B's mapping of TARGET_NUMBER cannot repoint it.
+    const ACTOR_NUMBER = (process.env.ALIM_CONNECT_STAGING_ACTOR_NUMBER ?? '').trim();
+    // Tanpa aktor staging, bagian ini hanya membuktikan penolakan Core; bukti nyata butuh orang
+    // yang benar-benar dipetakan dan diverifikasi di Core.
+    const real =
+      baseUrl !== '' &&
+      approvalKey !== '' &&
+      ACTOR_NUMBER !== '' &&
+      targetCorePersonId !== '00000000-0000-4000-8000-000000000003';
 
     (real ? it : it.skip)(
       'mengirim satu command dan mencatat jawaban Core yang sebenarnya',
       async () => {
+        // Arahkan aplikasi yang SUDAH berjalan ke Core sungguhan. `beforeAll` menimpa
+        // `ALIM_CORE_BASE_URL` dengan alamat mock SEBELUM AppModule dimuat, jadi ConfigService memegang
+        // alamat mock: tanpa baris ini, bagian ini tetap menembak mock lalu melaporkan APPLIED.
+        app.get(ConfigService).set('connect.approval.coreBaseUrl', baseUrl);
+        app.get(ConfigService).set('connect.approval.coreApiKey', approvalKey);
+
         // Referensi harus berbentuk `PREFIX-TAHUN-NOMOR` agar parser mengenalinya sebagai referensi.
         const marker = `IZN-2026-${randomUUID().replace(/\D/g, '').slice(0, 8)}`;
         coreCalls = [];
@@ -857,7 +927,7 @@ describe('Approval over HTTP with a mock Core at the HTTP boundary (e2e)', () =>
           .post('/api/approval/identities')
           .set('x-api-key', adminKey)
           .send({
-            externalIdentity: TARGET_NUMBER,
+            externalIdentity: ACTOR_NUMBER,
             corePersonId: targetCorePersonId,
             displayName: 'Probe staging',
             isVerified: true,
@@ -874,13 +944,16 @@ describe('Approval over HTTP with a mock Core at the HTTP boundary (e2e)', () =>
           reference: marker,
           requestedDurationDays: 1,
           targetCorePersonId: targetCorePersonId,
+          // Pengirim balasan harus orang yang dituju (processor memeriksa `sender.corePersonId`
+          // terhadap target), jadi permohonan ini ditujukan ke aktor staging itu sendiri.
+          targetIdentity: ACTOR_NUMBER,
           notify: false,
         }).expect(201);
         const request = ingested.body as ApprovalRequestBody;
         // Lokal: identitas pengirim harus terverifikasi, dan itulah yang diperiksa processor.
         const identity = await app
           .get<Repository<WhatsAppIdentity>>(getRepositoryToken(WhatsAppIdentity, 'data'))
-          .findOne({ where: { externalIdentity: TARGET_NUMBER } });
+          .findOne({ where: { externalIdentity: ACTOR_NUMBER } });
 
         // Pemetaan identitas bersifat global (`UQ_whatsapp_identities_external`), jadi nomor uji
         // dapat saja masih terpetakan ke personel lain dari suite B. Deskripsi publik sengaja
@@ -949,7 +1022,7 @@ describe('Approval over HTTP with a mock Core at the HTTP boundary (e2e)', () =>
         });
 
         const serialised = JSON.stringify(trails[0].metadata);
-        expect(serialised).not.toContain(TARGET_NUMBER);
+        expect(serialised).not.toContain(ACTOR_NUMBER);
         expect(serialised).not.toContain(marker);
         expect(serialised).not.toContain(approvalKey);
 
