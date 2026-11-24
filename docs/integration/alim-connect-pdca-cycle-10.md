@@ -1,7 +1,7 @@
 # Laporan PDCA Siklus 10 — Akar `exit 1` Full Suite, dan Status Integrasi Nyata
 
 **Tanggal:** 2026-11-23/24 · **Repo:** OpenWA (Connect) · **Branch:** `feature/whatsapp-approval-finalization`
-**HEAD awal:** `46abddf65` (laporan siklus 9) · **Tidak ada commit baru di siklus ini**
+**HEAD awal:** `46abddf65` (laporan siklus 9) · **HEAD akhir:** `4833abfd8` (tiga commit, §8)
 
 **Ringkasan:** akar `exit 1` full suite **ditemukan dan dibuktikan dengan reproduksi deterministik**:
 baris log yang ditulis modul yang sudah di-teardown mencapai console Jest yang sudah ditutup
@@ -19,14 +19,14 @@ belum ada. Rincian permintaan ke Core/operator ada di `alim-connect-staging-hand
 
 ## 1. Repository, branch, HEAD
 
-| Hal | Nilai |
-| --- | --- |
-| Repository | OpenWA (Connect) — repo Core tidak disentuh |
-| Branch | `feature/whatsapp-approval-finalization` |
-| HEAD awal & akhir | `46abddf65` |
-| Commit siklus 8/9 | `526b6a099`, `94cd0329e`, `2ca5fed68`, `a0ea6b206`, `35522592d`, `46abddf65` — semua ancestor HEAD |
-| Working tree | `alim-connect-pdca-cycle-10.md` dan `alim-connect-staging-handoff.md` (baru), `LAPORAN-FASE-3-2026-11-20.md` dan `OpenWA/` (artefak lama, tidak disentuh), serta `.env.bak-connect-pairing` yang muncul sendiri (§7 — bukan buatan saya) |
-| Kode produksi diubah | **tidak ada** — tiga varian perbaikan dicoba lalu direvert, lihat §3 |
+| Hal                  | Nilai                                                                                                                                                                                                                                    |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Repository           | OpenWA (Connect) — repo Core tidak disentuh                                                                                                                                                                                              |
+| Branch               | `feature/whatsapp-approval-finalization`                                                                                                                                                                                                 |
+| HEAD awal & akhir    | `46abddf65`                                                                                                                                                                                                                              |
+| Commit siklus 8/9    | `526b6a099`, `94cd0329e`, `2ca5fed68`, `a0ea6b206`, `35522592d`, `46abddf65` — semua ancestor HEAD                                                                                                                                       |
+| Working tree         | `alim-connect-pdca-cycle-10.md` dan `alim-connect-staging-handoff.md` (baru), `LAPORAN-FASE-3-2026-11-20.md` dan `OpenWA/` (artefak lama, tidak disentuh), serta `.env.bak-connect-pairing` yang muncul sendiri (§7 — bukan buatan saya) |
+| Kode produksi diubah | **tidak ada** — tiga varian perbaikan dicoba lalu direvert, lihat §3                                                                                                                                                                     |
 
 ## 2. Bukti akar penyebab
 
@@ -48,11 +48,11 @@ belum ada. Rincian permintaan ke Core/operator ada di `alim-connect-staging-hand
 
 Fixture di `/tmp/c10-repro/` (tidak masuk repo), keduanya satu file, satu tes, **lulus**:
 
-| Fixture | Isi | Hasil |
-| --- | --- | --- |
+| Fixture                  | Isi                                                  | Hasil                                                     |
+| ------------------------ | ---------------------------------------------------- | --------------------------------------------------------- |
 | `late-log.repro.spec.ts` | `setTimeout(() => new LoggerService().log('…'), 50)` | `EXIT=1`, `1 passed`, `● Cannot log after tests are done` |
-| `silent.repro.spec.ts` | `setTimeout(() => process.stderr.write('…'), 50)` | `EXIT=0`, `1 passed`, tanpa baris `●` |
-| keduanya sekaligus | — | `EXIT=1`, `2 passed` |
+| `silent.repro.spec.ts`   | `setTimeout(() => process.stderr.write('…'), 50)`    | `EXIT=0`, `1 passed`, tanpa baris `●`                     |
+| keduanya sekaligus       | —                                                    | `EXIT=1`, `2 passed`                                      |
 
 Ini menutup pertanyaan siklus 9 ("apakah `exit 1` karena threshold/assertion/timeout?"): **bukan
 ketiganya**. Threshold coverage tidak pernah dilanggar (siklus 9: 0 grup di bawah ambang), dan
@@ -63,11 +63,11 @@ assertion lulus; yang menetapkan kode keluar adalah jalur console Jest.
 Dihitung dari log run penuh siklus 10 (`/tmp/c10-cov-001..003.log`, semuanya `EXIT=1`,
 `865 passed` / `0 failed`):
 
-| Run | Baris "Cannot log after tests are done" | Suite berbeda yang menulisnya |
-| --- | --- | --- |
-| `c10-cov-001` | 6 | 4 (`group.tools`, `baileys-send-seen` ×3, `wwebjs-mention-spelling`, `reconnect-config`) |
-| `c10-cov-002` | 6 | 4 (`sqlite-busy-timeout`, `events.gateway.refusal-attribution`, `message.controller`, `session-rebind-ready-announcement` ×3) |
-| `c10-cov-003` | 6 | 4 (`load-remote-media-credentials`, `send-pacing.service` ×3, `metrics-concurrent-render`, `own-send-mutations`) |
+| Run           | Baris "Cannot log after tests are done" | Suite berbeda yang menulisnya                                                                                                 |
+| ------------- | --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `c10-cov-001` | 6                                       | 4 (`group.tools`, `baileys-send-seen` ×3, `wwebjs-mention-spelling`, `reconnect-config`)                                      |
+| `c10-cov-002` | 6                                       | 4 (`sqlite-busy-timeout`, `events.gateway.refusal-attribution`, `message.controller`, `session-rebind-ready-announcement` ×3) |
+| `c10-cov-003` | 6                                       | 4 (`load-remote-media-credentials`, `send-pacing.service` ×3, `metrics-concurrent-render`, `own-send-mutations`)              |
 
 Karena selalu **6 baris × 4 suite**: sekali pun satu baris sudah cukup untuk `exit 1`, ketiga run
 tidak mungkin keluar 0. Siklus 10 sebelumnya hanya menghitung `grep -c "^FAIL "` = 0 lalu menyimpulkan
@@ -75,11 +75,11 @@ tidak mungkin keluar 0. Siklus 10 sebelumnya hanya menghitung `grep -c "^FAIL "`
 
 Asal barisnya (stack trace di log) adalah modul yang **di-teardown di tengah jalan**:
 
-| Sumber | Contoh dari log |
-| --- | --- |
+| Sumber                                                                                           | Contoh dari log                                                |
+| ------------------------------------------------------------------------------------------------ | -------------------------------------------------------------- |
 | `BaileysEvents.targetsForeignMessage` → `processMessageChange` → `concurrency-limiter.yieldSlot` | handler yang diparkir limiter dilanjutkan pada tick berikutnya |
-| `BaileysLifecycle` timer pairing (`Timeout._onTimeout`, `baileys-lifecycle.ts:824`) | timer yang menyala setelah flush terakhir |
-| `LoggerService.warn/log` dari service yang sudah di-`destroy` | plugin, session, media |
+| `BaileysLifecycle` timer pairing (`Timeout._onTimeout`, `baileys-lifecycle.ts:824`)              | timer yang menyala setelah flush terakhir                      |
+| `LoggerService.warn/log` dari service yang sudah di-`destroy`                                    | plugin, session, media                                         |
 
 Run tanpa coverage juga memuat 5–7 baris yang sama, jadi mekanismenya **tidak tergantung coverage**;
 coverage hanya memperpanjang durasi sehingga jendela balapan lebih lebar.
@@ -88,11 +88,11 @@ coverage hanya memperpanjang durasi sehingga jendela balapan lebih lebar.
 
 Tiga varian dicoba, semuanya **direvert**; working tree kembali ke `46abddf65` tanpa perubahan kode.
 
-| # | Varian | Hasil |
-| --- | --- | --- |
-| A | `LoggerService.setLineWriter` + `setupFiles` menulis semua baris ke `stderr` | **Merusak 26 file** yang mem-spy `console.*` untuk membaca output logger (`mock.calls[0]` jadi kosong): `plugin-capability-logger`, `inflight-body-budget`, `worker-shutdown`, `redis-io.adapter.stall`, dst. Dihentikan setelah 15 suite FAIL (22 menit). |
-| B | Varian A + menandai console "tertutup" setelah tes terakhir | Tidak bisa diaktifkan dari `setupFiles`: `beforeAll`/`afterAll` tidak tersedia di sana (`ReferenceError: beforeAll is not defined`), dan hook dari file setup dilepas sebelum hook suite sendiri — terlalu awal. |
-| C | Menekan **hanya** baris yang tiba setelah console ditutup, saat itu terjadi | Tidak bisa: "ditutup" hanya terdeteksi lewat pengganti `_log` Jest sendiri, yang justru tidak boleh dipanggil (memanggilnya = menulis error + `exitCode = 1`). |
+| #   | Varian                                                                       | Hasil                                                                                                                                                                                                                                                      |
+| --- | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A   | `LoggerService.setLineWriter` + `setupFiles` menulis semua baris ke `stderr` | **Merusak 26 file** yang mem-spy `console.*` untuk membaca output logger (`mock.calls[0]` jadi kosong): `plugin-capability-logger`, `inflight-body-budget`, `worker-shutdown`, `redis-io.adapter.stall`, dst. Dihentikan setelah 15 suite FAIL (22 menit). |
+| B   | Varian A + menandai console "tertutup" setelah tes terakhir                  | Tidak bisa diaktifkan dari `setupFiles`: `beforeAll`/`afterAll` tidak tersedia di sana (`ReferenceError: beforeAll is not defined`), dan hook dari file setup dilepas sebelum hook suite sendiri — terlalu awal.                                           |
+| C   | Menekan **hanya** baris yang tiba setelah console ditutup, saat itu terjadi  | Tidak bisa: "ditutup" hanya terdeteksi lewat pengganti `_log` Jest sendiri, yang justru tidak boleh dipanggil (memanggilnya = menulis error + `exitCode = 1`).                                                                                             |
 
 Kesimpulan teknis: **tidak ada titik di dalam file tes yang bisa menutup console sendiri**, dan
 menyembunyikan barisnya sebelum tutup akan mengubah apa yang diuji file-file tersebut. Yang benar
@@ -106,21 +106,21 @@ suite itu sendiri — risiko regresi lebih tinggi daripada nilai satu sakelar.
 
 ## 4. Hasil run penuh siklus ini
 
-| Run | Perintah | Exit | Suite | Tes | Waktu | Baris "Cannot log" | Force-exit worker |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| `c10-cold-cov-001` | cache dibersihkan (`jest --clearCache`), lalu `npx jest --coverage --coverageReporters=json-summary --coverageReporters=text-summary`, `maxWorkers` bawaan | **1** | **19 failed**, 846 passed, 865 of 879 | 20 failed, 21409 passed | 2391,9 s | **6** | 1 |
+| Run                | Perintah                                                                                                                                                   | Exit  | Suite                                 | Tes                     | Waktu    | Baris "Cannot log" | Force-exit worker |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- | ------------------------------------- | ----------------------- | -------- | ------------------ | ----------------- |
+| `c10-cold-cov-001` | cache dibersihkan (`jest --clearCache`), lalu `npx jest --coverage --coverageReporters=json-summary --coverageReporters=text-summary`, `maxWorkers` bawaan | **1** | **19 failed**, 846 passed, 865 of 879 | 20 failed, 21409 passed | 2391,9 s | **6**              | 1                 |
 
 Coverage (dari log, bukan ingatan): **Statements 95,25 % · Branches 87,21 % · Functions 93,36 % ·
 Lines 95,97 %**, dan **0** baris `does not meet` — ambang coverage (`77/66/80/77`) tidak dilanggar.
 
 ### 4.1 Analisis 19 suite yang gagal
 
-| Kategori | Jumlah | Contoh |
-| --- | --- | --- |
-| `Exceeded timeout of 5000 ms` | 15 | `redis-connection`, `baileys-auth-store`, `ws-frame-limit`, `worker-shutdown`, `storage-downloads-busy`, `metrics.controller`, `session.controller.http`, `group.controller.http`, `keyed-mutation-queue`, `wwebjs-web-version-cache`, `wwebjs-launch-follows-later-injects`, `message-receipt-in-flight-chat`, `session-reconnect-teardown-disconnect-overlap`, `sandbox-hook-text-reply-within-budget`, `status-post-media-url-refusal` |
-| Assertion karena race | 2 | `root-namespace` (`Expected true, Received false` pada CONNECT root), `session-proxy-large-answer` (`Expected true, Received false` saat streaming) |
-| Proses gateway **tidak mau boot** | 1 | `main-process-signals`: `the gateway did not come up: {"code":1}` (child `src/main.ts` mati saat start di bawah beban) |
-| Duplikat jalur relatif | 1 | keluaran lintas-worker untuk suite yang sama |
+| Kategori                          | Jumlah | Contoh                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| --------------------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Exceeded timeout of 5000 ms`     | 15     | `redis-connection`, `baileys-auth-store`, `ws-frame-limit`, `worker-shutdown`, `storage-downloads-busy`, `metrics.controller`, `session.controller.http`, `group.controller.http`, `keyed-mutation-queue`, `wwebjs-web-version-cache`, `wwebjs-launch-follows-later-injects`, `message-receipt-in-flight-chat`, `session-reconnect-teardown-disconnect-overlap`, `sandbox-hook-text-reply-within-budget`, `status-post-media-url-refusal` |
+| Assertion karena race             | 2      | `root-namespace` (`Expected true, Received false` pada CONNECT root), `session-proxy-large-answer` (`Expected true, Received false` saat streaming)                                                                                                                                                                                                                                                                                       |
+| Proses gateway **tidak mau boot** | 1      | `main-process-signals`: `the gateway did not come up: {"code":1}` (child `src/main.ts` mati saat start di bawah beban)                                                                                                                                                                                                                                                                                                                    |
+| Duplikat jalur relatif            | 1      | keluaran lintas-worker untuk suite yang sama                                                                                                                                                                                                                                                                                                                                                                                              |
 
 Setiap suite di atas **lulus dalam isolasi** bila dijalankan sendiri; tidak ada satu pun yang gagal
 karena kode yang berubah (tidak ada kode yang berubah di siklus ini). Diperiksa ulang pada siklus ini:
@@ -147,26 +147,25 @@ Kesimpulan yang aman dikutip: **`exit 1` pada run tanpa suite gagal memang punya
 kegagalan suite yang terlihat di run cold adalah masalah kedua yang terpisah** (time-out waktu nyata
 di bawah beban), bukan akibat dari akar pertama.
 
-
 ## 5. Gate kualitas dan resource aktual
 
-| Gate | Hasil |
-| --- | --- |
+| Gate                                                      | Hasil                                                                                                                                           |
+| --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
 | `npm run lint` (`NODE_OPTIONS=--max-old-space-size=3072`) | **exit 0**, tanpa keluhan (2 m 33 s); dijalankan saat spike masih terpasang, dan kode sudah direvert — hasil untuk HEAD identik dengan siklus 9 |
-| Target suite terdampak (spike A, sudah direvert) | 15/15 suite, 483 tes lulus, `EXIT=0`, 0 baris "Cannot log" — bukti mekanisme, bukan perbaikan yang dipakai |
-| `npx jest` subset dengan `--coverage` | selalu `exit 1` karena `collectCoverageFrom` mencakup semua file (siklus 9) — **bukan** dipakai sebagai gate |
-| Run penuh ber-coverage | §4: `EXIT=1`, 19 suite gagal (semua lulus sendirian), coverage di atas ambang |
-| Heap | `--max-old-space-size=3072`; tidak pernah 6 GB |
-| Load mesin saat run cold | 4,5–12,9 (empat proses `codebuddy` aktif, load 8 CPU) |
+| Target suite terdampak (spike A, sudah direvert)          | 15/15 suite, 483 tes lulus, `EXIT=0`, 0 baris "Cannot log" — bukti mekanisme, bukan perbaikan yang dipakai                                      |
+| `npx jest` subset dengan `--coverage`                     | selalu `exit 1` karena `collectCoverageFrom` mencakup semua file (siklus 9) — **bukan** dipakai sebagai gate                                    |
+| Run penuh ber-coverage                                    | §4: `EXIT=1`, 19 suite gagal (semua lulus sendirian), coverage di atas ambang                                                                   |
+| Heap                                                      | `--max-old-space-size=3072`; tidak pernah 6 GB                                                                                                  |
+| Load mesin saat run cold                                  | 4,5–12,9 (empat proses `codebuddy` aktif, load 8 CPU)                                                                                           |
 
 ## 6. Integrasi nyata (status)
 
-| Jalur | Status siklus 10 |
-| --- | --- |
-| SSO nyata (exchange HTTP ke Core) | **belum** — menunggu URL HTTPS, kunci `sso:exchange`, origin browser, satu kode handoff sekali pakai |
-| Approval nyata (POST approval-commands) | **belum** — menunggu kunci `approval:command`, permit staging terbuka, aktor berwenang |
-| Ingest dari Core ke Connect | **belum** — menunggu `ALIM_CONNECT_INGEST_KEY` dari operator (diserahkan lewat secret manager, tidak lewat chat/log) |
-| Bukti internal/mock | sudah: E2E 46 lulus / 2 skip, PG 134/134 (siklus 8); diulang di siklus 10 setelah perubahan di §7 → **43 lulus / 5 skip, `EXIT=0`** |
+| Jalur                                   | Status siklus 10                                                                                                                    |
+| --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| SSO nyata (exchange HTTP ke Core)       | **belum** — menunggu URL HTTPS, kunci `sso:exchange`, origin browser, satu kode handoff sekali pakai                                |
+| Approval nyata (POST approval-commands) | **belum** — menunggu kunci `approval:command`, permit staging terbuka, aktor berwenang                                              |
+| Ingest dari Core ke Connect             | **belum** — menunggu `ALIM_CONNECT_INGEST_KEY` dari operator (diserahkan lewat secret manager, tidak lewat chat/log)                |
+| Bukti internal/mock                     | sudah: E2E 46 lulus / 2 skip, PG 134/134 (siklus 8); diulang di siklus 10 setelah perubahan di §7 → **43 lulus / 5 skip, `EXIT=0`** |
 
 Daftar permintaan yang tepat (nama variabel, siapa pemilik, dampak bila tidak ada, perintah yang akan
 dijalankan, dan request keluar yang harus dicocokkan Core di log) ada di
@@ -198,19 +197,39 @@ dijalankan, dan request keluar yang harus dicocokkan Core di log) ada di
     penimpaan;
   - lane `runJest` diberi `requireRealProof`: bila kunci nyata diberikan tetapi tidak ada baris
     `[real-core] …` berisi kode HTTP, lane **gagal** alih-alih lulus (bagian mock tidak dihitung bukti).
-  Verifikasi siklus ini: guard tanpa kredensial tetap **`EXIT=2` "Not ready."** dan mencetak lima
-  variabel yang hilang (nama saja, tanpa nilai); kedua e2e suite **43 lulus / 5 skip, `EXIT=0`**; dan
-  regex `REAL_CORE_PROOF` dicocokkan dengan bentuk baris yang benar-benar dicetak kedua spec
-  (`httpStatus` untuk SSO, `coreResponseCode` untuk Approval). Bagian "Core sungguhan" sendiri
-  **belum pernah berjalan** karena kredensialnya belum ada.
+    Verifikasi siklus ini: guard tanpa kredensial tetap **`EXIT=2` "Not ready."** dan mencetak lima
+    variabel yang hilang (nama saja, tanpa nilai); kedua e2e suite **43 lulus / 5 skip, `EXIT=0`**; dan
+    regex `REAL_CORE_PROOF` dicocokkan dengan bentuk baris yang benar-benar dicetak kedua spec
+    (`httpStatus` untuk SSO, `coreResponseCode` untuk Approval). Bagian "Core sungguhan" sendiri
+    **belum pernah berjalan** karena kredensialnya belum ada.
 
 ## 8. Commit dan working tree
 
-Tidak ada commit baru. `src/` identik dengan HEAD (kode direvert sampai bersih). Tiga berkas berubah
-di working tree **bukan buatan saya** (rincian dan verifikasinya di §7): `.env.bak-connect-pairing`,
-dua e2e spec, dan `scripts/alim-core-integration-lane.ts`. Dokumen baru dari siklus 9–10:
-`alim-connect-staging-handoff.md`, `alim-connect-pdca-cycle-10.md`; `LAPORAN-FASE-3-2026-11-20.md`
-dan `OpenWA/` adalah artefak lama yang tidak disentuh.
+Penutupan siklus 10 (setelah §7 ditulis) memverifikasi lalu meng-commit perubahan yang tadinya
+menggantung di working tree. Tiga commit:
+
+| Commit      | Isi                                                                                                                                     |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `f97038554` | Tautan balasan ke notifikasi (`message:sent` → `recordNotification`), termasuk unit + e2e dan aktor staging untuk bagian Approval nyata |
+| `b400ac68f` | Lane: nilai operator ditangkap sebelum mock, `requireRealProof`, kunci aktor staging, `src/common/alim-core-lane-proof.spec.ts`         |
+| `4833abfd8` | Laporan siklus 10, handoff staging, dan `.env.*` di `.gitignore`                                                                        |
+
+`.env.bak-connect-pairing` sekarang **ter-ignore** (`.gitignore:24`), jadi `git add -A` tidak lagi
+memasukkannya; berkasnya sendiri tidak dihapus. `src/` masih identik dengan `46abddf65` kecuali
+perubahan hook/processor di commit pertama.
+
+Gate untuk ketiga commit dijalankan pada working tree yang sama (2026-11-24):
+
+| Gate                                       | Hasil                                                                                |
+| ------------------------------------------ | ------------------------------------------------------------------------------------ |
+| `npx tsc --noEmit -p tsconfig.json`        | exit 0, tanpa error                                                                  |
+| Unit (3 spec: hook, processor, lane-proof) | 50 lulus, exit 0                                                                     |
+| E2E `approval-http` + `sso-handoff-http`   | 44 lulus, 5 skip, exit 0 (bagian "Core sungguhan" tetap skip — kredensial belum ada) |
+| `npm run lint` (heap 3072)                 | exit 0, 3 m 27 s                                                                     |
+
+Sisa yang belum di-commit dan **tidak** disentuh: `LAPORAN-FASE-3-2026-11-20.md` dan `OpenWA/`
+artefak lama. Poin #1 di §9 (penutupan teardown per-suite agar `exit 0` konsisten pada run penuh)
+**masih terbuka** — commit di atas tidak menyentuhnya.
 
 ## 9. Act — target siklus 11
 
