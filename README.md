@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/logo/openwa_logo.webp" alt="ALIM Connect Logo" width="200"/>
+  <img src="docs/logo/alim-connect.png" alt="ALIM Connect Logo" width="200"/>
 </p>
 
 <h1 align="center">ALIM Connect</h1>

@@ -157,7 +157,7 @@ export function Login({ onLogin }: LoginProps) {
     <div className="login-container">
       <div className="login-card">
         <div className="login-logo">
-          <img src="/openwa_logo.webp" alt="ALIM Connect" className="logo-icon" />
+          <img src="/alim-connect-icon.png" alt="ALIM Connect" className="logo-icon" />
           <span className="version-info">
             {t('login.version', {
               version: __APP_VERSION__,
