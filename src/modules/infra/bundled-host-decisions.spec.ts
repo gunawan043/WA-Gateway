@@ -15,6 +15,13 @@ jest.mock('../../config/storage-root', () => {
   const actual = jest.requireActual<typeof import('../../config/storage-root')>('../../config/storage-root');
   return { ...actual, resolveStorageRoot: jest.fn((options: { configured?: string }) => options.configured ?? '') };
 });
+// getStatus kicks the wa-version registry resolve without awaiting it. Left real, that fetch outlives
+// this file and its five-second deadline aborts into a warning while a later suite is running — the
+// full run reports it as "Cannot log after tests are done". Nothing here asserts the resolved build.
+jest.mock('../../engine/wa-web-version', () => {
+  const actual = jest.requireActual<typeof import('../../engine/wa-web-version')>('../../engine/wa-web-version');
+  return { ...actual, resolveCurrentWebVersion: jest.fn(() => Promise.resolve(null)) };
+});
 
 import { InfraConfigController } from './infra-config.controller';
 import { InfraStatusController } from './infra-status.controller';

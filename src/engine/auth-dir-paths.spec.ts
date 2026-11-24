@@ -10,14 +10,20 @@ import { WhatsAppWebJsAdapter } from './adapters/whatsapp-web-js.adapter';
 describe('engine auth directory paths', () => {
   const SESSION_ID = '8f5b1d9e-0c4a-4e21-9d6b-2a7c3f0e1b44';
 
-  it('the baileys adapter stores credentials at the id-keyed path', () => {
+  it('the baileys adapter stores credentials at the id-keyed path', async () => {
     const adapter = new BaileysAdapter({
       sessionId: SESSION_ID,
       dbSessionId: SESSION_ID,
       authDir: './data/baileys',
     });
 
-    expect((adapter as unknown as { authPath: string }).authPath).toBe(baileysAuthDir('./data/baileys', SESSION_ID));
+    try {
+      expect((adapter as unknown as { authPath: string }).authPath).toBe(baileysAuthDir('./data/baileys', SESSION_ID));
+    } finally {
+      // The adapter owns a lifecycle delegate; leaving it undisposed keeps its listeners reachable
+      // in the worker after this file has finished.
+      await adapter.destroy();
+    }
   });
 
   it('the whatsapp-web.js adapter removes the id-keyed LocalAuth profile', async () => {

@@ -308,6 +308,18 @@ const newAdapter = (): BaileysAdapter =>
     messageStore: fakeStore,
   });
 
+/**
+ * A fresh adapter that this describe disposes after its test. requestPairingCode() arms the lifecycle's
+ * five-minute pairing window, and destroy() is the only thing that cancels it: left alone, the timer
+ * fires after jest froze the console and the full run reports "Cannot log after tests are done".
+ */
+const adapters: BaileysAdapter[] = [];
+const trackedAdapter = (): BaileysAdapter => {
+  const adapter = newAdapter();
+  adapters.push(adapter);
+  return adapter;
+};
+
 const noopCallbacks = (over: Partial<EngineEventCallbacks> = {}): EngineEventCallbacks => over;
 
 /** The attempt number and delay of each reported reconnect; the close context that rides along has its own tests. */
@@ -348,6 +360,12 @@ describe('BaileysAdapter lifecycle & status', () => {
     jest.clearAllMocks();
   });
 
+  afterEach(async () => {
+    // Disposes every adapter this test opened, which is what cancels a pairing window requestPairingCode
+    // armed. Several tests below cannot call destroy() themselves (it would change what they assert).
+    await Promise.all(adapters.splice(0).map(adapter => adapter.destroy()));
+  });
+
   it('starts DISCONNECTED', () => {
     expect(newAdapter().getStatus()).toBe(EngineStatus.DISCONNECTED);
   });
@@ -360,7 +378,7 @@ describe('BaileysAdapter lifecycle & status', () => {
       resolveQr = resolve;
     });
     const onQRCode = jest.fn((url: string) => resolveQr(url));
-    const adapter = newAdapter();
+    const adapter = trackedAdapter();
     await adapter.initialize(noopCallbacks({ onQRCode }));
     fakeSock.fire('connection.update', { qr: 'QR-STRING' });
 
@@ -389,7 +407,7 @@ describe('BaileysAdapter lifecycle & status', () => {
 
   it('captures phone/pushName and fires onReady on connection open', async () => {
     const onReady = jest.fn();
-    const adapter = newAdapter();
+    const adapter = trackedAdapter();
     await adapter.initialize(noopCallbacks({ onReady }));
     fakeSock.user = { id: '628999:12@s.whatsapp.net', name: 'Me' };
     fakeSock.fire('connection.update', { connection: 'open' });
@@ -401,7 +419,7 @@ describe('BaileysAdapter lifecycle & status', () => {
 
   it('takes the push name on connection open from the live credentials, not the copy the socket was built with', async () => {
     const onReady = jest.fn();
-    const adapter = newAdapter();
+    const adapter = trackedAdapter();
     await adapter.initialize(noopCallbacks({ onReady }));
     fakeSock.authState.creds.me = { id: '628999:12@s.whatsapp.net', name: 'Synced Name' };
     // Baileys copies creds.me into sock.user when it builds the socket, before a new link's name syncs.
@@ -528,7 +546,7 @@ describe('BaileysAdapter lifecycle & status', () => {
     const rmSpy = jest.spyOn(fs.promises, 'rm').mockResolvedValue(undefined);
     try {
       const onDisconnected = jest.fn();
-      const adapter = newAdapter();
+      const adapter = trackedAdapter();
       await adapter.initialize(noopCallbacks({ onDisconnected }));
       // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       const makeWASocket = jest.requireMock('@whiskeysockets/baileys').default as jest.Mock;
@@ -552,7 +570,7 @@ describe('BaileysAdapter lifecycle & status', () => {
     const rmSpy = jest.spyOn(fs.promises, 'rm').mockResolvedValue(undefined);
     try {
       const onDisconnected = jest.fn();
-      const adapter = newAdapter();
+      const adapter = trackedAdapter();
       await adapter.initialize(noopCallbacks({ onDisconnected }));
       fakeStore.clearSession.mockRejectedValueOnce(new Error('SQLITE_BUSY'));
       fakeSock.fire('connection.update', {
@@ -574,7 +592,7 @@ describe('BaileysAdapter lifecycle & status', () => {
     // emitting a QR. A terminal loggedOut MUST wipe the auth dir.
     const rmSpy = jest.spyOn(fs.promises, 'rm').mockResolvedValue(undefined);
     try {
-      const adapter = newAdapter();
+      const adapter = trackedAdapter();
       await adapter.initialize(noopCallbacks({}));
       fakeSock.fire('connection.update', {
         connection: 'close',
@@ -606,7 +624,7 @@ describe('BaileysAdapter lifecycle & status', () => {
     const onDisconnected = jest.fn();
     const onError = jest.fn();
     try {
-      const adapter = newAdapter();
+      const adapter = trackedAdapter();
       // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       const makeWASocket = jest.requireMock('@whiskeysockets/baileys').default as jest.Mock;
       await adapter.initialize(noopCallbacks({ onCredentialTeardownStarted, onDisconnected, onError }));
@@ -652,7 +670,7 @@ describe('BaileysAdapter lifecycle & status', () => {
     const onDisconnected = jest.fn();
     const onError = jest.fn();
     try {
-      const adapter = newAdapter();
+      const adapter = trackedAdapter();
       // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       const makeWASocket = jest.requireMock('@whiskeysockets/baileys').default as jest.Mock;
       await adapter.initialize(noopCallbacks({ onDisconnected, onError }));
@@ -680,7 +698,7 @@ describe('BaileysAdapter lifecycle & status', () => {
     // linked server-side with no local credentials to retry with.
     const rmSpy = jest.spyOn(fs.promises, 'rm').mockResolvedValue(undefined);
     try {
-      const adapter = newAdapter();
+      const adapter = trackedAdapter();
       await adapter.initialize(noopCallbacks({}));
       fakeSock.user = { id: '628999:12@s.whatsapp.net', name: 'Me' };
 
@@ -722,7 +740,7 @@ describe('BaileysAdapter lifecycle & status', () => {
     // when creds.me is unset, so it is intentionally NOT used.
     const rmSpy = jest.spyOn(fs.promises, 'rm').mockResolvedValue(undefined);
     try {
-      const adapter = newAdapter();
+      const adapter = trackedAdapter();
       await adapter.initialize(noopCallbacks({}));
       fakeSock.user = { id: '628999:12@s.whatsapp.net', name: 'Me' };
 
@@ -741,7 +759,7 @@ describe('BaileysAdapter lifecycle & status', () => {
     // incomplete (409, not 502).
     const rmSpy = jest.spyOn(fs.promises, 'rm').mockResolvedValue(undefined);
     try {
-      const adapter = newAdapter();
+      const adapter = trackedAdapter();
       await adapter.initialize(noopCallbacks({}));
       fakeSock.user = undefined; // no linked companion identity
       (adapter as unknown as { sock: unknown }).sock = fakeSock;
@@ -766,7 +784,7 @@ describe('BaileysAdapter lifecycle & status', () => {
     // this is an incomplete operation (502 at the service). Auth survives; the socket still dies.
     const rmSpy = jest.spyOn(fs.promises, 'rm').mockResolvedValue(undefined);
     try {
-      const adapter = newAdapter();
+      const adapter = trackedAdapter();
       await adapter.initialize(noopCallbacks({}));
       fakeSock.user = { id: '628999:12@s.whatsapp.net', name: 'Me' };
       fakeSock.query.mockResolvedValueOnce(undefined);
@@ -788,7 +806,7 @@ describe('BaileysAdapter lifecycle & status', () => {
     // removed (the link may still be valid server-side); the socket still ends locally.
     const rmSpy = jest.spyOn(fs.promises, 'rm').mockResolvedValue(undefined);
     try {
-      const adapter = newAdapter();
+      const adapter = trackedAdapter();
       await adapter.initialize(noopCallbacks({}));
       fakeSock.user = { id: '628999:12@s.whatsapp.net', name: 'Me' };
       fakeSock.query.mockRejectedValueOnce(new Error('Timed Out'));
@@ -810,7 +828,7 @@ describe('BaileysAdapter lifecycle & status', () => {
     // removal propagates (the operation is incomplete), so 200 is never reported.
     const rmSpy = jest.spyOn(fs.promises, 'rm').mockRejectedValueOnce(new Error('disk full'));
     try {
-      const adapter = newAdapter();
+      const adapter = trackedAdapter();
       await adapter.initialize(noopCallbacks({}));
       fakeSock.user = { id: '628999:12@s.whatsapp.net', name: 'Me' };
 
@@ -833,7 +851,7 @@ describe('BaileysAdapter lifecycle & status', () => {
   it('logout() rejects and keeps the on-disk auth dir when there is no socket at all', async () => {
     const rmSpy = jest.spyOn(fs.promises, 'rm').mockResolvedValue(undefined);
     try {
-      const adapter = newAdapter();
+      const adapter = trackedAdapter();
       await adapter.initialize(noopCallbacks({}));
       (adapter as unknown as { sock: unknown }).sock = null;
 
@@ -849,7 +867,7 @@ describe('BaileysAdapter lifecycle & status', () => {
   // lid resolution); a stop or logout in between must surface as a 409, not a TypeError that feeds the
   // send breaker as an account failure.
   it('a socket torn down after the readiness check reads as not ready, not as a null socket', async () => {
-    const adapter = newAdapter();
+    const adapter = trackedAdapter();
     await adapter.initialize(noopCallbacks({}));
     const host = (adapter as unknown as { messaging: { host: { getSocket(): unknown } } }).messaging.host;
     expect(host.getSocket()).toBe(fakeSock);
@@ -859,7 +877,7 @@ describe('BaileysAdapter lifecycle & status', () => {
 
   it('on a recoverable close: reconnects (re-creates the socket) and does NOT fire onDisconnected', async () => {
     const onDisconnected = jest.fn();
-    const adapter = newAdapter();
+    const adapter = trackedAdapter();
     await adapter.initialize(noopCallbacks({ onDisconnected }));
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     const makeWASocket = jest.requireMock('@whiskeysockets/baileys').default as jest.Mock;
@@ -883,7 +901,7 @@ describe('BaileysAdapter lifecycle & status', () => {
   });
 
   it('on a recoverable close: forgets the replays it awaited of the socket that closed', async () => {
-    const adapter = newAdapter();
+    const adapter = trackedAdapter();
     await adapter.initialize(noopCallbacks({}));
     const forget = jest.spyOn(
       (adapter as unknown as { sessionStore: { dropReadEchoes(): void } }).sessionStore,
@@ -912,7 +930,7 @@ describe('BaileysAdapter lifecycle & status', () => {
     // this callback an operator cannot tell a one-second blip from an hour-long outage.
     const onReconnecting = jest.fn();
     const onDisconnected = jest.fn();
-    const adapter = newAdapter();
+    const adapter = trackedAdapter();
     await adapter.initialize(noopCallbacks({ onReconnecting, onDisconnected }));
 
     jest.useFakeTimers({ doNotFake: ['setImmediate'] });
@@ -937,7 +955,7 @@ describe('BaileysAdapter lifecycle & status', () => {
     // Baileys can emit more than one close per drop. The attempt number rides `lastError` and the
     // reconnect_loop alert cadence, so double-counting would report a loop that is not happening.
     const onReconnecting = jest.fn();
-    const adapter = newAdapter();
+    const adapter = trackedAdapter();
     await adapter.initialize(noopCallbacks({ onReconnecting }));
 
     jest.useFakeTimers({ doNotFake: ['setImmediate'] });
@@ -955,7 +973,7 @@ describe('BaileysAdapter lifecycle & status', () => {
   });
 
   it('disconnect() ends the socket and does not reconnect', async () => {
-    const adapter = newAdapter();
+    const adapter = trackedAdapter();
     await adapter.initialize(noopCallbacks({}));
     await adapter.disconnect();
     expect(fakeSock.end).toHaveBeenCalled();
@@ -963,14 +981,14 @@ describe('BaileysAdapter lifecycle & status', () => {
   });
 
   it('requestPairingCode throws EngineNotReadyError before initialize()', async () => {
-    const adapter = newAdapter();
+    const adapter = trackedAdapter();
     await expect(adapter.requestPairingCode('628999')).rejects.toBeInstanceOf(EngineNotReadyError);
   });
 
   // The socket object exists from the moment makeWASocket returns, but its WebSocket is still
   // connecting: sending then makes Baileys throw a raw Boom 428 that surfaces as a 500.
   it('requestPairingCode throws EngineNotReadyError while the socket is still connecting', async () => {
-    const adapter = newAdapter();
+    const adapter = trackedAdapter();
     await adapter.initialize(noopCallbacks({}));
     await expect(adapter.requestPairingCode('628999')).rejects.toBeInstanceOf(EngineNotReadyError);
     expect(fakeSock.requestPairingCode).not.toHaveBeenCalled();
@@ -982,7 +1000,7 @@ describe('BaileysAdapter lifecycle & status', () => {
       resolveQr = resolve;
     });
     const onQRCode = jest.fn(() => resolveQr());
-    const adapter = newAdapter();
+    const adapter = trackedAdapter();
     await adapter.initialize(noopCallbacks({ onQRCode }));
     fakeSock.fire('connection.update', { qr: 'QR-STRING' });
     await qrPublished;
@@ -997,7 +1015,7 @@ describe('BaileysAdapter lifecycle & status', () => {
     const qrPublished = new Promise<void>(resolve => {
       resolveQr = resolve;
     });
-    const adapter = newAdapter();
+    const adapter = trackedAdapter();
     await adapter.initialize(
       noopCallbacks({
         onQRCode: (url: string) => {
@@ -1066,7 +1084,7 @@ describe('BaileysAdapter lifecycle & status', () => {
 
   it('discards a QR that finished rendering after the socket dropped', async () => {
     const onQRCode = jest.fn();
-    const adapter = newAdapter();
+    const adapter = trackedAdapter();
     await adapter.initialize(noopCallbacks({ onQRCode }));
     fakeSock.fire('connection.update', { qr: 'QR-STRING' });
     // The drop lands while the render is in flight: Baileys closes its WebSocket before it emits.
@@ -1117,7 +1135,7 @@ describe('BaileysAdapter lifecycle & status', () => {
 
   it('discards a QR whose render finished after WhatsApp accepted the link', async () => {
     const onQRCode = jest.fn();
-    const adapter = newAdapter();
+    const adapter = trackedAdapter();
     await adapter.initialize(noopCallbacks({ onQRCode }));
     fakeSock.fire('connection.update', { qr: 'QR-STRING' });
     fakeSock.fire('connection.update', { isNewLogin: true, qr: undefined });
@@ -1129,7 +1147,7 @@ describe('BaileysAdapter lifecycle & status', () => {
   });
 
   it('persists creds: subscribes saveCreds to creds.update', async () => {
-    const adapter = newAdapter();
+    const adapter = trackedAdapter();
     await adapter.initialize(noopCallbacks({}));
     fakeSock.fire('creds.update', {});
     expect(saveCreds).toHaveBeenCalled();
@@ -1151,7 +1169,7 @@ describe('BaileysAdapter lifecycle & status', () => {
     baileys.fetchLatestBaileysVersion.mockReturnValueOnce(versionPromise);
     baileys.default.mockClear();
 
-    const adapter = newAdapter();
+    const adapter = trackedAdapter();
     const initPromise = adapter.initialize(noopCallbacks({}));
 
     // While connect() is blocked waiting for fetchLatestBaileysVersion, call disconnect().
@@ -1175,7 +1193,7 @@ describe('BaileysAdapter lifecycle & status', () => {
     baileys.useMultiFileAuthState.mockRejectedValueOnce(new Error('network error'));
 
     const onError = jest.fn();
-    const adapter = newAdapter();
+    const adapter = trackedAdapter();
     await expect(adapter.initialize(noopCallbacks({ onError }))).rejects.toThrow('network error');
     expect(adapter.getStatus()).toBe(EngineStatus.FAILED);
     expect(onError).toHaveBeenCalledWith('network error');
@@ -1193,7 +1211,7 @@ describe('BaileysAdapter lifecycle & status', () => {
       '%s() before initialize() does not create a socket, and a later initialize() still does not',
       async ({ method }) => {
         makeWASocket().mockClear();
-        const adapter = newAdapter();
+        const adapter = trackedAdapter();
         // A brand-new adapter has never connected: tearing it down must not touch the socket factory.
         await adapter[method]();
         expect(makeWASocket()).not.toHaveBeenCalled();
@@ -1208,7 +1226,7 @@ describe('BaileysAdapter lifecycle & status', () => {
 
     it('logout() before initialize() rejects (no socket) and a subsequent initialize() still does not make a socket', async () => {
       makeWASocket().mockClear();
-      const adapter = newAdapter();
+      const adapter = trackedAdapter();
       // No socket was ever created, so the unlink cannot be sent.
       await expect(adapter.logout()).rejects.toThrow(/no live whatsapp socket/i);
       expect(makeWASocket()).not.toHaveBeenCalled();

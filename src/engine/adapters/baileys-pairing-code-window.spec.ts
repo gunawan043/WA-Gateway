@@ -60,13 +60,30 @@ function qrStage() {
 }
 
 describe('Baileys pairing code requested and never entered', () => {
+  /**
+   * Every lifecycle this file started. Switching back to real timers hands a socket's pairing window
+   * to the OS: once the fake clock moved it past its deadline, it fires on the next turn of the event
+   * loop, after this file's tests are over. In a full run that is what wakes the torn-down lifecycle
+   * mid-way through another suite and writes its log once jest froze the console. destroy() cancels
+   * the window, so the file disposes what it opened before handing the timers back.
+   */
+  const started: BaileysLifecycle[] = [];
+  const start = () => {
+    const stage = qrStage();
+    started.push(stage.lifecycle);
+    return stage;
+  };
+
   beforeEach(() => jest.useFakeTimers());
-  afterEach(() => jest.useRealTimers());
+  afterEach(async () => {
+    await Promise.all(started.splice(0).map(lifecycle => lifecycle.destroy()));
+    jest.useRealTimers();
+  });
 
   // Baileys renders the first QR for 60 s and each later one for 20 s, and renders none after the
   // request. A QR older than that names a ref WhatsApp has retired and that nothing will replace.
   it('stops serving the QR rendered before the request once that QR can no longer be scanned', async () => {
-    const { lifecycle } = qrStage();
+    const { lifecycle } = start();
     await expect(lifecycle.requestPairingCode('628123456789')).resolves.toBe('ABCD1234');
 
     jest.advanceTimersByTime(59_000);
@@ -80,7 +97,7 @@ describe('Baileys pairing code requested and never entered', () => {
   // Unpatched, the library ends an unscanned registration once its refs run out (a 408 'QR refs attempts
   // ended', which the lifecycle answers with a fresh registration). Nothing takes that bound's place here.
   it('does not keep the session waiting at the QR stage indefinitely', async () => {
-    const { lifecycle, sock } = qrStage();
+    const { lifecycle, sock } = start();
     await lifecycle.requestPairingCode('628123456789');
 
     jest.advanceTimersByTime(10 * 60_000);
@@ -90,7 +107,7 @@ describe('Baileys pairing code requested and never entered', () => {
   });
 
   it('waits the whole window for the code, measured from the latest request', async () => {
-    const { lifecycle, sock } = qrStage();
+    const { lifecycle, sock } = start();
     await lifecycle.requestPairingCode('628123456789');
     jest.advanceTimersByTime(BAILEYS_PAIRING_CODE_WINDOW_MS - 60_000);
     await lifecycle.requestPairingCode('628123456789');
@@ -105,7 +122,7 @@ describe('Baileys pairing code requested and never entered', () => {
   // The close the window raises is the end of an unscanned QR window, not a connection failure: no
   // reconnect attempt is counted or reported, and the next connect registers again.
   it('ends the wait as an unscanned QR window that reconnects at once without counting an attempt', async () => {
-    const { lifecycle, sock, internals, onReconnecting } = qrStage();
+    const { lifecycle, sock, internals, onReconnecting } = start();
     const connect = jest.spyOn(internals, 'connect').mockResolvedValue(undefined);
     internals.reconnectAttempts = 4;
     await lifecycle.requestPairingCode('628123456789');
@@ -122,7 +139,7 @@ describe('Baileys pairing code requested and never entered', () => {
   });
 
   it('leaves a code that was entered alone', async () => {
-    const { lifecycle, sock, internals } = qrStage();
+    const { lifecycle, sock, internals } = start();
     await lifecycle.requestPairingCode('628123456789');
     jest.advanceTimersByTime(30_000);
 
@@ -137,7 +154,7 @@ describe('Baileys pairing code requested and never entered', () => {
     ['a stop', (lifecycle: BaileysLifecycle) => lifecycle.disconnect()],
     ['a destroy', (lifecycle: BaileysLifecycle) => lifecycle.destroy()],
   ])('cancels the wait on %s', async (_label, teardown) => {
-    const { lifecycle, sock } = qrStage();
+    const { lifecycle, sock } = start();
     await lifecycle.requestPairingCode('628123456789');
 
     await teardown(lifecycle);
@@ -149,7 +166,7 @@ describe('Baileys pairing code requested and never entered', () => {
   });
 
   it('answers not ready and arms nothing when the session stops while the code is being requested', async () => {
-    const { lifecycle, sock, internals } = qrStage();
+    const { lifecycle, sock, internals } = start();
     let answer!: (code: string) => void;
     sock.requestPairingCode.mockImplementationOnce(() => new Promise<string>(resolve => (answer = resolve)));
     const requesting = lifecycle.requestPairingCode('628123456789');
@@ -163,7 +180,7 @@ describe('Baileys pairing code requested and never entered', () => {
   });
 
   it('answers not ready when the stop closes the socket under the request and the request rejects', async () => {
-    const { lifecycle, sock, internals } = qrStage();
+    const { lifecycle, sock, internals } = start();
     let fail!: (error: Error) => void;
     sock.requestPairingCode.mockImplementationOnce(() => new Promise<string>((_, reject) => (fail = reject)));
     const requesting = lifecycle.requestPairingCode('628123456789');
@@ -176,7 +193,7 @@ describe('Baileys pairing code requested and never entered', () => {
   });
 
   it('answers not ready when the socket was replaced while the status still reads QR_READY', async () => {
-    const { lifecycle, sock, internals } = qrStage();
+    const { lifecycle, sock, internals } = start();
     let answer!: (code: string) => void;
     sock.requestPairingCode.mockImplementationOnce(() => new Promise<string>(resolve => (answer = resolve)));
     const requesting = lifecycle.requestPairingCode('628123456789');
@@ -189,14 +206,14 @@ describe('Baileys pairing code requested and never entered', () => {
   });
 
   it('keeps the failure of a request that nothing stopped', async () => {
-    const { lifecycle, sock } = qrStage();
+    const { lifecycle, sock } = start();
     sock.requestPairingCode.mockImplementationOnce(() => Promise.reject(new Error('rate-overlimit')));
 
     await expect(lifecycle.requestPairingCode('628123456789')).rejects.toThrow('rate-overlimit');
   });
 
   it('does nothing to a socket that has been replaced since the request', async () => {
-    const { lifecycle, sock, internals } = qrStage();
+    const { lifecycle, sock, internals } = start();
     await lifecycle.requestPairingCode('628123456789');
 
     internals.sock = { ...sock, end: jest.fn() };

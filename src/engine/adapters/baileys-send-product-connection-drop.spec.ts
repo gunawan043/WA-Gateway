@@ -8,12 +8,20 @@ import { countsTowardSendBreaker, sentNothing } from '../../modules/message/send
 const CONNECTION_CLOSED = 428;
 
 describe('BaileysAdapter.sendProduct when the connection drops or the socket is replaced during catalog lookup', () => {
+  /** Adapters readyAdapter() built, destroyed in afterEach so no lifecycle delegate outlives its test. */
+  const adapters: BaileysAdapter[] = [];
+
+  afterEach(async () => {
+    await Promise.all(adapters.splice(0).map(adapter => adapter.destroy()));
+  });
+
   const readyAdapter = (getCatalog: jest.Mock) => {
     const adapter = new BaileysAdapter({
       sessionId: 's',
       dbSessionId: 's-db',
       authDir: './data/sessions',
     });
+    adapters.push(adapter);
     const sendMessage = jest.fn().mockResolvedValue({ key: { id: 'M1' }, messageTimestamp: 1 });
     const onWhatsApp = jest.fn((jid: string) => Promise.resolve([{ jid, exists: true }]));
     const sock = {
@@ -21,6 +29,8 @@ describe('BaileysAdapter.sendProduct when the connection drops or the socket is 
       getCatalog,
       onWhatsApp,
       sendMessage,
+      // destroy() ends the socket it was given; this fake has to answer it like a live one.
+      end: jest.fn(),
     };
     const lifecycle = (adapter as unknown as { lifecycle: { status: EngineStatus; sock: unknown } }).lifecycle;
     lifecycle.status = EngineStatus.READY;
@@ -67,6 +77,7 @@ describe('BaileysAdapter.sendProduct when the connection drops or the socket is 
       user: { id: '628199:1@s.whatsapp.net' },
       onWhatsApp: jest.fn((jid: string) => Promise.resolve([{ jid, exists: true }])),
       sendMessage: newSendMessage,
+      end: jest.fn(),
     };
     const getCatalog = jest.fn(() => {
       built.lifecycle.sock = newSock;

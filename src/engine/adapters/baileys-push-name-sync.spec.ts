@@ -56,6 +56,9 @@ const ACCOUNT = '628999:12@s.whatsapp.net';
  * stores the business name (none for a personal account), and the name arrives later as a creds update
  * (an app-state push name setting or an own message). The adapter reports it then, without a second ready.
  */
+/** Adapters this file opened, destroyed in afterEach so no socket outlives its test. */
+const adapters: BaileysAdapter[] = [];
+
 async function linkedAdapter(me: Me = { id: ACCOUNT }) {
   mockSock = new FakeSock();
   mockSock.authState.creds.me = me;
@@ -75,6 +78,9 @@ async function linkedAdapter(me: Me = { id: ACCOUNT }) {
     },
   });
   await adapter.initialize({ onReady, onPushNameChanged });
+  // initialize() opens a socket and registers listeners on it; nothing else in the app closes this
+  // adapter, so the file has to, or the socket and its handlers outlive the suite.
+  adapters.push(adapter);
   return { adapter, onReady, onPushNameChanged };
 }
 
@@ -87,6 +93,9 @@ describe('the push name a newly linked Baileys account syncs after the connectio
   afterAll(() => {
     if (version === undefined) delete process.env.BAILEYS_WA_VERSION;
     else process.env.BAILEYS_WA_VERSION = version;
+  });
+  afterEach(async () => {
+    await Promise.all(adapters.splice(0).map(adapter => adapter.destroy()));
   });
 
   it('is reported once and read back, after a ready that carried none', async () => {
