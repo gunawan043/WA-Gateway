@@ -224,6 +224,10 @@ export async function resolveCurrentWebVersion(fetcher: typeof fetch = fetch): P
     try {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 5000);
+      // The deadline must not keep the process alive on its own: nothing else in the process needs
+      // this call, and a host that was told to stop should not wait out a network deadline. This
+      // also stops a suite that ends mid-resolve from emitting the failure warning afterwards.
+      timer.unref?.();
       try {
         const res = await fetcher(WA_VERSION_REGISTRY_URL, { signal: controller.signal });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);

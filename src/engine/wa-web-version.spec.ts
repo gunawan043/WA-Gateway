@@ -290,6 +290,22 @@ describe('resolveCurrentWebVersion failure warning', () => {
     expect(fetcher).toHaveBeenCalledTimes(1);
     expect(mockWarn).toHaveBeenCalledTimes(1);
   });
+
+  // A host told to stop must not wait out the network deadline, and a test that ends mid-resolve
+  // must not be woken by it: the abort timer is the only thing the 5 s deadline keeps alive.
+  it('does not keep the process alive while the fetch is in flight', async () => {
+    const unrefs = jest.fn();
+    const setSpy = jest.spyOn(global, 'setTimeout').mockImplementation((() => {
+      return { unref: unrefs };
+    }) as unknown as typeof setTimeout);
+    try {
+      void resolveCurrentWebVersion(jest.fn(() => new Promise(() => undefined)) as never);
+      await Promise.resolve();
+      expect(unrefs).toHaveBeenCalled();
+    } finally {
+      setSpy.mockRestore();
+    }
+  });
 });
 
 // whatsapp-web.js fetches a remote pin's HTML with no timeout and, non-strict, loads the live build
