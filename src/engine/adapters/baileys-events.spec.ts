@@ -2384,6 +2384,11 @@ describe('BaileysEvents encrypted edits and reactions', () => {
       for (const index of held) gates.set(index, new Promise<void>(resolve => opens.set(index, resolve)));
       let copy: WAMessage | null = null;
       let reads = 0;
+      // The answer every receipt handed out shares. A test that ends while the session is still deciding
+      // releases it here, so the change parked on that outcome is judged and finishes inside the test
+      // rather than during the next one. Nothing is asserted after that release, so nothing it applies can
+      // be taken as this file's result.
+      const receipts = new AbortController();
       const setups = setup({
         getStoredMessage: async (id: string) => {
           if (id !== 'ORIG1') return null;
@@ -2399,10 +2404,19 @@ describe('BaileysEvents encrypted edits and reactions', () => {
           copy = null;
           return Promise.resolve();
         },
-        getOnMessage: () => jest.fn(() => ({ settled: answered })),
+        getOnMessage: () => jest.fn(() => ({ settled: Promise.race([answered, abortSignal(receipts.signal)]) })),
       });
-      return { ...setups, open: (index: number) => opens.get(index)!() };
+      return {
+        ...setups,
+        open: (index: number) => opens.get(index)!(),
+        releaseOutcome: () => receipts.abort(),
+      };
     };
+    const abortSignal = (signal: AbortSignal): Promise<{ conflict?: boolean } | undefined> =>
+      new Promise(resolve => {
+        if (signal.aborted) resolve(undefined);
+        else signal.addEventListener('abort', () => resolve(undefined), { once: true });
+      });
     const forged = (): WAMessage =>
       editEnvelope({
         participant: reactor,
@@ -2410,7 +2424,10 @@ describe('BaileysEvents encrypted edits and reactions', () => {
       });
 
     it('is held until the original is stored, and stays held while the original has no answer', async () => {
-      const { events, onMessageEdited, recordMessageEdit, open } = withHeldReads([1], new Promise(() => undefined));
+      const { events, onMessageEdited, recordMessageEdit, open, releaseOutcome } = withHeldReads(
+        [1],
+        new Promise(() => undefined),
+      );
 
       events.handleMessagesUpsert({ type: 'notify', messages: [original()] });
       await flush();
@@ -2421,6 +2438,11 @@ describe('BaileysEvents encrypted edits and reactions', () => {
       open(1);
       await flush();
       expect(onMessageEdited).not.toHaveBeenCalled();
+      expect(recordMessageEdit).not.toHaveBeenCalled();
+
+      // What "stays held" already showed, now left unheld: the session answers once the test is over.
+      releaseOutcome();
+      await flush();
       expect(recordMessageEdit).not.toHaveBeenCalled();
     });
 
@@ -2607,56 +2629,80 @@ describe('BaileysEvents changes waiting for the message they change', () => {
     else process.env.MEDIA_DOWNLOAD_TIMEOUT_MS = saved;
   });
 
-  /** The original never finishes: its check for a repeat delivery is not answered. */
+  /**
+   * The original never finishes while the test runs: its check for a repeat delivery, then the read of the
+   * copy it is stored under, are not answered until `release` is called. The reaction parked behind it
+   * therefore outlives what the test asserts. Released, the copy is the one put under the id, so the
+   * reaction is judged and applied; the three deadlines that ended the wait once the test was over are run
+   * first, since that wait's timer is not one left behind.
+   */
   const withMessageStuck = () => {
-    let checked = false;
+    // The original is never stored: the reads of its own repeat check and of the change's target are held
+    // where they are, so it is never handed on and the reaction parks behind it. `release` settles them:
+    // the original is then dropped as a repeat of a copy that cannot be read (fail-open, nothing announced
+    // for it), and the reaction — its wait run out first, since that timer is not one left behind — finds
+    // nothing to judge it against.
+    const openings: Array<() => void> = [];
     const onMessageReaction = jest.fn();
     const events = new BaileysEvents(
       makeHost({
         getStoredMessage: (id: string) => {
-          if (id !== 'M' || checked) return Promise.resolve(null);
-          checked = true;
-          return new Promise<WAMessage | null>(() => undefined);
+          if (id !== 'M') return Promise.resolve(null);
+          return new Promise<WAMessage | null>(resolve => openings.push(() => resolve(null)));
         },
         getOnMessageReaction: () => onMessageReaction,
       }),
     );
     events.handleMessagesUpsert({ type: 'notify', messages: [original] });
-    return { events, onMessageReaction };
+    const release = async (): Promise<void> => {
+      for (const open of openings.splice(0)) open();
+      for (let i = 0; i < 20; i++) await new Promise(resolve => setImmediate(resolve));
+      if (jest.getTimerCount() > 0) jest.advanceTimersByTime(3_000);
+      for (const open of openings.splice(0)) open();
+      for (let i = 0; i < 20; i++) await new Promise(resolve => setImmediate(resolve));
+    };
+    return { events, onMessageReaction, release };
   };
 
   it('lets a change go three media deadlines after it began to wait, and leaves no timer behind', async () => {
-    const { events, onMessageReaction } = withMessageStuck();
+    const { events, onMessageReaction, release } = withMessageStuck();
     await flush();
     events.handleMessagesUpsert({ type: 'notify', messages: [reaction] });
     await flush();
     expect(onMessageReaction).not.toHaveBeenCalled();
     expect(jest.getTimerCount()).toBe(1);
-
     jest.advanceTimersByTime(2_999);
     expect(onMessageReaction).not.toHaveBeenCalled();
     jest.advanceTimersByTime(1);
 
     expect(onMessageReaction).toHaveBeenCalledTimes(1);
     expect(jest.getTimerCount()).toBe(0);
+
+    await release();
+    expect(onMessageReaction).toHaveBeenCalledTimes(1);
   });
 
   it('does not keep the process alive while a change waits', async () => {
     const waits: Array<{ unref: jest.SpyInstance }> = [];
     const fake = global.setTimeout;
-    jest.spyOn(global, 'setTimeout').mockImplementation(((fn: () => void, ms?: number) => {
+    const setSpy = jest.spyOn(global, 'setTimeout').mockImplementation(((fn: () => void, ms?: number) => {
       const handle = fake(fn, ms) as unknown as { unref: () => unknown };
       if (ms === 3_000) waits.push({ unref: jest.spyOn(handle, 'unref') });
       return handle;
     }) as never);
-    const { events } = withMessageStuck();
+    const { events, release } = withMessageStuck();
     await flush();
 
     events.handleMessagesUpsert({ type: 'notify', messages: [reaction] });
     await flush();
 
+    // A spy left on a global outlives the test: restored here, so nothing the suite does after it is watched.
+    setSpy.mockRestore();
     expect(waits).toHaveLength(1);
     expect(waits[0].unref).toHaveBeenCalledTimes(1);
+    for (const { unref } of waits) unref.mockRestore();
+
+    await release();
   });
 
   it('stops the timer once the message has been handed on', async () => {
