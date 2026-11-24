@@ -19,6 +19,11 @@ coverage/
 .env.development.local
 .env.test.local
 .env.production.local
+# Every ad-hoc copy of .env: .env.bak-*, .env.old, .env.backup, .env.save … They hold the same
+# secrets and are made in a hurry, usually without a .local suffix to match the lines above.
+.env.*
+!.env.example
+!.env.minimal
 
 # Logs
 npm-debug.log*
