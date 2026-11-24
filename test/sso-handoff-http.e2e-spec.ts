@@ -1,4 +1,5 @@
 import { INestApplication } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Test, TestingModule } from '@nestjs/testing';
 import { randomUUID } from 'crypto';
@@ -34,6 +35,9 @@ const CORE_USER_EMAIL = 'sso-operator@example.com';
 
 process.env.TRUSTED_PROXIES = '127.0.0.1';
 process.env.ALIM_CORE_WEB_ORIGIN = CORE_ORIGIN;
+// Section mock memakai SSO_KEY; section "Core sungguhan" harus memakai kunci operator, jika tidak
+// uji nyata ditolak 401 oleh Core staging walau URL-nya sudah benar.
+const operatorSsoKey = (process.env.ALIM_CONNECT_SSO_KEY ?? '').trim();
 process.env.ALIM_CONNECT_SSO_KEY = SSO_KEY;
 process.env.ALIM_CONNECT_SSO_TIMEOUT_MS = '300';
 process.env.AUTH_SESSION_IDLE_TIMEOUT_MINUTES = '5';
@@ -181,6 +185,11 @@ describe('WhatsApp Connect SSO handoff over HTTP (e2e)', () => {
   };
 
   const liveSessionCount = async (): Promise<number> => sessions.count({ where: { userId } });
+
+  // URL Core dari operator harus ditangkap SEBELUM mock menimpa variabel di bawah: bagian
+  // "ALIM Core sungguhan" membaca nilai ini, dan bila ia diambil setelah penimpaan maka uji nyata
+  // akan diam-diam menembak mock lalu melaporkan "lulus" tanpa pernah menyentuh Core.
+  const operatorCoreBaseUrl = (process.env.ALIM_CORE_BASE_URL ?? '').trim();
 
   beforeAll(async () => {
     await startMockCore();
@@ -559,9 +568,19 @@ describe('WhatsApp Connect SSO handoff over HTTP (e2e)', () => {
    * refusal must be a business refusal with no session, not a 502 from a broken client.
    */
   describe('Z. ALIM Core sungguhan', () => {
-    const baseUrl = (process.env.ALIM_CORE_BASE_URL ?? '').trim();
-    const ssoKey = (process.env.ALIM_CONNECT_SSO_KEY ?? '').trim();
+    const baseUrl = operatorCoreBaseUrl;
+    const ssoKey = operatorSsoKey;
     const real = baseUrl !== '' && ssoKey !== '';
+
+    // Same reason as the approval spec: `beforeAll` pointed ALIM_CORE_BASE_URL at the mock BEFORE
+    // AppModule was loaded, so ConfigService holds the mock host and the handoff controller would
+    // answer against it. Point the running app at the operator's host and key for this section.
+    beforeAll(() => {
+      if (!real) return;
+      const config = app.get(ConfigService);
+      config.set('connect.sso.coreBaseUrl', baseUrl.replace(/\/+$/, ''));
+      config.set('connect.sso.apiKey', ssoKey);
+    });
 
     (real ? it : it.skip)(
       'menolak kode yang tidak pernah diterbitkan Core tanpa membuat sesi',

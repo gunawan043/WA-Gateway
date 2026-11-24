@@ -21,6 +21,7 @@
  */
 import { execFileSync } from 'child_process';
 import * as fs from 'fs';
+import * as os from 'os';
 import * as path from 'path';
 
 /** Specs that carry a real-Core section, so the lane is meaningless without them. */
@@ -86,6 +87,9 @@ const isSet = (key: string): boolean => (process.env[key] ?? '').trim() !== '';
 /** Read by `test/sso-handoff-http.e2e-spec.ts` to turn the success proof from "ran" into "proved". */
 const SSO_PROOF_KEYS = ['ALIM_CONNECT_SSO_TEST_CODE', 'ALIM_CONNECT_SSO_EXPECTED_CORE_USER'];
 
+/** Read by the approval spec, not by the application: an actor Core already mapped, or a 403. */
+const APPROVAL_PROOF_KEYS = ['ALIM_CONNECT_STAGING_ACTOR_NUMBER', 'ALIM_CONNECT_STAGING_ACTOR_CORE_USER'];
+
 function report(label: string, checks: Check[]): boolean {
   const absent = checks.filter(check => !isSet(check.env));
   const hard = absent.filter(check => check.required);
@@ -101,15 +105,44 @@ function report(label: string, checks: Check[]): boolean {
   return hard.length === 0;
 }
 
-function runJest(specs: string[]): void {
+/**
+ * The real-Core sections assert on what Connect recorded, not on where it went: with a wrong key or
+ * an unreachable host they still report APPLIED and the suite still passes. So when a real key is
+ * supplied, the lane reads the output and fails unless at least one line proves a real answer —
+ * `[real-core] approval command` carrying `coreResponseCode`, or `[real-core] sso exchange` carrying
+ * `httpStatus` (the two names the specs actually print; a mismatch here would make every SSO-only
+ * run report MISSING proof). A run that proved nothing must not exit 0.
+ */
+const REAL_CORE_PROOF = /\[real-core\] approval command \{.*"coreResponseCode":\d+|\[real-core\] sso exchange \{.*"httpStatus":\d+/;
+
+function runJest(specs: string[], requireRealProof: boolean): void {
   console.log('');
   console.log(`Running: jest --config ./test/jest-e2e.json ${specs.join(' ')} --runInBand`);
+  // Jest writes its report to the inherited terminal rather than to a pipe here, so the report is
+  // captured through a file: a piped run came back empty and the proof check could never fire.
+  const reportPath = path.join(os.tmpdir(), `alim-core-lane-${process.pid}.log`);
+  let jestFailed = false;
   try {
     execFileSync('npx', ['jest', '--config', './test/jest-e2e.json', ...specs, '--runInBand'], {
       cwd: repoRoot,
-      stdio: 'inherit',
+      stdio: ['ignore', fs.openSync(reportPath, 'w'), fs.openSync(reportPath, 'a')],
     });
   } catch {
+    jestFailed = true;
+  }
+  const output = fs.existsSync(reportPath) ? fs.readFileSync(reportPath, 'utf8') : '';
+  process.stdout.write(output);
+  fs.rmSync(reportPath, { force: true });
+
+  if (jestFailed) {
+    process.exitCode = 1;
+    return;
+  }
+
+  if (requireRealProof && !REAL_CORE_PROOF.test(output)) {
+    console.log('');
+    console.log('  real-Core proof      MISSING — every real section skipped or recorded no HTTP answer.');
+    console.log('                       The mock sections passing is not evidence that Core was contacted.');
     process.exitCode = 1;
   }
 }
@@ -139,10 +172,25 @@ function main(): void {
     );
   }
 
+  // The approval section has proof keys of its own: without a staging actor Core answers
+  // 403 actor_identity_unmapped, and the section skips. Saying so here keeps a lane that only ran
+  // the mock approval sections from reading as a real result.
+  const missingActor = APPROVAL_PROOF_KEYS.filter(key => !isSet(key));
+  if (missingActor.length === 0) {
+    console.log(`  ${'approval actor proof'.padEnd(26)} ready`);
+  } else {
+    console.log(`  ${'approval actor proof'.padEnd(26)} MISSING ${missingActor.join(', ')}`);
+    console.log(
+      `  ${''.padEnd(26)}   skips     Core answers 403 actor_identity_unmapped for an actor it never mapped`,
+    );
+  }
+
   if (guardOnly) {
     console.log('');
-    console.log(ssoReady && approvalReady ? 'Both integrations have what the real sections need.' : 'Not ready.');
-    process.exitCode = ssoReady && approvalReady ? 0 : 2;
+    console.log(ssoReady && approvalReady && missingActor.length === 0 && missingProof.length === 0
+      ? 'Both integrations have what the real sections need.'
+      : 'Not ready.');
+    process.exitCode = ssoReady && approvalReady && missingActor.length === 0 && missingProof.length === 0 ? 0 : 2;
     return;
   }
 
@@ -160,13 +208,14 @@ function main(): void {
     console.log('a code Core issued; it is one-time and this lane will spend it).');
   }
 
-  // Approval runs only when its own credential is there; otherwise its real section would skip and
-  // read as a pass.
-  const specs = wantApproval && approvalReady ? LANE_SPECS : [LANE_SPECS[0]];
-  if (wantApproval && !approvalReady) {
-    console.log('Approval: skipped — its configuration is incomplete.');
+  // Approval runs only when its own credential AND an actor Core knows are there; otherwise its real
+  // section would skip and read as a pass.
+  const approvalRunnable = approvalReady && missingActor.length === 0;
+  const specs = wantApproval && approvalRunnable ? LANE_SPECS : [LANE_SPECS[0]];
+  if (wantApproval && !approvalRunnable) {
+    console.log('Approval: skipped — its configuration or its staging actor is incomplete.');
   }
-  runJest(specs);
+  runJest(specs, approvalRunnable && wantApproval);
 }
 
 // Importable by the spec that cross-checks CHECKS without running the lane.
