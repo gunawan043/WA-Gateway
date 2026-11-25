@@ -68,6 +68,7 @@
     "templates": "टेम्पलेट्स",
     "apiKeys": "API कुंजियाँ",
     "messageTester": "संदेश परीक्षक",
+    "sendApi": "भेजने का API",
     "infrastructure": "बुनियादी ढांचा",
     "plugins": "प्लगइन्स",
     "logs": "लॉग्स",

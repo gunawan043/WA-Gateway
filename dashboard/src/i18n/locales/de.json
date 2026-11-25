@@ -68,6 +68,7 @@
     "templates": "Vorlagen",
     "apiKeys": "API-Schlüssel",
     "messageTester": "Nachrichtentester",
+    "sendApi": "Versand-API",
     "infrastructure": "Infrastruktur",
     "plugins": "Plugins",
     "logs": "Protokolle",

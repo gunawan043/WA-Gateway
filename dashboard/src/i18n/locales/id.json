@@ -68,6 +68,7 @@
     "templates": "Templat",
     "apiKeys": "Kunci API",
     "messageTester": "Penguji Pesan",
+    "sendApi": "API Pengiriman",
     "infrastructure": "Infrastruktur",
     "plugins": "Plugin",
     "logs": "Log",

@@ -70,6 +70,7 @@
     "templates": "Templates",
     "apiKeys": "Clés API",
     "messageTester": "Testeur de messages",
+    "sendApi": "API d'envoi",
     "infrastructure": "Infrastructure",
     "plugins": "Plugins",
     "logs": "Journaux",

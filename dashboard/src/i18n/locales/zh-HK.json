@@ -68,6 +68,7 @@
     "templates": "範本",
     "apiKeys": "API 金鑰",
     "messageTester": "訊息測試器",
+    "sendApi": "傳送 API",
     "infrastructure": "基礎架構",
     "plugins": "外掛",
     "logs": "記錄",

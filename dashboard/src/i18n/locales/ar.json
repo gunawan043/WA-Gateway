@@ -76,6 +76,7 @@
     "templates": "القوالب",
     "apiKeys": "مفاتيح API",
     "messageTester": "اختبار الرسائل",
+    "sendApi": "واجهة برمجة الإرسال",
     "infrastructure": "البنية التحتية",
     "plugins": "الإضافات",
     "logs": "السجلات",

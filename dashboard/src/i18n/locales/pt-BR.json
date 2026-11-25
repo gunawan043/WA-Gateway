@@ -69,6 +69,7 @@
     "webhooks": "Webhooks",
     "apiKeys": "Chaves API",
     "messageTester": "Testador de mensagens",
+    "sendApi": "API de envio",
     "infrastructure": "Infraestrutura",
     "plugins": "Plugins",
     "logs": "Registros",

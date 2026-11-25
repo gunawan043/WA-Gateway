@@ -29,6 +29,7 @@ const Logs = lazy(() => import('./pages/Logs').then(m => ({ default: m.Logs })))
 const ApiKeys = lazy(() => import('./pages/ApiKeys').then(m => ({ default: m.ApiKeys })));
 const Users = lazy(() => import('./pages/Users').then(m => ({ default: m.Users })));
 const MessageTester = lazy(() => import('./pages/MessageTester').then(m => ({ default: m.MessageTester })));
+const SendApi = lazy(() => import('./pages/SendApi').then(m => ({ default: m.SendApi })));
 const NumberChecker = lazy(() => import('./pages/NumberChecker').then(m => ({ default: m.NumberChecker })));
 const Infrastructure = lazy(() => import('./pages/Infrastructure').then(m => ({ default: m.Infrastructure })));
 const Plugins = lazy(() => import('./pages/Plugins'));
@@ -185,6 +186,9 @@ function AppContent() {
                 {role === 'admin' && !scoped && <Route path="users" element={<Users />} />}
                 {role === 'admin' && <Route path="logs" element={<Logs />} />}
                 <Route path="message-tester" element={<MessageTester />} />
+                {/* Sending from other systems: the same send routes, explained. Not admin-only —
+                    an operator's script uses this page to find the endpoint and prove it works. */}
+                <Route path="send-api" element={<SendApi />} />
                 {role === 'admin' && !scoped && <Route path="infrastructure" element={<Infrastructure />} />}
                 {role === 'admin' && !scoped && <Route path="plugins" element={<Plugins />} />}
                 {role === 'admin' && !scoped && <Route path="settings" element={<Settings />} />}

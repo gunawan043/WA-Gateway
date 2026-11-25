@@ -68,6 +68,7 @@
     "templates": "Şablonlar",
     "apiKeys": "API Anahtarları",
     "messageTester": "Mesaj Test Aracı",
+    "sendApi": "Gönderim API",
     "infrastructure": "Altyapı",
     "plugins": "Eklentiler",
     "logs": "Kayıtlar (Logs)",

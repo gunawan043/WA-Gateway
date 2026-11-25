@@ -68,6 +68,7 @@
     "templates": "模板",
     "apiKeys": "API 密钥",
     "messageTester": "消息测试器",
+    "sendApi": "发送 API",
     "infrastructure": "基础设施",
     "plugins": "插件",
     "logs": "日志",

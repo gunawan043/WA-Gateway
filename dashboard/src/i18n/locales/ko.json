@@ -68,6 +68,7 @@
     "templates": "템플릿",
     "apiKeys": "API 키",
     "messageTester": "메시지 테스터",
+    "sendApi": "전송 API",
     "infrastructure": "인프라",
     "plugins": "플러그인",
     "logs": "로그",
