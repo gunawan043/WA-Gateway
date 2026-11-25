@@ -3,7 +3,7 @@ import * as path from 'path';
 import * as dotenv from 'dotenv';
 import { randomUUID } from 'crypto';
 import { Injectable } from '@nestjs/common';
-import { isEnvPinned } from '../../config/env-precedence';
+import { isEnvPinned, isOsProvidedEnv } from '../../config/env-precedence';
 import { writeSecretFile } from '../../common/utils/secret-file';
 import { createLogger } from '../../common/services/logger.service';
 import {
@@ -80,16 +80,19 @@ export class AlimCoreSettingsService {
   }
 
   /**
-   * The value the running process actually holds for a key.
+   * The value the running process actually holds for a key, and which layer it came from.
    *
-   * `process.env` is authoritative for what this process does, and a pinned key (one supplied by the
-   * host or by `.env`) outranks the overlay at every boot, so the overlay can hold a value that will
-   * never apply. The page reports the effective value and flags the rest as pending.
+   * `process.env` is authoritative for what this process does, but by the time the app is serving it
+   * holds all three layers merged, so a value read back from it says nothing about its origin.
+   * `isOsProvidedEnv` is the only thing that can: the loader snapshots the host-supplied keys before
+   * it merges `.env` and the overlay, so a key outside that snapshot came from a file. That
+   * distinction is what lets the page offer an overlay value as editable instead of reporting it as
+   * pinned by the host, which would have made every key saved here uneditable after the next boot.
    */
   private effective(key: string, overlay: Record<string, string>): { value: string; source: AlimCoreFieldValue['source'] } {
     const fromProcess = process.env[key];
     if (fromProcess !== undefined && fromProcess !== '') {
-      return { value: fromProcess, source: 'environment' };
+      return { value: fromProcess, source: isOsProvidedEnv(key) ? 'environment' : 'overlay' };
     }
     const fromOverlay = overlay[key];
     if (fromOverlay !== undefined && fromOverlay !== '') {

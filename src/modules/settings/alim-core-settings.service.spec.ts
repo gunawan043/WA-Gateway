@@ -1,6 +1,8 @@
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
+import { ALIM_CORE_FIELDS } from './alim-core-fields';
+import { recordOsEnvKeys } from '../../config/env-precedence';
 import { AlimCoreSettingsService } from './alim-core-settings.service';
 
 /**
@@ -77,6 +79,38 @@ describe('AlimCoreSettingsService', () => {
       delete process.env.ALIM_CONNECT_SSO_AUDIENCE;
       const field = service.read().fields.find(item => item.key === 'ALIM_CONNECT_SSO_AUDIENCE');
       expect(field?.value).toBe('connect');
+    });
+  });
+
+  describe('the origin of a value already in the environment', () => {
+    // The failure this guards showed up only after a restart: once the overlay is merged into
+    // process.env, reading the value back and calling it "environment" made every key saved from the
+    // page look host-pinned, and therefore uneditable.
+    it('reports a value the host supplied as coming from the environment', () => {
+      process.env.ALIM_CORE_BASE_URL = 'https://host.example.id';
+      recordOsEnvKeys(process.env);
+      try {
+        const field = service.read().fields.find(item => item.key === 'ALIM_CORE_BASE_URL');
+        expect(field?.source).toBe('environment');
+      } finally {
+        delete process.env.ALIM_CORE_BASE_URL;
+        recordOsEnvKeys({});
+      }
+    });
+
+    it('reports a value that came from a file as coming from the overlay, not the environment', () => {
+      // Simulates the state after boot: the overlay was merged into process.env, and the loader
+      // snapshotted the host keys BEFORE that merge — so this key is not in the snapshot.
+      process.env.ALIM_CORE_BASE_URL = 'https://alim.example.id';
+      recordOsEnvKeys({});
+      try {
+        const field = service.read().fields.find(item => item.key === 'ALIM_CORE_BASE_URL');
+        expect(field?.source).toBe('overlay');
+        expect(field?.value).toBe('https://alim.example.id');
+      } finally {
+        delete process.env.ALIM_CORE_BASE_URL;
+        recordOsEnvKeys({});
+      }
     });
   });
 
