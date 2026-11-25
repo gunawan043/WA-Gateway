@@ -71,6 +71,7 @@
 | 35b | [ALIM Core API Coordination and Safety](./35b-alim-core-api-coordination-and-safety-plan.md) | API needs for Core, production safety plan and the D9 go/no-go gate |
 | 35c | [ALIM Core Connect API Contract Draft](./35c-alim-core-connect-api-contract-draft.md) | Tahap 0: draft contract, mock server, fixtures and contract tests |
 | 36  | [WhatsApp Approval Workflow](./36-whatsapp-approval-workflow.md)         | Core command API and Connect's WhatsApp approval flow, with tests and open decisions |
+| 37  | [WhatsApp Numbered Menu](./37-whatsapp-numbered-menu.md)                 | Set up a numbered auto-reply menu (greeting, then 1–4) with built-in automation rules |
 
 **Integration audits**
 
