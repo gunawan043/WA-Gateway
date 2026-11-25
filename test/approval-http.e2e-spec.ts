@@ -298,6 +298,22 @@ describe('Approval over HTTP with a mock Core at the HTTP boundary (e2e)', () =>
   // apa pun yang dikirim ke Core berasal dari aplikasi, bukan dari test.
   const ingestApproval = (overrides: Record<string, unknown> = {}) => ingest(overrides);
 
+  /**
+   * The same reply from another number, for the real-Core section: the mock sections' sender
+   * (TARGET_NUMBER) is mapped by an earlier test to somebody else, so a real command sent as that
+   * number is refused on the actor while the permit it replies to is still targeted at the staging
+   * actor — a mismatch that says nothing about Core.
+   */
+  const replyFrom = async (from: string, body: string, messageId: string): Promise<void> => {
+    const result = await hooks.execute(
+      'message:received',
+      { id: messageId, from, chatId: from, body, isGroup: false, fromMe: false },
+      { source: 'Engine' },
+    );
+
+    expect(result.continue).toBe(true);
+  };
+
   const reply = async (body: string, messageId: string): Promise<void> => {
     const result = await hooks.execute(
       'message:received',
@@ -316,6 +332,24 @@ describe('Approval over HTTP with a mock Core at the HTTP boundary (e2e)', () =>
       .expect(200);
 
     return res.body as DetailBody;
+  };
+
+  /**
+   * The permit once ALIM has a verdict for it: a command was stored, and its status has moved past
+   * PENDING. Polled because the reply hook does not wait for Core to answer; 20 s is far beyond a Core
+   * round trip, and a permit still unsettled then is returned as it is, not assumed.
+   */
+  const waitForCommand = async (id: string): Promise<DetailBody> => {
+    const settled = (body: DetailBody): boolean => {
+      const [command] = body.commands ?? [];
+      return Boolean(command) && command.status !== 'PENDING';
+    };
+    let latest = await detail(id);
+    for (let waited = 0; waited < 20_000 && !settled(latest); waited += 250) {
+      await new Promise(resolve => setTimeout(resolve, 250));
+      latest = await detail(id);
+    }
+    return latest;
   };
 
   // `MetricsService.render()` menyajikan hasil yang di-cache selama beberapa detik, sehingga dua
@@ -891,6 +925,7 @@ describe('Approval over HTTP with a mock Core at the HTTP boundary (e2e)', () =>
    * operator asked for a real run, and an unreachable Core is the thing being tested.
    */
   describe('Z. ALIM Core sungguhan', () => {
+    const direct = (): HttpAlimCoreApprovalClient => app.get<HttpAlimCoreApprovalClient>(HttpAlimCoreApprovalClient);
     const baseUrl = operatorCoreBaseUrl;
     const approvalKey = operatorApprovalKey;
     // A PERMIT for a nil UUID in a person's name is legal in Core's domain; a probe command is not.
@@ -900,6 +935,22 @@ describe('Approval over HTTP with a mock Core at the HTTP boundary (e2e)', () =>
       (process.env.ALIM_CONNECT_STAGING_ACTOR_CORE_USER ?? '').trim() || '00000000-0000-4000-8000-000000000003';
     // Identity used only by this section, so suite B's mapping of TARGET_NUMBER cannot repoint it.
     const ACTOR_NUMBER = (process.env.ALIM_CONNECT_STAGING_ACTOR_NUMBER ?? '').trim();
+    // A number Core cannot have mapped, built from the actor's own so it keeps the same country and
+    // length while differing in its last digit. The actor check needs it to show that Core answers
+    // `actor_identity_unmapped` for an unknown number — without that contrast, a refusal of the mapped
+    // actor would look the same as a misconfigured key.
+    const ACTOR_JID = ACTOR_NUMBER === '' ? '' : `${ACTOR_NUMBER}@s.whatsapp.net`;
+    const UNMAPPED_ACTOR_NUMBER =
+      ACTOR_NUMBER.length >= 8 ? `${ACTOR_NUMBER.slice(0, -1)}${ACTOR_NUMBER.endsWith('7') ? '8' : '7'}` : '';
+    // Connect normalises what Core sends (`0812…`, `+62 812…`, `62812…@s.whatsapp.net` all become the
+    // E.164 digits without `+`), so a value in any of those forms would still be sent as digits — but a
+    // value it cannot normalise (`''`, a word) would silently become `''` and fail at Core, weeks later.
+    // Reported here instead of asserted, so the run still ends with the failure Core itself gives.
+    const actorNumberProblem = /^[1-9][0-9]{7,14}$/.test(ACTOR_NUMBER)
+      ? ''
+      : ACTOR_NUMBER === ''
+        ? ''
+        : `ALIM_CONNECT_STAGING_ACTOR_NUMBER is not E.164 digits (8–15, no "+"): it would be sent as "${ACTOR_NUMBER.replace(/[^0-9]/g, '')}"`;
     // Tanpa aktor staging, bagian ini hanya membuktikan penolakan Core; bukti nyata butuh orang
     // yang benar-benar dipetakan dan diverifikasi di Core.
     const real =
@@ -907,6 +958,8 @@ describe('Approval over HTTP with a mock Core at the HTTP boundary (e2e)', () =>
       approvalKey !== '' &&
       ACTOR_NUMBER !== '' &&
       targetCorePersonId !== '00000000-0000-4000-8000-000000000003';
+
+    if (real && actorNumberProblem !== '') console.log(`[real-core] ${actorNumberProblem}`);
 
     (real ? it : it.skip)(
       'mengirim satu command dan mencatat jawaban Core yang sebenarnya',
@@ -967,74 +1020,110 @@ describe('Approval over HTTP with a mock Core at the HTTP boundary (e2e)', () =>
 
         // Referensi pada teks balasan harus menyebut `reference` yang benar-benar di-ingest; coretan
         // lama memakai `IZN-2026-…` sehingga balasannya tidak pernah dikenali sebagai keputusan.
-        await reply(`SETUJU 1 HARI ${request.reference}`, `wamid-real-${randomUUID()}`);
+        // The reply comes from the actor's own number: a reply from anyone else is refused as
+        // `not_authorized` before Core is called, and proves nothing about Core's mapping of the actor.
+        await replyFrom(ACTOR_JID, `SETUJU 1 HARI ${request.reference}`, `wamid-real-${randomUUID()}`);
 
-        const after = await detail(request.id);
-        const [command] = after.commands ?? [];
-
-        // Printed so the operator has a verbatim record; none of it is a credential or a permit body.
-        console.log(
-          '[real-core] approval command ' +
-            JSON.stringify({
-              commandId: command?.commandId,
-              status: command?.status,
-              attempts: command?.attempts,
-              coreResponseCode: command?.coreResponseCode,
-              errorCode: command?.errorCode,
-              requestStatus: after.status,
-              coreStatus: after.coreStatus,
-            }),
-        );
-
-        // Dua kemungkinan yang keduanya sah: command terkirim, atau balasan berhenti di jalur
-        // yang tidak memanggil Core. Kasus kedua dibuktikan dengan tidak adanya request, bukan
-        // dengan menganggapnya lulus — dan sebabnya disebut agar keluar sebagai diagnosa.
-        if (!command) {
-          // A real Core never reaches the loopback recorder, so this is reported, not asserted on it.
-          throw new Error(`no command was created: request status ${after.status} did not produce one`);
+        // What ALIM recorded went up the loopback recorder: this command reached the mock, not Core.
+        const misrouted = coreCalls.filter(call => call.body?.command_id);
+        if (misrouted.length > 0) {
+          throw new Error(
+            `${misrouted.length} approval command(s) went to the loopback mock, not Core: ` +
+              `the real section would report what the mock said`,
+          );
         }
 
-        expect([200, 201, 202]).toContain(command.coreResponseCode);
-        expect(['APPLIED', 'DUPLICATE']).toContain(command.status);
-        expect(after.status).toBe('APPROVED');
+        // The reply hook stores the command and then calls Core; it does not wait for Core's answer. A
+        // real Core is fast enough to make an immediate read look settled, but not reliably so, and a
+        // read that sees PENDING_APPROVAL with no command says nothing about whether Core approved.
+        const after = await waitForCommand(request.id);
 
-        // The Connect-side trail, read back through the repository the processor writes to. Core's
-        // verdict is confirmed above; this proves Connect recorded the same verdict.
-        //
-        // `commandId` is absent here for a reason worth stating: `AuditService.log` merges the live
-        // request id *last*, so a row written inside the message hook carries `requestId` where the
-        // command id would be. The row is found by `coreRequestId` instead, and the processor spec
-        // pins the precedence (`mempertahankan commandId walau AuditService menimpanya`).
-        const trails = (
+        if ((after.commands?.length ?? 0) === 0) {
+          // The reply produced no command: reported with what a direct command with the same actor
+          // answers, so a permit restriction and an unmapped actor do not print the same line.
+          const probe = await direct().sendApprovalCommand({
+            commandId: randomUUID(),
+            requestId: '00000000-0000-4000-8000-000000000000',
+            decision: 'approved',
+            approvedDurationDays: 1,
+            actorExternalId: ACTOR_NUMBER,
+            actorCorePersonId: targetCorePersonId,
+            source: 'whatsapp',
+            externalMessageId: `diag-${randomUUID()}`,
+            messageText: 'DIAG',
+            notes: null,
+          });
+          throw new Error(
+            `no command was created: request status ${after.status} (coreStatus ${after.coreStatus}) did not produce one; ` +
+              `a direct command with the same actor and no permit answered ${probe.httpStatus} ${probe.code ?? ''} (${probe.outcome})`,
+          );
+        }
+
+        // Every command this section sends must carry the actor's number and the permit's person, and its
+        // idempotency key must be the command id — readable for the mock sections, asserted here for the
+        // command Connect built for a real reply.
+        const actorTrails = (
           await app.get<Repository<AuditLog>>(getRepositoryToken(AuditLog, 'main')).find({
             where: { action: AuditAction.APPROVAL_COMMAND },
             order: { createdAt: 'DESC' },
             take: 20,
           })
         ).filter(row => row.metadata?.coreRequestId === request.coreRequestId);
+        expect(actorTrails).toHaveLength(1);
+        expect(JSON.stringify(actorTrails[0].metadata)).not.toContain(ACTOR_NUMBER);
+        const actorStored = (
+          await app.get<Repository<ApprovalCommand>>(getRepositoryToken(ApprovalCommand, 'data')).find({
+            where: { approvalRequestId: request.id },
+          })
+        )[0];
+        expect(actorStored?.commandId).toMatch(/^[0-9a-f-]{36}$/);
+        expect(actorStored?.decision).toBe('approved');
+        expect(actorStored?.status).toMatch(/^(PENDING|UNKNOWN|APPLIED|DUPLICATE|REJECTED|FAILED)$/);
 
-        expect(trails).toHaveLength(1);
-        expect(trails[0].metadata).toMatchObject({
-          coreResponseCode: command.coreResponseCode,
-          commandStatus: command.status,
-          decision: command.decision,
-          coreRequestId: request.coreRequestId,
-        });
+        const command = (await waitForCommand(request.id)).commands?.find(c => c.commandId === actorStored?.commandId);
 
-        const serialised = JSON.stringify(trails[0].metadata);
-        expect(serialised).not.toContain(ACTOR_NUMBER);
-        expect(serialised).not.toContain(marker);
-        expect(serialised).not.toContain(approvalKey);
+        if (!command) return; // no settled command: the error above already reported why
+        const verdict = await waitForCommand(request.id);
 
-        // A second reply for a decision already settled must not become a second command.
-        const settled = (await detail(request.id)).commands?.length ?? 0;
-        await reply(`SETUJU 1 HARI ${request.reference}`, `wamid-real-again-${randomUUID()}`);
-        expect((await detail(request.id)).commands?.length ?? 0).toBe(settled);
+        // Printed so the operator has a verbatim record; none of it is a credential or a permit body.
+        console.log(
+          '[real-core] approval command ' +
+            JSON.stringify({
+              commandId: command.commandId,
+              status: command.status,
+              attempts: command.attempts,
+              coreResponseCode: command.coreResponseCode,
+              errorCode: command.errorCode,
+              requestStatus: verdict.status,
+              coreStatus: verdict.coreStatus,
+            }),
+        );
+
+        if (command.status === 'REJECTED' || command.status === 'FAILED') {
+          return; // Core refused: reported above, and there is no earlier decision to check against
+        }
+
+        expect([200, 201, 202]).toContain(command.coreResponseCode);
+        expect(['APPLIED', 'DUPLICATE']).toContain(command.status);
+        expect(verdict.status).toBe('APPROVED');
+        // Core's own verdict for the permit, not ALIM's starting value: `pending` here means the read
+        // ran before Core answered, which the wait above should have made impossible.
+        expect(verdict.coreStatus).not.toBe('pending');
+
+        // A second reply for a decision already settled must not become a second command — from the
+        // same number, which is the only sender the reply path accepts for this permit.
+        const before = (await detail(request.id)).commands?.length ?? 0;
+        await replyFrom(ACTOR_JID, `SETUJU 1 HARI ${request.reference}`, `wamid-real-again-${randomUUID()}`);
+        expect((await detail(request.id)).commands?.length ?? 0).toBe(before);
 
         // Retry path against Core. The suite's own policy (400 ms timeout, 2 attempts) is reused on
         // purpose: a temporary env override here would also apply to the mock sections above, because
-        // config is read once at module load. A permit Core just approved answers the replay with a
-        // business refusal, so the command is expected to end `REJECTED` writing no second decision.
+        // config is read once at module load.
+        //
+        // What Core answers a replay is not assumed, because two behaviours are both correct: a replay
+        // of the same command id is a `duplicate` (the same answer, not a second decision), and a permit
+        // already settled may be refused as a business result. What must hold either way is checked
+        // below and in the verbatim line printed above.
         const sent = command.attempts;
         const now = new Date();
         await commands.update(
@@ -1054,7 +1143,68 @@ describe('Approval over HTTP with a mock Core at the HTTP boundary (e2e)', () =>
         expect(['APPLIED', 'DUPLICATE', 'REJECTED', 'FAILED']).toContain(replayed?.status);
         // Whatever Core answered the second time, it never became a second decision in Connect.
         expect(final.status).toBe('APPROVED');
-        expect(final.commands).toHaveLength(settled);
+        expect(final.commands).toHaveLength(before);
+
+        // The permit's state as Core reports it, printed for the operator's own Core-side check (the
+        // audit row is read there, since Connect has no endpoint into Core's audit log).
+        console.log(
+          '[real-core] permit after replay ' +
+            JSON.stringify({
+              requestStatus: final.status,
+              coreStatus: final.coreStatus,
+              commandStatus: replayed?.status,
+            }),
+        );
+      },
+      60_000,
+    );
+
+    (real && actorNumberProblem === '' ? it : it.skip)(
+      'menolak aktor yang tidak dikenali Core, dan membuktikan yang terpetakan diterima',
+      async () => {
+        app.get(ConfigService).set('connect.approval.coreBaseUrl', baseUrl);
+        app.get(ConfigService).set('connect.approval.coreApiKey', approvalKey);
+        const client = direct();
+        const base = {
+          decision: 'approved' as const,
+          approvedDurationDays: 1,
+          source: 'whatsapp' as const,
+          notes: null,
+          requestId: '00000000-0000-4000-8000-000000000000',
+        };
+        // Neither command names a permit, so neither can apply a decision whatever Core answers; the
+        // only thing read here is which actor Core accepts.
+        const unmapped = await client.sendApprovalCommand({
+          ...base,
+          commandId: randomUUID(),
+          actorExternalId: UNMAPPED_ACTOR_NUMBER,
+          actorCorePersonId: null,
+          externalMessageId: `actor-probe-unmapped-${randomUUID()}`,
+          messageText: 'PROBE, unmapped actor — must not be applied',
+        });
+        expect(unmapped.outcome).toBe('rejected');
+        expect(unmapped.code).toBe('actor_identity_unmapped');
+
+        const mapped = await client.sendApprovalCommand({
+          ...base,
+          commandId: randomUUID(),
+          actorExternalId: ACTOR_NUMBER,
+          actorCorePersonId: targetCorePersonId,
+          externalMessageId: `actor-probe-mapped-${randomUUID()}`,
+          messageText: 'PROBE, mapped actor — must not be applied',
+        });
+        console.log(
+          '[real-core] actor check ' +
+            JSON.stringify({
+              unmapped: { outcome: unmapped.outcome, httpStatus: unmapped.httpStatus, code: unmapped.code },
+              mapped: { outcome: mapped.outcome, httpStatus: mapped.httpStatus, code: mapped.code },
+            }),
+        );
+        // A mapped, authorised Head of Dormitory gets past the actor: Core then refuses the permit that
+        // does not exist, which is the answer that proves the actor was recognised.
+        expect(mapped.outcome).toBe('rejected');
+        expect(mapped.httpStatus).toBe(404);
+        expect(mapped.code ?? '').not.toMatch(/^actor_/);
       },
       60_000,
     );

@@ -39,6 +39,7 @@ import {
 } from './config/bootstrap-security';
 import { BullBoardAuthMiddleware } from './common/security/bull-board-auth.middleware';
 import { invalidTrustedProxies } from './common/utils/ip';
+import { assertCoreTransportAllowed } from './config/core-transport-policy';
 import { AuthService } from './modules/auth/auth.service';
 import { AuditService } from './modules/audit/audit.service';
 import { Request, Response, NextFunction } from 'express';
@@ -92,6 +93,29 @@ async function bootstrap() {
       'NODE_ENV is not set: running with development defaults — the default-secret guard is skipped, ' +
         'wildcard CORS is allowed, Swagger UI is served, and validation error detail is exposed. ' +
         'Set NODE_ENV=production for a production deployment.',
+    );
+  }
+
+  // Fail fast: never send the Core keys, or redeem a handoff code, over plaintext in production.
+  // With the approval integration deliberately switched off there is no Core URL in use, so the
+  // URL check is skipped — but the SSO origin check still applies, and any URL that IS set is
+  // still validated (see assertCoreTransportAllowed).
+  const coreIntegrationDisabled = (process.env.ALIM_CONNECT_CORE_CLIENT ?? '').trim().toLowerCase() === 'disabled';
+  assertCoreTransportAllowed(
+    {
+      coreBaseUrl: process.env.ALIM_CORE_BASE_URL,
+      coreWebOrigin: process.env.ALIM_CORE_WEB_ORIGIN,
+    },
+    process.env.NODE_ENV,
+    coreIntegrationDisabled,
+  );
+
+  if (coreIntegrationDisabled) {
+    bootstrapLogger.warn(
+      'Integrasi ALIM Core DINONAKTIFKAN (ALIM_CONNECT_CORE_CLIENT=disabled): approval dan SSO ' +
+        'tidak memproses apa pun. Dashboard, sesi WhatsApp, inbox, API key dan webhook tetap berjalan. ' +
+        'Aktifkan dengan ALIM_CONNECT_CORE_CLIENT=http beserta ALIM_CORE_BASE_URL, ' +
+        'ALIM_CORE_APPROVAL_API_KEY dan ALIM_CONNECT_SSO_KEY setelah disepakati pemilik Core.',
     );
   }
 

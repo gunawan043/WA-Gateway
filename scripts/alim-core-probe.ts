@@ -37,14 +37,21 @@ interface Line {
   detail: string;
 }
 
-const args = new Set(process.argv.slice(2));
-const runSso = args.has('--all') || args.has('--sso') || !args.has('--approval');
-const runApproval = args.has('--all') || args.has('--approval');
-/** `--sso-code=<code>`: a handoff code Core's UI issued, for proving the success path. */
-const ssoCode = process.argv
-  .slice(2)
-  .find(arg => arg.startsWith('--sso-code='))
-  ?.slice('--sso-code='.length);
+/**
+ * The flags this run was given. Read at call time rather than once at load: a spec that loads this
+ * module to check its verdicts runs the probe itself, and must be able to say which probes it runs.
+ */
+function selection(argv: string[]): { runSso: boolean; runApproval: boolean; ssoCode: string | undefined } {
+  const args = new Set(argv);
+  return {
+    runSso: args.has('--all') || args.has('--sso') || !args.has('--approval'),
+    runApproval: args.has('--all') || args.has('--approval'),
+    /** `--sso-code=<code>`: a handoff code Core's UI issued, for proving the success path. */
+    ssoCode: argv.find(arg => arg.startsWith('--sso-code='))?.slice('--sso-code='.length),
+  };
+}
+
+const { runSso, runApproval, ssoCode } = selection(process.argv.slice(2));
 
 const env = process.env;
 const coreBaseUrl = (env.ALIM_CORE_BASE_URL ?? '').replace(/\/+$/, '');
@@ -174,12 +181,16 @@ async function probeApproval(): Promise<Line> {
         detail: `CONTRACT VIOLATION: Core answered ${result.outcome} for a nil request_id (HTTP ${result.httpStatus})`,
       };
     case 'rejected':
+      // The key and the route are proven by any refusal, but which refusal matters: the probe names no
+      // person as its actor and no permit as its target, so `actor_*` is Core refusing the probe's own
+      // actor rather than reproducing the refusal the lane's actor check needs. A run that ends there
+      // says nothing about whether a mapped actor would be accepted, and is reported as such.
       return {
         probe: 'Approval command',
-        verdict: 'PASS',
+        verdict: result.code?.startsWith('actor_') ? 'WARN' : 'PASS',
         detail: `route + key accepted; Core refused the probe command (HTTP ${result.httpStatus}${
           result.code ? `, ${result.code}` : ''
-        })`,
+        })${result.code?.startsWith('actor_') ? ' — refused on the probe actor, so this does not show what a mapped actor gets; run the actor check' : ''}`,
       };
     case 'unavailable':
       return {

@@ -2,6 +2,7 @@ import { ConfigService } from '@nestjs/config';
 import { ApprovalCoreClientConfigError, assertApprovalCoreClientAllowed } from './core-client/core-client-policy';
 import { createApprovalCoreClient } from './approval.module';
 import { MockAlimCoreApprovalClient } from './core-client/mock-alim-core-approval.client';
+import { DisabledAlimCoreApprovalClient } from './core-client/disabled-alim-core-approval.client';
 import { HttpAlimCoreApprovalClient } from './core-client/http-alim-core-approval.client';
 
 /**
@@ -11,6 +12,7 @@ import { HttpAlimCoreApprovalClient } from './core-client/http-alim-core-approva
 describe('Kebijakan klien ALIM Core', () => {
   const http = { name: 'http' } as unknown as HttpAlimCoreApprovalClient;
   const mock = { name: 'mock' } as unknown as MockAlimCoreApprovalClient;
+  const disabled = { name: 'disabled' } as unknown as DisabledAlimCoreApprovalClient;
 
   const configFor = (values: Record<string, string>): ConfigService =>
     ({
@@ -27,7 +29,7 @@ describe('Kebijakan klien ALIM Core', () => {
     it('menolak pilihan klien yang tidak dikenal di produksi (bukan hanya "mock")', () => {
       expect(() =>
         assertApprovalCoreClientAllowed({ coreClient: '', coreBaseUrl: '', coreApiKey: '' }, 'production'),
-      ).toThrow(/ALIM_CONNECT_CORE_CLIENT harus "http" di produksi/);
+      ).toThrow(/ALIM_CONNECT_CORE_CLIENT harus "http" atau "disabled" di produksi/);
     });
 
     it('menolak klien HTTP tanpa alamat atau kunci di produksi, dan menyebut variabel yang kurang', () => {
@@ -56,6 +58,31 @@ describe('Kebijakan klien ALIM Core', () => {
       ).not.toThrow();
     });
 
+    // The architectural requirement: ALIM Connect must run on its own, so the deliberate opt-out
+    // has to pass in production even with no Core URL and no key.
+    it('menerima "disabled" di produksi meski tanpa alamat dan kunci Core', () => {
+      expect(() =>
+        assertApprovalCoreClientAllowed({ coreClient: 'disabled', coreBaseUrl: '', coreApiKey: '' }, 'production'),
+      ).not.toThrow();
+    });
+
+    it('menerima "disabled" tanpa memandang huruf besar/kecil dan spasi', () => {
+      for (const value of ['disabled', 'DISABLED', ' Disabled ']) {
+        expect(() =>
+          assertApprovalCoreClientAllowed({ coreClient: value, coreBaseUrl: '', coreApiKey: '' }, 'production'),
+        ).not.toThrow();
+      }
+    });
+
+    // A typo must never be read as "disabled": only the exact word opts out.
+    it('tidak memperlakukan salah ketik sebagai disabled', () => {
+      for (const value of ['disable', 'off', 'none', 'false', '']) {
+        expect(() =>
+          assertApprovalCoreClientAllowed({ coreClient: value, coreBaseUrl: '', coreApiKey: '' }, 'production'),
+        ).toThrow(ApprovalCoreClientConfigError);
+      }
+    });
+
     it('tetap mengizinkan mock di luar produksi (development dan testing)', () => {
       for (const env of ['development', 'test', undefined]) {
         expect(() =>
@@ -67,7 +94,7 @@ describe('Kebijakan klien ALIM Core', () => {
 
   describe('createApprovalCoreClient', () => {
     it('mengembalikan mock saat konfigurasi kosong di luar produksi', () => {
-      expect(createApprovalCoreClient(configFor({}), mock, http)).toBe(mock);
+      expect(createApprovalCoreClient(configFor({}), mock, http, disabled)).toBe(mock);
     });
 
     it('mengembalikan klien HTTP saat dikonfigurasi', () => {
@@ -77,7 +104,43 @@ describe('Kebijakan klien ALIM Core', () => {
         'connect.approval.coreApiKey': 'k',
       });
 
-      expect(createApprovalCoreClient(config, mock, http)).toBe(http);
+      expect(createApprovalCoreClient(config, mock, http, disabled)).toBe(http);
+    });
+
+    it('mengembalikan klien disabled saat integrasi dimatikan, BUKAN mock', () => {
+      const config = configFor({ 'connect.approval.coreClient': 'disabled' });
+
+      // The distinction matters: mock answers `applied`, which would confirm an approval to the
+      // Head of Dormitory that Core never made.
+      expect(createApprovalCoreClient(config, mock, http, disabled)).toBe(disabled);
+      expect(createApprovalCoreClient(config, mock, http, disabled)).not.toBe(mock);
+    });
+  });
+
+  describe('DisabledAlimCoreApprovalClient', () => {
+    it('tidak pernah menjawab applied — command berakhir unavailable dan tidak diulang', async () => {
+      const client = new DisabledAlimCoreApprovalClient();
+      const result = await client.sendApprovalCommand({
+        commandId: 'cmd-1',
+        requestId: 'req-1',
+        decision: 'approved',
+        approvedDurationDays: 2,
+        actorExternalId: '628123456789',
+        actorCorePersonId: null,
+        source: 'whatsapp',
+        externalMessageId: 'wamid-1',
+        messageText: 'SETUJU 2 HARI',
+        notes: null,
+      });
+
+      expect(result.outcome).toBe('unavailable');
+      expect(result.outcome).not.toBe('applied');
+      expect(result.code).toBe('core_integration_disabled');
+      expect(result.coreStatus).toBeNull();
+      // A retry loop would re-log the same refusal for every command and never converge.
+      expect(result.retryable).toBe(false);
+      // The command id survives, so an operator can still reconcile the row against the reply.
+      expect(result.raw).toEqual({ command_id: 'cmd-1', disabled: true });
     });
   });
 });

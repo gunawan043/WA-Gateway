@@ -1,0 +1,65 @@
+# ALIM Connect — production overlay for alim-wa.abuhurairah.id
+#
+# WHY AN OVERLAY
+# --------------
+# docker-compose.yml builds the image from the working tree (`build: context: .`). On a production
+# host that is not a release: the deployed artefact would depend on whatever source happens to sit
+# on that machine, and there would be no digest to roll back to. This file pins the image by digest
+# and refuses to start when the digest is missing, so a production start cannot silently rebuild
+# from source.
+#
+# USAGE
+# -----
+#   # Image digest comes from CI (ghcr.io/<repo>:sha-<commit>); pin the digest, not the tag.
+#   export ALIM_CONNECT_IMAGE="ghcr.io/<owner>/<repo>@sha256:<digest>"
+#
+#   docker compose -f docker-compose.yml -f docker-compose.production.yml up -d --no-build
+#
+# The overlay does NOT change ports, volumes, networks or the entrypoint: those come from the base
+# file so the two cannot drift. It only:
+#   1. replaces the build with a pinned digest,
+#   2. keeps the published port on loopback (the base file already does; restated here so a base-file
+#      edit cannot publish it by accident),
+#   3. sets the reverse-proxy-facing defaults this deployment needs.
+#
+# The TLS terminator is NOT defined here. alim-wa.abuhurairah.id serves TLS at the edge (the host
+# already answers HTTP/2 200 with HSTS), so Connect stays on 127.0.0.1:2785 and the edge forwards to
+# it. If that edge is not on this host, point it at this host's private address instead and set
+# TRUSTED_PROXIES to its address.
+#
+# NOTHING IN THIS FILE CONTAINS A SECRET. Every credential is read from the operator's environment
+# (or an env_file the operator owns); see docs/integration/alim-connect-production-env.template.md.
+
+services:
+  openwa-api:
+    # `build: !reset null` would be the cleanest way to drop the base `build:` key, but `!reset`
+    # needs Compose v2.24+ and this repo's hosts are not guaranteed to have it. The invocation below
+    # therefore always passes `--no-build`, which makes Compose ignore `build:` entirely, and a
+    # `build:` stanza that would still be honoured is made to fail loudly by pointing its context at
+    # a path that does not exist. Both guards must be removed only together, and only after the
+    # host's `docker compose version` is confirmed to be 2.24 or newer.
+    build:
+      context: ./__production_build_is_forbidden_use_the_pinned_image__
+    image: ${ALIM_CONNECT_IMAGE:?ALIM_CONNECT_IMAGE must be set to ghcr.io/<repo>@sha256:<digest>}
+    # The base file publishes 127.0.0.1:${API_PORT:-2785}:2785. Restated so the loopback binding is
+    # a property of the production file itself rather than a default inherited from the base.
+    ports:
+      - '127.0.0.1:${API_PORT:-2785}:2785'
+    environment:
+      # Production posture, stated rather than inherited: an unset NODE_ENV skips the
+      # default-secret guard, allows wildcard CORS and serves Swagger.
+      - NODE_ENV=production
+      # The edge terminates TLS and forwards; the browser's scheme is https. The app reads
+      # TRUSTED_PROXIES to decide whether X-Forwarded-For may be believed, so an empty value here
+      # means "every client shares one rate-limit bucket". Set it on the host.
+      - TRUSTED_PROXIES=${TRUSTED_PROXIES:-}
+      # Same-origin dashboard: the SPA calls `/api` on its own origin, so the allowlist is the
+      # public origin only. Never `*` (production refuses a wildcard anyway).
+      - CORS_ORIGINS=${CORS_ORIGINS:-https://alim-wa.abuhurairah.id}
+      # The Core handoff is embedded from the Core web origin; only that origin may post a code.
+      - ALIM_CORE_WEB_ORIGIN=${ALIM_CORE_WEB_ORIGIN:-https://alim.abuhurairah.id}
+      - ALIM_CORE_BASE_URL=${ALIM_CORE_BASE_URL:-https://alim.abuhurairah.id}
+      # Production must talk to the real Core, never the mock.
+      - ALIM_CONNECT_CORE_CLIENT=http
+      # Swagger is reconnaissance surface; keep it off unless an operator opts in.
+      - ENABLE_SWAGGER=${ENABLE_SWAGGER:-false}

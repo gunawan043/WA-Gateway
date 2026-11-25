@@ -12,7 +12,8 @@ import { ApprovalRetryService } from './approval-retry.service';
 import { ApprovalService } from './approval.service';
 import { ALIM_CORE_APPROVAL_CLIENT } from './core-client/alim-core-approval.client';
 import type { AlimCoreApprovalClient } from './core-client/alim-core-approval.client';
-import { assertApprovalCoreClientAllowed } from './core-client/core-client-policy';
+import { assertApprovalCoreClientAllowed, isApprovalIntegrationDisabled } from './core-client/core-client-policy';
+import { DisabledAlimCoreApprovalClient } from './core-client/disabled-alim-core-approval.client';
 import { HttpAlimCoreApprovalClient } from './core-client/http-alim-core-approval.client';
 import { MockAlimCoreApprovalClient } from './core-client/mock-alim-core-approval.client';
 import { ApprovalCommand } from './entities/approval-command.entity';
@@ -31,12 +32,14 @@ import { WhatsAppIdentityService } from './whatsapp-identity.service';
  * Memilih klien Core untuk provider `ALIM_CORE_APPROVAL_CLIENT`.
  *
  * Diekspor supaya jalur startup ini dapat diuji langsung: `assertApprovalCoreClientAllowed`
- * menggagalkan boot ketika produksi akan memakai mock atau klien HTTP tanpa alamat/kunci.
+ * menggagalkan boot ketika produksi akan memakai mock atau klien HTTP tanpa alamat/kunci, dan
+ * mengizinkan `disabled` — mode yang membuat ALIM Connect berjalan tanpa integrasi Core.
  */
 export function createApprovalCoreClient(
   config: ConfigService,
   mock: MockAlimCoreApprovalClient,
   http: HttpAlimCoreApprovalClient,
+  disabled: DisabledAlimCoreApprovalClient,
 ): AlimCoreApprovalClient {
   const coreClient = config.get<string>('connect.approval.coreClient', 'mock');
 
@@ -45,6 +48,10 @@ export function createApprovalCoreClient(
     coreBaseUrl: config.get<string>('connect.approval.coreBaseUrl', ''),
     coreApiKey: config.get<string>('connect.approval.coreApiKey', ''),
   });
+
+  if (isApprovalIntegrationDisabled({ coreClient, coreBaseUrl: '', coreApiKey: '' })) {
+    return disabled;
+  }
 
   return coreClient === 'http' ? http : mock;
 }
@@ -63,9 +70,10 @@ export function createApprovalCoreClient(
     ApprovalInboundHook,
     MockAlimCoreApprovalClient,
     HttpAlimCoreApprovalClient,
+    DisabledAlimCoreApprovalClient,
     {
       provide: ALIM_CORE_APPROVAL_CLIENT,
-      inject: [ConfigService, MockAlimCoreApprovalClient, HttpAlimCoreApprovalClient],
+      inject: [ConfigService, MockAlimCoreApprovalClient, HttpAlimCoreApprovalClient, DisabledAlimCoreApprovalClient],
       useFactory: createApprovalCoreClient,
     },
   ],
