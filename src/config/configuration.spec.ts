@@ -2,6 +2,7 @@ import * as path from 'path';
 import configuration, {
   DEFAULT_DATA_DIR,
   PINNED_BROWSER_LOCALE,
+  resolveApprovalCoreClient,
   resolveNonNegativeIntEnv,
   withPinnedBrowserLocale,
 } from './configuration';
@@ -477,5 +478,40 @@ describe('configuration — puppeteer locale pin', () => {
   it('respects an explicit --lang inside PUPPETEER_ARGS', () => {
     process.env.PUPPETEER_ARGS = '--no-sandbox --lang=id-ID';
     expect(configuration().engine.puppeteer.args).toEqual(['--no-sandbox', '--lang=id-ID']);
+  });
+});
+
+// A production deploy that sets ALIM_CONNECT_CORE_CLIENT=disabled booted straight into the mock
+// rejection: the mapping only knew `http`, so `disabled` arrived at the factory as `mock`. The safe
+// posture was therefore unreachable in production — the one place it exists for.
+describe('configuration — ALIM Connect Core client selection', () => {
+  const orig = process.env.ALIM_CONNECT_CORE_CLIENT;
+
+  afterEach(() => {
+    if (orig === undefined) delete process.env.ALIM_CONNECT_CORE_CLIENT;
+    else process.env.ALIM_CONNECT_CORE_CLIENT = orig;
+  });
+
+  it('passes disabled through instead of collapsing it to mock', () => {
+    process.env.ALIM_CONNECT_CORE_CLIENT = 'disabled';
+    expect(resolveApprovalCoreClient(process.env.ALIM_CONNECT_CORE_CLIENT)).toBe('disabled');
+    expect(configuration().connect.approval.coreClient).toBe('disabled');
+  });
+
+  it('accepts disabled regardless of case or surrounding whitespace', () => {
+    process.env.ALIM_CONNECT_CORE_CLIENT = '  Disabled ';
+    expect(configuration().connect.approval.coreClient).toBe('disabled');
+  });
+
+  it('still maps http to http', () => {
+    process.env.ALIM_CONNECT_CORE_CLIENT = 'http';
+    expect(configuration().connect.approval.coreClient).toBe('http');
+  });
+
+  it('leaves an unset or unrecognised value on mock, which the production gate then rejects', () => {
+    expect(resolveApprovalCoreClient(undefined)).toBe('mock');
+    expect(resolveApprovalCoreClient('')).toBe('mock');
+    expect(resolveApprovalCoreClient('disable')).toBe('mock');
+    expect(resolveApprovalCoreClient('off')).toBe('mock');
   });
 });

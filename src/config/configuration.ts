@@ -32,6 +32,25 @@ import { parseCoreWebOrigin } from './core-web-origin';
  */
 export const DEFAULT_DATA_DIR = './data';
 
+/**
+ * Maps `ALIM_CONNECT_CORE_CLIENT` onto the value the approval module reads.
+ *
+ * `disabled` is the one value that was being lost: it is the posture that lets ALIM Connect serve
+ * the dashboard and sessions while Core integration is still unagreed, and it must reach the
+ * factory as `disabled` so the safe client is selected. Unrecognised input becomes `mock`, which
+ * the production gate in `assertApprovalCoreClientAllowed` rejects rather than accepting silently.
+ */
+export function resolveApprovalCoreClient(raw: string | undefined): 'http' | 'disabled' | 'mock' {
+  const value = (raw ?? '').trim().toLowerCase();
+  if (value === 'http') {
+    return 'http';
+  }
+  if (value === 'disabled') {
+    return 'disabled';
+  }
+  return 'mock';
+}
+
 /** Where installed plugin packages live when PLUGINS_DIR is unset — the tree the registry is in. */
 export const DEFAULT_PLUGINS_DIR = path.join(DEFAULT_DATA_DIR, 'plugins');
 
@@ -577,7 +596,11 @@ export default () => ({
   // here — Connect is only a caller.
   connect: {
     approval: {
-      coreClient: process.env.ALIM_CONNECT_CORE_CLIENT === 'http' ? 'http' : 'mock',
+      // Three values, and each one must survive this mapping unchanged: collapsing `disabled` into
+      // `mock` made the safe posture unrepresentable, so a production deploy that set `disabled`
+      // was refused at boot as if it had asked for mock. Anything unrecognised still falls through
+      // to `mock`, which the production gate then rejects — never silently accepted.
+      coreClient: resolveApprovalCoreClient(process.env.ALIM_CONNECT_CORE_CLIENT),
       coreBaseUrl: (process.env.ALIM_CORE_BASE_URL ?? '').replace(/\/+$/, ''),
       coreApiKey: process.env.ALIM_CORE_APPROVAL_API_KEY ?? '',
       coreApiHeader: process.env.ALIM_CORE_APPROVAL_API_HEADER ?? 'X-ALIM-CONNECT-APPROVAL-KEY',
