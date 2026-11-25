@@ -635,7 +635,14 @@ export default () => ({
       coreBaseUrl: (process.env.ALIM_CORE_BASE_URL ?? '').replace(/\/+$/, ''),
       apiKey: process.env.ALIM_CONNECT_SSO_KEY ?? '',
       apiHeader: process.env.ALIM_CONNECT_SSO_API_HEADER ?? 'X-ALIM-CONNECT-SSO-KEY',
-      timeoutMs: positiveIntFromEnv('ALIM_CONNECT_SSO_TIMEOUT_MS', 5000),
+      // ONE attempt, no retry — the code is one-time, so a retry after a slow answer could redeem it
+      // twice or burn it on a request whose reply was merely late. The budget therefore has to cover
+      // the slow end of Core's latency by itself, not the average: a single measured host answered
+      // the same exchange in 1.8 s to 7.6 s, and a 5000 ms budget turned the 7.6 s case into a
+      // handoff failure that looked like a configuration error. The default leaves room for that
+      // spread; `npm run probe:alim-core -- --latency` measures it on the host that makes the call,
+      // and env.validation refuses a value under ALIM_CONNECT_SSO_MIN_TIMEOUT_MS at boot.
+      timeoutMs: resolveNonNegativeIntEnv(process.env.ALIM_CONNECT_SSO_TIMEOUT_MS, 15000),
       // The browser origin allowed to embed Connect and to post the handoff. Invalid values resolve
       // to null, which disables SSO instead of widening `frame-ancestors`.
       coreWebOrigin: parseCoreWebOrigin(process.env.ALIM_CORE_WEB_ORIGIN),

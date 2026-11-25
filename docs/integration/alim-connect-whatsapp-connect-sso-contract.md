@@ -90,8 +90,28 @@ Klien yang mengirim `Accept: application/json` menerima `{ ok, userId, expiresAt
 | Base URL | `ALIM_CORE_BASE_URL` (tanpa garis miring di akhir) |
 | Header   | `X-ALIM-CONNECT-SSO-KEY: <ALIM_CONNECT_SSO_KEY>`   |
 | Body     | `application/json`                                 |
-| Timeout  | `ALIM_CONNECT_SSO_TIMEOUT_MS`, default 5000 ms     |
+| Timeout  | `ALIM_CONNECT_SSO_TIMEOUT_MS`, default 15000 ms    |
 | Retry    | **tidak ada** — code bersifat one-time             |
+
+### 3.3 Anggaran timeout
+
+Exchange tidak pernah diulang: kode bersifat one-time, jadi percobaan kedua setelah jawaban yang
+lambat bisa menghabiskan atau mengulang kode yang sama. Karena itu anggaran timeout harus menutup
+**ujung lambat** latensi Core, bukan rata-ratanya.
+
+Satu host pernah menjawab exchange yang sama antara 1,8 detik dan 7,6 detik. Dengan anggaran
+5000 ms, kasus 7,6 detik berakhir `core_timeout` — handoff gagal secara acak dan terlihat seperti
+kesalahan konfigurasi, padahal Core sehat. Default kini 15000 ms.
+
+Ukur dari host yang benar-benar melakukan panggilan, bukan dari laptop:
+
+```bash
+npm run probe:alim-core -- --latency
+```
+
+Perintah itu mengirim lima exchange dengan kode karangan (Core menolaknya — penolakan tetap
+membuktikan perjalanan pulang-pergi), lalu melaporkan p50/p95/maks dan keluar dengan kode 4 bila
+ada panggilan yang menembus anggaran, beserta nilai minimum yang disarankan.
 
 ```json
 {
@@ -213,7 +233,7 @@ Kontrol pengganti, semuanya aktif pada endpoint ini:
 | `ALIM_CONNECT_SSO_KEY`               | ya*   | —                        | Key scope `sso:exchange`. Berbeda dari key approval/ingest.    |
 | `ALIM_CORE_WEB_ORIGIN`               | ya*   | —                        | Origin browser Core untuk CSP dan allowlist Origin.            |
 | `ALIM_CONNECT_SSO_API_HEADER`        | tidak | `X-ALIM-CONNECT-SSO-KEY` | Nama header key.                                               |
-| `ALIM_CONNECT_SSO_TIMEOUT_MS`        | tidak | `5000`                   | Timeout satu panggilan exchange.                               |
+| `ALIM_CONNECT_SSO_TIMEOUT_MS`        | tidak | `15000`                  | Timeout satu panggilan exchange — lihat §3.3.                  |
 | `ALIM_CONNECT_SSO_AUDIENCE`          | tidak | `connect`                | Audience yang diminta dan diverifikasi.                        |
 | `ALIM_CONNECT_SSO_SCOPE`             | tidak | `whatsapp.embed`         | Scope yang diminta dan diverifikasi.                           |
 | `ALIM_CONNECT_SSO_SESSION_TTL_HOURS` | tidak | `0` (pakai default auth) | Umur absolut session hasil handoff.                            |

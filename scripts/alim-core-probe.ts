@@ -9,9 +9,13 @@
  * Usage:
  *   npm run probe:alim-core                 # configuration summary + SSO exchange probe
  *   npm run probe:alim-core -- --sso        # same
+ *   npm run probe:alim-core -- --latency    # 5 exchanges: is the timeout budget big enough?
  *   npm run probe:alim-core -- --sso-code=<code>   # spend a code Core issued: proves the success path
  *   npm run probe:alim-core -- --approval   # also send one invalid approval command (opt-in)
- *   npm run probe:alim-core -- --all        # both
+ *   npm run probe:alim-core -- --all        # every probe above
+ *
+ * Run `--latency` from the host that makes the real calls, not from a laptop: the container's
+ * resolver, egress route and proxy environment are what decide whether the budget is enough.
  *
  * The approval probe is opt-in because it is a POST: it sends a command whose `request_id` is the
  * nil UUID and whose actor is not a person, so the only correct answers are a business 4xx. A 2xx
@@ -20,6 +24,7 @@
  *
  * Exit codes: 0 every selected probe passed; 1 a probe failed; 2 configuration missing;
  * 3 Core violated the contract (accepted a code it never issued, or applied a probe command).
+ * 4 the SSO timeout budget is too small for the latency Core is showing (see `--latency`).
  *
  * No secret is ever printed: the key is reported as present/absent, never echoed.
  */
@@ -41,27 +46,44 @@ interface Line {
  * The flags this run was given. Read at call time rather than once at load: a spec that loads this
  * module to check its verdicts runs the probe itself, and must be able to say which probes it runs.
  */
-function selection(argv: string[]): { runSso: boolean; runApproval: boolean; ssoCode: string | undefined } {
+function selection(argv: string[]): {
+  runSso: boolean;
+  runApproval: boolean;
+  runLatency: boolean;
+  ssoCode: string | undefined;
+} {
   const args = new Set(argv);
   return {
     runSso: args.has('--all') || args.has('--sso') || !args.has('--approval'),
     runApproval: args.has('--all') || args.has('--approval'),
+    /** Repeated exchange calls, to compare Core's latency against ALIM_CONNECT_SSO_TIMEOUT_MS. */
+    runLatency: args.has('--all') || args.has('--latency'),
     /** `--sso-code=<code>`: a handoff code Core's UI issued, for proving the success path. */
     ssoCode: argv.find(arg => arg.startsWith('--sso-code='))?.slice('--sso-code='.length),
   };
 }
 
-const { runSso, runApproval, ssoCode } = selection(process.argv.slice(2));
+const { runSso, runApproval, runLatency, ssoCode } = selection(process.argv.slice(2));
 
 const env = process.env;
 const coreBaseUrl = (env.ALIM_CORE_BASE_URL ?? '').replace(/\/+$/, '');
+
+/** Enough calls to see a spike, few enough to finish while an operator is watching. */
+const LATENCY_SAMPLES = 5;
+
+/**
+ * The budget `configuration.ts` applies when ALIM_CONNECT_SSO_TIMEOUT_MS is unset. Duplicated as a
+ * literal rather than imported because this script also stands in for the client when it measures:
+ * importing the config factory would drag the whole application's environment into a probe.
+ */
+const DEFAULT_SSO_TIMEOUT_MS = 15000;
 
 /** The same keys `configuration.ts` exposes, so the clients read what production reads. */
 const values: Record<string, unknown> = {
   'connect.sso.coreBaseUrl': coreBaseUrl,
   'connect.sso.apiKey': env.ALIM_CONNECT_SSO_KEY ?? '',
   'connect.sso.apiHeader': env.ALIM_CONNECT_SSO_API_HEADER ?? 'X-ALIM-CONNECT-SSO-KEY',
-  'connect.sso.timeoutMs': Number(env.ALIM_CONNECT_SSO_TIMEOUT_MS ?? 5000),
+  'connect.sso.timeoutMs': Number(env.ALIM_CONNECT_SSO_TIMEOUT_MS ?? DEFAULT_SSO_TIMEOUT_MS),
   'connect.sso.audience': env.ALIM_CONNECT_SSO_AUDIENCE ?? 'connect',
   'connect.sso.scope': env.ALIM_CONNECT_SSO_SCOPE ?? 'whatsapp.embed',
   'connect.approval.coreBaseUrl': coreBaseUrl,
@@ -153,6 +175,62 @@ async function probeSso(): Promise<Line> {
 }
 
 /**
+ * How much of the timeout budget Core actually uses on this host.
+ *
+ * A single exchange answers "did it work", not "will it keep working": the same host measured
+ * 1.8 s to 7.6 s across four probes against a 5000 ms budget, which is a handoff that fails at
+ * random and looks like a config error. The distribution is the answer, so this repeats the call.
+ *
+ * Each call spends a fresh invented code, which Core refuses — that is the measurable path. A
+ * refusal still proves the round trip, and costs Core nothing beyond the lookup.
+ */
+async function probeLatency(): Promise<Line[]> {
+  const client = new HttpAlimCoreSsoClient(config);
+  const budgetMs = Number(values['connect.sso.timeoutMs'] ?? DEFAULT_SSO_TIMEOUT_MS);
+  const samples: { ms: number; refused: boolean }[] = [];
+
+  for (let i = 0; i < LATENCY_SAMPLES; i++) {
+    const startedAt = Date.now();
+    const result = await client.exchange({ code: `latency-probe-${randomUUID()}`, state: 'latency' });
+    const ms = Date.now() - startedAt;
+    samples.push({ ms, refused: !result.ok });
+  }
+
+  const measured = samples.map(s => s.ms);
+  const sorted = [...measured].sort((a, b) => a - b);
+  const p50 = sorted[Math.floor(sorted.length / 2)];
+  const p95 = sorted[Math.min(sorted.length - 1, Math.ceil(sorted.length * 0.95) - 1)];
+  const worst = sorted[sorted.length - 1];
+  const timeouts = measured.filter(ms => ms >= budgetMs).length;
+
+  const summary = `p50 ${p50} ms, p95 ${p95} ms, max ${worst} ms over ${samples.length} calls (budget ${budgetMs} ms)`;
+  const refused = samples.filter(s => s.refused).length;
+
+  if (timeouts > 0) {
+    // The budget is the finding, not Core: a refusal at 7.6 s is a working Core behind a budget
+    // that already gave up. Recommend the next power-of-two-ish value instead of a magic number.
+    const recommended = Math.max(15000, Math.ceil((worst * 2) / 1000) * 1000);
+    return [
+      {
+        probe: 'SSO latency',
+        verdict: 'FAIL',
+        detail: `${summary}; ${timeouts} call(s) hit the timeout. Raise ALIM_CONNECT_SSO_TIMEOUT_MS to at least ${recommended}`,
+      },
+    ];
+  }
+  if (refused < samples.length) {
+    return [
+      {
+        probe: 'SSO latency',
+        verdict: 'WARN',
+        detail: `${summary}; ${samples.length - refused} call(s) were NOT refused — check Core's one-time semantics`,
+      },
+    ];
+  }
+  return [{ probe: 'SSO latency', verdict: 'PASS', detail: summary }];
+}
+
+/**
  * Sends a command Core must refuse. The nil `request_id` guarantees there is no permit to decide,
  * so a `rejected` outcome proves auth + route + payload shape without touching real data.
  */
@@ -222,6 +300,7 @@ async function main(): Promise<void> {
 
   const lines: Line[] = [];
   if (runSso) lines.push(await probeSso());
+  if (runLatency) lines.push(...(await probeLatency()));
   if (runApproval) {
     console.log('Sending one invalid approval command (nil request_id) — staging only.\n');
     lines.push(await probeApproval());
