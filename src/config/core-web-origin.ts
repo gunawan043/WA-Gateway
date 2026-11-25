@@ -46,6 +46,23 @@ export function frameAncestorsFor(coreWebOrigin: string | null): string[] {
 }
 
 /**
+ * Rewrites `frame-ancestors` in an already-serialised CSP so a single response can name the Core
+ * origin without loosening the application-wide policy.
+ *
+ * Used only for the handoff documents. A directive that is absent is appended rather than left
+ * alone: an unset `frame-ancestors` falls back to `default-src 'self'`, which would refuse the embed
+ * while looking like a policy that was considered.
+ */
+export function withFrameAncestors(csp: string, coreWebOrigin: string): string {
+  const directive = `frame-ancestors ${frameAncestorsFor(coreWebOrigin).join(' ')}`;
+  const pattern = /(?:^|;)\s*frame-ancestors\b[^;]*/;
+  if (pattern.test(csp)) {
+    return csp.replace(pattern, (_match: string) => `; ${directive}`);
+  }
+  return `${csp.replace(/;\s*$/, '')}; ${directive}`;
+}
+
+/**
  * Whether a browser-supplied `Origin` (or a `Referer` fallback) is the configured Core origin.
  *
  * A cross-origin form POST always carries `Origin` in a current browser, so a missing header is

@@ -6,7 +6,7 @@ import type { Request, Response } from 'express';
 import { randomBytes } from 'crypto';
 import { Public } from '../auth/decorators/auth.decorators';
 import { resolveClientIp } from '../../common/utils/ip';
-import { isAllowedHandoffOrigin } from '../../config/core-web-origin';
+import { isAllowedHandoffOrigin, withFrameAncestors } from '../../config/core-web-origin';
 import { SsoHandoffDto } from './dto/sso-handoff.dto';
 import { HandoffFailure, SsoHandoffService } from './sso-handoff.service';
 import { renderHandoffErrorPage, renderHandoffLoadingPage, renderHandoffSuccessPage } from './sso-pages';
@@ -162,12 +162,32 @@ export class SsoHandoffController {
       : randomBytes(18).toString('base64url');
   }
 
-  /** Headers every handoff document carries: no caching, no referrer, no indexing. */
+  /**
+   * Headers every handoff document carries: no caching, no referrer, no indexing — and the one
+   * place where framing is widened.
+   *
+   * The global CSP/nosniff/frameguard stack is installed once for the whole application, so the only
+   * way to let Core frame the handoff document is to narrow that policy here, on these responses
+   * alone, rather than relaxing it for the dashboard and API. `frame-ancestors` is rewritten to name
+   * the configured Core origin exactly (never a wildcard, never `*`), and `X-Frame-Options` is
+   * dropped because it cannot express a second origin and older Safari would honour it over CSP and
+   * refuse the embed. With no Core origin configured nothing is relaxed: the response keeps the
+   * application default, so an unconfigured deployment refuses every embedder.
+   */
   private prepareDocument(res: Response): void {
     res.setHeader('Cache-Control', 'no-store, max-age=0');
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Referrer-Policy', 'no-referrer');
     res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+
+    const coreOrigin = this.coreOrigin();
+    if (!coreOrigin) return;
+
+    const csp = res.getHeader('Content-Security-Policy');
+    if (typeof csp === 'string') {
+      res.setHeader('Content-Security-Policy', withFrameAncestors(csp, coreOrigin));
+    }
+    res.removeHeader('X-Frame-Options');
   }
 
   private fail(res: Response, reason: PageFailure, wantsJson: boolean): void {

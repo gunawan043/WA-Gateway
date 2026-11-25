@@ -18,7 +18,7 @@ import { createLogger } from './common/services/logger.service';
 import { ShutdownService } from './common/services/shutdown.service';
 import { injectDashboardCspNonce } from './config/dashboard-csp';
 import { resolveCorsPolicy, isUpgradeInsecureRequestsEnabled, resolveBodyLimit } from './config/bootstrap-security';
-import { parseCoreWebOrigin, frameAncestorsFor } from './config/core-web-origin';
+import { parseCoreWebOrigin } from './config/core-web-origin';
 import { resolveRequestTimeoutMs } from './config/http-timeouts';
 import { parseTrustedProxies } from './common/utils/ip';
 import {
@@ -101,11 +101,8 @@ export function configureApp(app: INestApplication, options: ConfigureAppOptions
 
   // Enhanced Security Headers
   //
-  // `frame-ancestors` is the only way the WhatsApp Connect workspace may be embedded, and only by
-  // the configured Core browser origin. It is read here (not at import time) so a suite and a
-  // restart both see the current environment. An unset or invalid value keeps the default
-  // `'self'`: SSO is then disabled rather than open to every embedder.
-  const coreWebOrigin = parseCoreWebOrigin(process.env.ALIM_CORE_WEB_ORIGIN);
+  // Everything below is one policy for the whole application. The single exception is framing: the
+  // SSO handoff documents narrow it per response so Core can embed them, and nothing else can.
   app.use(
     helmet({
       contentSecurityPolicy: {
@@ -128,7 +125,12 @@ export function configureApp(app: INestApplication, options: ConfigureAppOptions
           objectSrc: ["'none'"],
           // A configured Core origin is added alongside 'self' — never a wildcard. Every other
           // protection above stays exactly as it was.
-          frameAncestors: frameAncestorsFor(coreWebOrigin),
+          // Application-wide framing stays `'self'`. Only the SSO handoff documents may be framed by
+          // Core, and they widen this header themselves (see SsoHandoffController.prepareDocument) —
+          // a per-response narrowing rather than a policy the dashboard, API and Bull Board share.
+          // Relaxing it here instead would also drop X-Frame-Options for every response, which the
+          // embedding requirement never asked for.
+          frameAncestors: ["'self'"],
           // Auto-upgrade HTTP→HTTPS in production, unless CSP_UPGRADE_INSECURE_REQUESTS opts out for an
           // HTTP-only private-network deployment (otherwise the browser forces the dashboard to https). (#611)
           upgradeInsecureRequests: isUpgradeInsecureRequestsEnabled(
@@ -143,7 +145,10 @@ export function configureApp(app: INestApplication, options: ConfigureAppOptions
       // (older Safari) would refuse the Core embed even though CSP allows it. When a Core origin is
       // configured, CSP `frame-ancestors` is the sole framing policy; otherwise the default
       // SAMEORIGIN stays in place.
-      frameguard: coreWebOrigin ? false : undefined,
+      // Stays on for the whole application, including API responses. The handoff documents remove it
+      // individually, because X-Frame-Options cannot express a second allowed origin and older Safari
+      // would honour it over CSP and refuse the Core embed.
+      frameguard: undefined,
       hsts: {
         maxAge: 31536000,
         includeSubDomains: true,

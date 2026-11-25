@@ -17,6 +17,8 @@ interface FakeResponse {
   send(value: string): FakeResponse;
   json(value: unknown): FakeResponse;
   setHeader(name: string, value: string): FakeResponse;
+  getHeader(name: string): string | undefined;
+  removeHeader(name: string): void;
 }
 
 function makeResponse(): FakeResponse {
@@ -45,6 +47,12 @@ function makeResponse(): FakeResponse {
     setHeader(name, value) {
       res.headers[name] = value;
       return res;
+    },
+    getHeader(name) {
+      return res.headers[name];
+    },
+    removeHeader(name) {
+      delete res.headers[name];
     },
   };
   return res;
@@ -101,6 +109,76 @@ describe('SsoHandoffController.loading', () => {
     expect(res.body).toContain('ALIM Core');
     expect(res.body).not.toContain('owa_s1_');
     expect(res.body).toMatch(/nonce="[A-Za-z0-9_-]{16,}"/);
+  });
+});
+
+// Embedding is the one thing this endpoint exists to make possible, and it must not be bought by
+// weakening every other response: the handoff documents themselves are where the policy changes.
+describe('SsoHandoffController.loading - framing policy', () => {
+  const GLOBAL_CSP = "default-src 'self'; frame-ancestors 'self'; object-src 'none'";
+
+  function withGlobalPolicy() {
+    const res = makeResponse();
+    res.setHeader('Content-Security-Policy', GLOBAL_CSP);
+    res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+    return res;
+  }
+
+  it('names the configured Core origin in frame-ancestors and drops X-Frame-Options', () => {
+    const { controller } = makeController();
+    const res = withGlobalPolicy();
+
+    controller.loading(res as unknown as Response);
+
+    expect(res.headers['Content-Security-Policy']).toContain("frame-ancestors 'self' https://core.example.com");
+    expect(res.headers['Content-Security-Policy']).not.toBe(GLOBAL_CSP);
+    expect(res.headers['X-Frame-Options']).toBeUndefined();
+  });
+
+  it('leaves the rest of the policy byte-identical', () => {
+    const { controller } = makeController();
+    const res = withGlobalPolicy();
+
+    controller.loading(res as unknown as Response);
+
+    const policy = res.headers['Content-Security-Policy'];
+    expect(policy).toContain("default-src 'self'");
+    expect(policy).toContain("object-src 'none'");
+  });
+
+  it('relaxes nothing when no Core origin is configured', () => {
+    const { controller } = makeController({ coreOrigin: null });
+    const res = withGlobalPolicy();
+
+    controller.loading(res as unknown as Response);
+
+    expect(res.headers['Content-Security-Policy']).toBe(GLOBAL_CSP);
+    expect(res.headers['X-Frame-Options']).toBe('SAMEORIGIN');
+  });
+
+  it('refuses to widen framing to a foreign origin the operator did not configure', () => {
+    const { controller } = makeController({ coreOrigin: 'https://alim.example.org' });
+    const res = withGlobalPolicy();
+
+    controller.loading(res as unknown as Response);
+
+    expect(res.headers['Content-Security-Policy']).not.toContain('alim.abuhurairah.id');
+    expect(res.headers['Content-Security-Policy']).toContain('https://alim.example.org');
+  });
+
+  it('applies the same widening to the error document a refused handoff renders', async () => {
+    const { controller } = makeController();
+    const res = withGlobalPolicy();
+
+    await controller.receive(
+      { code: CODE } as never,
+      makeRequest({ origin: 'https://evil.example' }),
+      res as unknown as Response,
+    );
+
+    expect(res.statusCode).toBe(403);
+    expect(res.headers['Content-Security-Policy']).toContain("frame-ancestors 'self' https://core.example.com");
+    expect(res.headers['X-Frame-Options']).toBeUndefined();
   });
 });
 
