@@ -253,6 +253,50 @@ describe('SsoHandoffController.receive - configuration and origin', () => {
   });
 });
 
+describe('SsoHandoffController.receive - a request with no code', () => {
+  // The field used to be required, so the global validation pipe answered a bare "Bad Request"
+  // before the handler ran. A frame reload or an empty form submit is ordinary, and the person on the
+  // other side needs to be told the flow starts from Core.
+  it('answers code_required instead of a bare validation error, without calling Core', async () => {
+    const { controller, complete } = makeController();
+    const res = makeResponse();
+
+    await controller.receive({} as never, makeRequest({ origin: CORE_ORIGIN }), res as unknown as Response);
+
+    expect(res.statusCode).toBe(422);
+    expect(complete).not.toHaveBeenCalled();
+    expect(res.body).toContain('ALIM Core');
+  });
+
+  it('treats a whitespace-only code as absent', async () => {
+    const { controller, complete } = makeController();
+    const res = makeResponse();
+
+    await controller.receive(
+      { code: '   ' } as never,
+      makeRequest({ origin: CORE_ORIGIN }),
+      res as unknown as Response,
+    );
+
+    expect(res.statusCode).toBe(422);
+    expect(complete).not.toHaveBeenCalled();
+  });
+
+  it('gives a JSON caller the code_required reason', async () => {
+    const { controller } = makeController();
+    const res = makeResponse();
+
+    await controller.receive(
+      {} as never,
+      makeRequest({ origin: CORE_ORIGIN, accept: 'application/json' }),
+      res as unknown as Response,
+    );
+
+    expect(res.statusCode).toBe(422);
+    expect(JSON.parse(res.body).code).toBe('code_required');
+  });
+});
+
 describe('SsoHandoffController.receive - success', () => {
   it('exchanges the code with the client IP and user agent, then renders the success page', async () => {
     const { controller, complete } = makeController();

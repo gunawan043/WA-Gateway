@@ -48,6 +48,11 @@ export class SsoHandoffController {
    * The page the Core embed can load while the form POST is in flight. A browser keeps this
    * document on screen until the POST response arrives, so the person sees a Connect-owned loading
    * state instead of a blank frame. It creates nothing and accepts no code.
+   *
+   * Someone who opens this URL directly — or presses Enter on it, or reloads the frame — reaches the
+   * same page and gets an honest answer: the flow only starts from Core. It deliberately does not
+   * borrow the POST's `code_required` refusal, because that refusal is a 4xx for a broken exchange,
+   * whereas this is a page render for a person with nothing wrong to point at.
    */
   @Get('handoff')
   @Public()
@@ -111,7 +116,15 @@ export class SsoHandoffController {
       return;
     }
 
-    // 3. Exchange, map and issue. The service never writes a session before all three succeed.
+    // 3. A request with no code is refused here rather than at the validation pipe, which would
+    //    answer a bare "Bad Request" that names nothing. `code_required` is the documented status
+    //    for it, and nothing reaches Core.
+    if (!dto.code || dto.code.trim() === '') {
+      this.fail(res, 'code_required', wantsJson);
+      return;
+    }
+
+    // 4. Exchange, map and issue. The service never writes a session before all three succeed.
     const trustedProxies = this.config.get<string[]>('security.trustedProxies') ?? [];
     const result = await this.handoff.complete({
       code: dto.code,
@@ -125,7 +138,7 @@ export class SsoHandoffController {
       return;
     }
 
-    // 4. The token is delivered only inside the HTML page, written to sessionStorage, and the
+    // 5. The token is delivered only inside the HTML page, written to sessionStorage, and the
     //    document is replaced. JSON callers get the outcome but never the token.
     if (wantsJson) {
       res.status(200).json({ ok: true, userId: result.userId, expiresAt: result.expiresAt });
