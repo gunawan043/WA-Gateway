@@ -2388,3 +2388,48 @@ export const campaignApi = {
   removeSegment: (sessionId: string, id: string) =>
     request<void>(`${campaignBase(sessionId)}/segments/${encodeURIComponent(id)}`, { method: 'DELETE' }),
 };
+
+/** One ALIM Core setting as the settings page renders it. A secret never carries its value. */
+export interface AlimCoreField {
+  key: string;
+  section: 'core' | 'sso' | 'approval' | 'ingest' | 'retry';
+  label: string;
+  kind: 'url' | 'secret' | 'text' | 'enum' | 'integer' | 'boolean';
+  help: string;
+  choices?: string[];
+  optional?: boolean;
+  defaultValue?: string;
+  value: string;
+  isSet?: boolean;
+  source: 'environment' | 'overlay' | 'default' | 'unset';
+  pendingRestart: boolean;
+}
+
+export interface AlimCoreSettings {
+  fields: AlimCoreField[];
+  restartRequired: boolean;
+  ready: { sso: boolean; approval: boolean };
+}
+
+export interface AlimCoreSaveResult {
+  saved: boolean;
+  restartRequired: boolean;
+  errors?: Record<string, string>;
+  message?: string;
+}
+
+/**
+ * The ALIM Core connection, read and written from one place.
+ *
+ * Saves land in the dashboard-owned env overlay and take effect on the next restart; the response
+ * says so rather than reporting a change as live.
+ */
+export const alimCoreSettingsApi = {
+  get: () => request<AlimCoreSettings>('/settings/alim-core'),
+  save: (values: Record<string, string>) =>
+    request<AlimCoreSaveResult>('/settings/alim-core', {
+      method: 'PUT',
+      body: JSON.stringify({ values }),
+    }),
+  restart: () => request<{ requested: boolean; pending: string[] }>('/settings/alim-core/restart', { method: 'POST' }),
+};

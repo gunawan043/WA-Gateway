@@ -76,7 +76,8 @@
     "pipeline": "Pipeline",
     "campaigns": "Kampanye",
     "users": "Pengguna",
-    "divisions": "Divisi"
+    "divisions": "Divisi",
+    "settings": "Pengaturan"
   },
   "chats": {
     "edited": "Diedit",
@@ -1887,5 +1888,57 @@
     "settings.saveFailed": "Pengaturan gagal disimpan.",
     "slaMinutes": "Target respons pertama (menit)",
     "slaMinutesHint": "0 mematikan SLA. Hitungan mulai saat pesan pelanggan belum dijawab dan berhenti pada balasan manusia pertama."
+  },
+  "settings": {
+    "title": "Pengaturan",
+    "subtitle": "Koneksi ALIM Core, SSO handoff, approval, dan percobaan ulang — dalam satu halaman.",
+    "reload": "Muat ulang",
+    "save": "Simpan",
+    "saving": "Menyimpan…",
+    "loading": "Memuat pengaturan…",
+    "none": "Tidak ada perubahan untuk disimpan.",
+    "saved": "Tersimpan. Nilai berlaku setelah aplikasi dimulai ulang.",
+    "statusTitle": "Status integrasi",
+    "ssoReady": "SSO siap",
+    "ssoNotReady": "SSO belum siap",
+    "ssoHint": "Mode http, kedua URL, dan kunci SSO harus terisi.",
+    "approvalReady": "Approval siap",
+    "approvalNotReady": "Approval belum siap",
+    "approvalHint": "Mode http, alamat Core, dan kunci approval harus terisi.",
+    "pendingTitle": "Ada nilai tersimpan yang belum dipakai proses yang sedang berjalan. Simpan perubahan lain lebih dulu bila perlu — mulai ulang menerapkan semuanya sekaligus.",
+    "applyRestart": "Terapkan & mulai ulang",
+    "restartSent": "Aplikasi sedang dimulai ulang. Halaman ini akan terhubung kembali sendiri.",
+    "restartUnknown": "Permintaan mulai ulang tidak terkonfirmasi. Periksa status aplikasi.",
+    "secretSet": "sudah diisi",
+    "secretUnset": "belum diisi",
+    "fromEnv": "dari .env / host",
+    "pendingRestart": "menunggu mulai ulang",
+    "optional": "opsional",
+    "secretKeep": "Tersimpan — biarkan kosong untuk mempertahankan",
+    "secretEmpty": "Belum diisi",
+    "loadFailed": "Pengaturan tidak dapat dimuat.",
+    "saveFailed": "Penyimpanan gagal.",
+    "sections": {
+      "core": {
+        "title": "Koneksi ALIM Core",
+        "hint": "Alamat Core, origin browser, dan kunci yang dipertukarkan. Kunci di sini harus sama dengan nilai yang dipegang Core."
+      },
+      "sso": {
+        "title": "SSO handoff",
+        "hint": "Pertukaran kode sekali pakai saat WhatsApp dibuka dari dalam ALIM Core."
+      },
+      "approval": {
+        "title": "Persetujuan (approval)",
+        "hint": "Kontrak pengiriman keputusan izin ke Core."
+      },
+      "ingest": {
+        "title": "Permintaan masuk",
+        "hint": "Bukti yang harus dibawa Core saat mengirim permohonan ke Connect."
+      },
+      "retry": {
+        "title": "Percobaan ulang",
+        "hint": "Bagaimana keputusan yang gagal dikirim dicoba lagi."
+      }
+    }
   }
 }

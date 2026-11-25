@@ -76,7 +76,8 @@
     "pipeline": "销售管道",
     "campaigns": "活动",
     "users": "用户",
-    "divisions": "部门"
+    "divisions": "部门",
+    "settings": "设置"
   },
   "chats": {
     "edited": "已编辑",
@@ -1887,5 +1888,57 @@
     "settings.saveFailed": "无法保存设置。",
     "slaMinutes": "首次响应目标（分钟）",
     "slaMinutesHint": "0 表示关闭 SLA。计时从无人回复的客户消息开始，在首次人工回复时停止。"
+  },
+  "settings": {
+    "title": "设置",
+    "subtitle": "ALIM Core 连接、SSO 交接、审批与重试——集中在一个页面。",
+    "reload": "重新加载",
+    "save": "保存",
+    "saving": "正在保存…",
+    "loading": "正在加载设置…",
+    "none": "没有需要保存的更改。",
+    "saved": "已保存。重新启动应用后生效。",
+    "statusTitle": "集成状态",
+    "ssoReady": "SSO 已就绪",
+    "ssoNotReady": "SSO 未就绪",
+    "ssoHint": "必须填写 http 模式、两个 URL 和 SSO 密钥。",
+    "approvalReady": "审批已就绪",
+    "approvalNotReady": "审批未就绪",
+    "approvalHint": "必须填写 http 模式、Core 地址和审批密钥。",
+    "pendingTitle": "有已保存的值尚未被当前运行的进程使用。请先保存其他更改——重新启动会一次性全部应用。",
+    "applyRestart": "应用并重启",
+    "restartSent": "应用正在重启，此页面会自动重新连接。",
+    "restartUnknown": "重启请求未得到确认。请检查应用状态。",
+    "secretSet": "已设置",
+    "secretUnset": "未设置",
+    "fromEnv": "来自 .env / 主机",
+    "pendingRestart": "等待重启",
+    "optional": "可选",
+    "secretKeep": "已保存——留空即可保留",
+    "secretEmpty": "尚未设置",
+    "loadFailed": "无法加载设置。",
+    "saveFailed": "保存失败。",
+    "sections": {
+      "core": {
+        "title": "ALIM Core 连接",
+        "hint": "Core 地址、浏览器 origin 与交换的密钥。此处的密钥必须与 Core 持有的值一致。"
+      },
+      "sso": {
+        "title": "SSO 交接",
+        "hint": "从 ALIM Core 内打开 WhatsApp 时交换一次性代码。"
+      },
+      "approval": {
+        "title": "审批",
+        "hint": "向 Core 发送许可决定的契约。"
+      },
+      "ingest": {
+        "title": "传入请求",
+        "hint": "Core 向 Connect 发送请求时必须携带的凭证。"
+      },
+      "retry": {
+        "title": "重试",
+        "hint": "未能发送的决定如何再次尝试。"
+      }
+    }
   }
 }

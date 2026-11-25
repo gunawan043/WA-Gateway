@@ -76,6 +76,13 @@ const FOCUS_CUES: [string, string[]][] = [
   ],
   ['pages/Inbox.css', ['.inbox-page .inbox-search:focus-within']],
   [
+    'pages/Settings.css',
+    [
+      '.settings-page .settings-field input:focus-visible',
+      '.settings-page .settings-field select:focus-visible',
+    ],
+  ],
+  [
     'pages/Infrastructure.css',
     [
       '.infrastructure-page .radio-option:has(input:focus-visible)',

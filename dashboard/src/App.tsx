@@ -32,6 +32,7 @@ const MessageTester = lazy(() => import('./pages/MessageTester').then(m => ({ de
 const NumberChecker = lazy(() => import('./pages/NumberChecker').then(m => ({ default: m.NumberChecker })));
 const Infrastructure = lazy(() => import('./pages/Infrastructure').then(m => ({ default: m.Infrastructure })));
 const Plugins = lazy(() => import('./pages/Plugins'));
+const Settings = lazy(() => import('./pages/Settings').then(m => ({ default: m.Settings })));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -186,6 +187,7 @@ function AppContent() {
                 <Route path="message-tester" element={<MessageTester />} />
                 {role === 'admin' && !scoped && <Route path="infrastructure" element={<Infrastructure />} />}
                 {role === 'admin' && !scoped && <Route path="plugins" element={<Plugins />} />}
+                {role === 'admin' && !scoped && <Route path="settings" element={<Settings />} />}
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Route>
             </Routes>

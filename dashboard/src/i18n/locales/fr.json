@@ -78,7 +78,8 @@
     "pipeline": "Pipeline",
     "campaigns": "Campaigns",
     "users": "Utilisateurs",
-    "divisions": "Divisions"
+    "divisions": "Divisions",
+    "settings": "Settings"
   },
   "chats": {
     "edited": "Modifié",
@@ -1896,5 +1897,57 @@
     "settings.saveFailed": "Impossible d'enregistrer les réglages.",
     "slaMinutes": "Objectif de première réponse (minutes)",
     "slaMinutesHint": "0 désactive le SLA. Le compteur démarre sur un message sans réponse et s’arrête à la première réponse humaine."
+  },
+  "settings": {
+    "title": "Settings",
+    "subtitle": "The ALIM Core connection, SSO handoff, approval and retries — on one page.",
+    "reload": "Reload",
+    "save": "Save",
+    "saving": "Saving…",
+    "loading": "Loading settings…",
+    "none": "There is nothing to save.",
+    "saved": "Saved. The values apply after the application restarts.",
+    "statusTitle": "Integration status",
+    "ssoReady": "SSO ready",
+    "ssoNotReady": "SSO not ready",
+    "ssoHint": "Mode http, both URLs and the SSO key must be filled in.",
+    "approvalReady": "Approval ready",
+    "approvalNotReady": "Approval not ready",
+    "approvalHint": "Mode http, the Core address and the approval key must be filled in.",
+    "pendingTitle": "A stored value is not in use by the running process yet. Save any other changes first — a restart applies them all at once.",
+    "applyRestart": "Apply & restart",
+    "restartSent": "The application is restarting. This page reconnects by itself.",
+    "restartUnknown": "The restart request was not confirmed. Check the application status.",
+    "secretSet": "set",
+    "secretUnset": "not set",
+    "fromEnv": "from .env / host",
+    "pendingRestart": "waiting for restart",
+    "optional": "optional",
+    "secretKeep": "Stored — leave empty to keep",
+    "secretEmpty": "Not set yet",
+    "loadFailed": "Settings could not be loaded.",
+    "saveFailed": "Saving failed.",
+    "sections": {
+      "core": {
+        "title": "Koneksi ALIM Core",
+        "hint": "Alamat Core, origin browser, dan kunci yang dipertukarkan. Kunci di sini harus sama dengan nilai yang dipegang Core."
+      },
+      "sso": {
+        "title": "SSO handoff",
+        "hint": "Pertukaran kode sekali pakai saat WhatsApp dibuka dari dalam ALIM Core."
+      },
+      "approval": {
+        "title": "Persetujuan (approval)",
+        "hint": "Kontrak pengiriman keputusan izin ke Core."
+      },
+      "ingest": {
+        "title": "Permintaan masuk",
+        "hint": "Bukti yang harus dibawa Core saat mengirim permohonan ke Connect."
+      },
+      "retry": {
+        "title": "Percobaan ulang",
+        "hint": "Bagaimana keputusan yang gagal dikirim dicoba lagi."
+      }
+    }
   }
 }

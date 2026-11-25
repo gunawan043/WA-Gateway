@@ -13,6 +13,7 @@ import {
   Send,
   Server,
   Puzzle,
+  SlidersHorizontal,
   Sun,
   Moon,
   Monitor,
@@ -70,6 +71,8 @@ const allNavItems = [
   // Backend /infra/* is ADMIN-only; hide the nav item from non-admins (UX + defense-in-depth).
   { to: '/infrastructure', icon: Server, key: 'infrastructure' as const, adminOnly: true, unscopedOnly: true },
   { to: '/plugins', icon: Puzzle, key: 'plugins' as const, adminOnly: true, unscopedOnly: true },
+  // Deployment-wide connection settings: ADMIN-only and refused to a session-scoped key, like /infra.
+  { to: '/settings', icon: SlidersHorizontal, key: 'settings' as const, adminOnly: true, unscopedOnly: true },
   // Backend /audit is ADMIN-only too.
   { to: '/logs', icon: FileText, key: 'logs' as const, adminOnly: true },
 ];

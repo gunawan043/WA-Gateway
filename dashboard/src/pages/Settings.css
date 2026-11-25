@@ -1,0 +1,197 @@
+.settings-page {
+  padding: 2rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.settings-page .page-header {
+  margin-bottom: 2rem;
+}
+
+.settings-page .settings-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.settings-page .settings-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  border-radius: 12px;
+  border: 1px solid var(--control-border);
+  background: var(--bg-white);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.settings-page .settings-banner--warn {
+  border-color: var(--warning);
+  color: var(--text-primary);
+}
+
+.settings-page .settings-banner svg {
+  flex-shrink: 0;
+  margin-block-start: 2px;
+}
+
+.settings-page .settings-banner__actions {
+  margin-inline-start: auto;
+  flex-shrink: 0;
+}
+
+.settings-page .settings-card {
+  background: var(--bg-white);
+  border-radius: 12px;
+  border: 1px solid var(--control-border);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.settings-page .settings-card__head {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  border-block-end: 1px solid var(--control-border);
+  background: var(--bg-light);
+}
+
+.settings-page .settings-card__head h2 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.settings-page .settings-card__body {
+  display: grid;
+  gap: 1.25rem;
+  padding: 1.25rem;
+}
+
+.settings-page .settings-field {
+  display: grid;
+  gap: 0.375rem;
+}
+
+.settings-page .settings-field__label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.settings-page .settings-field__code {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.7rem;
+  font-weight: 400;
+  color: var(--text-secondary);
+}
+
+.settings-page .settings-field input,
+.settings-page .settings-field select {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.55rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid var(--control-border);
+  background-color: var(--bg-white);
+  color: var(--text-primary);
+  font-size: 0.875rem;
+}
+
+.settings-page .settings-field input:focus-visible,
+.settings-page .settings-field select:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
+.settings-page .settings-field__help {
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.settings-page .settings-field__error {
+  font-size: 0.75rem;
+  color: var(--error-text);
+}
+
+.settings-page .settings-field__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+}
+
+.settings-page .settings-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid var(--control-border);
+  font-size: 0.68rem;
+  font-weight: 600;
+}
+
+.settings-page .settings-chip--set {
+  border-color: var(--success);
+  color: var(--success);
+}
+
+.settings-page .settings-chip--pending {
+  border-color: var(--warning);
+  color: var(--warning);
+}
+
+.settings-page .settings-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.settings-page .settings-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.55rem 1rem;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: var(--bg-white);
+  border-color: var(--primary);
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.settings-page .settings-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.settings-page .settings-button--ghost {
+  background: transparent;
+  border-color: var(--control-border);
+  color: var(--text-primary);
+}
+
+.settings-page .settings-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  font-size: 0.85rem;
+}
+
+.settings-page .settings-summary__item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}

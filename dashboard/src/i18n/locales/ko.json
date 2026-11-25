@@ -76,7 +76,8 @@
     "pipeline": "파이프라인",
     "campaigns": "캠페인",
     "users": "사용자",
-    "divisions": "부서"
+    "divisions": "부서",
+    "settings": "설정"
   },
   "chats": {
     "edited": "수정됨",
@@ -1887,5 +1888,57 @@
     "settings.saveFailed": "설정을 저장하지 못했습니다.",
     "slaMinutes": "첫 응답 목표(분)",
     "slaMinutesHint": "0이면 SLA를 사용하지 않습니다. 답장이 없는 고객 메시지에서 시작해 첫 사람 답장에서 멈춥니다."
+  },
+  "settings": {
+    "title": "설정",
+    "subtitle": "ALIM Core 연결, SSO 핸드오프, 승인, 재시도를 한 페이지에서.",
+    "reload": "다시 불러오기",
+    "save": "저장",
+    "saving": "저장 중…",
+    "loading": "설정을 불러오는 중…",
+    "none": "저장할 변경 사항이 없습니다.",
+    "saved": "저장되었습니다. 애플리케이션을 다시 시작한 뒤 값이 적용됩니다.",
+    "statusTitle": "연동 상태",
+    "ssoReady": "SSO 준비됨",
+    "ssoNotReady": "SSO 준비되지 않음",
+    "ssoHint": "모드 http, 두 URL, SSO 키를 모두 채워야 합니다.",
+    "approvalReady": "승인 준비됨",
+    "approvalNotReady": "승인 준비되지 않음",
+    "approvalHint": "모드 http, Core 주소, 승인 키를 모두 채워야 합니다.",
+    "pendingTitle": "저장된 값이 아직 실행 중인 프로세스에 적용되지 않았습니다. 다른 변경 사항을 먼저 저장하세요 — 다시 시작하면 한 번에 모두 적용됩니다.",
+    "applyRestart": "적용 후 다시 시작",
+    "restartSent": "애플리케이션을 다시 시작하는 중입니다. 이 페이지는 자동으로 다시 연결됩니다.",
+    "restartUnknown": "다시 시작 요청이 확인되지 않았습니다. 애플리케이션 상태를 확인하세요.",
+    "secretSet": "설정됨",
+    "secretUnset": "설정 안 됨",
+    "fromEnv": ".env / 호스트에서",
+    "pendingRestart": "다시 시작 대기 중",
+    "optional": "선택 사항",
+    "secretKeep": "저장됨 — 유지하려면 비워 두세요",
+    "secretEmpty": "아직 설정되지 않음",
+    "loadFailed": "설정을 불러올 수 없습니다.",
+    "saveFailed": "저장에 실패했습니다.",
+    "sections": {
+      "core": {
+        "title": "ALIM Core 연결",
+        "hint": "Core 주소, 브라우저 origin, 교환되는 키. 여기의 키는 Core가 가진 값과 같아야 합니다."
+      },
+      "sso": {
+        "title": "SSO 핸드오프",
+        "hint": "ALIM Core 안에서 WhatsApp을 열 때 일회용 코드를 교환합니다."
+      },
+      "approval": {
+        "title": "승인",
+        "hint": "권한 결정을 Core로 보내는 계약입니다."
+      },
+      "ingest": {
+        "title": "들어오는 요청",
+        "hint": "Core가 Connect로 요청을 보낼 때 지녀야 하는 증명입니다."
+      },
+      "retry": {
+        "title": "재시도",
+        "hint": "전송에 실패한 결정을 다시 보내는 방식입니다."
+      }
+    }
   }
 }
